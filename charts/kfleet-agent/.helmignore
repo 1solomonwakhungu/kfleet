@@ -1,0 +1,8 @@
+# Patterns to ignore when packaging
+*.tgz
+*.tar.gz
+.DS_Store
+node_modules/
+.idea/
+.vscode/
+*.db

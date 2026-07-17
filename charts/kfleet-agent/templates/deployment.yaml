@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kfleet-agent.fullname" . }}
+  labels:
+    {{- include "kfleet-agent.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "kfleet-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kfleet-agent.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "kfleet-agent.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: KFLEET_HUB_URL
+              value: {{ required "hub.url is required" .Values.hub.url | quote }}
+            - name: KFLEET_CLUSTER_NAME
+              value: {{ required "cluster.name is required" .Values.cluster.name | quote }}
+            - name: KFLEET_REPORT_INTERVAL
+              value: {{ .Values.reportInterval | quote }}
+            - name: KFLEET_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kfleet-agent.fullname" . }}
+                  key: hub-token
+            {{- if .Values.cluster.labels }}
+            - name: KFLEET_CLUSTER_LABELS
+              value: {{ .Values.cluster.labels | toJson | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

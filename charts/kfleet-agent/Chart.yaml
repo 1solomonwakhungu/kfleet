@@ -1,0 +1,16 @@
+apiVersion: v2
+name: kfleet-agent
+description: kfleet agent daemon for multi-cluster Kubernetes management
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - kubernetes
+  - multi-cluster
+  - fleet
+  - management
+home: https://github.com/1solomonwakhungu/kfleet
+sources:
+  - https://github.com/1solomonwakhungu/kfleet
+maintainers:
+  - name: Solomon Wakhungu
