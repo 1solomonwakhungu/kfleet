@@ -24,3 +24,11 @@ Multi-cluster Kubernetes management platform
 
 Run `make help` to list the available Makefile targets for building, testing,
 linting, tidying, and cleaning the project.
+
+## Releases
+
+Pushing a tag matching `v*` starts the release workflow. GoReleaser builds and
+publishes hub and agent archives, pushes versioned and `latest` container images
+to GHCR, and creates the GitHub release. A dependent job packages the hub and
+agent Helm charts and publishes them to `oci://ghcr.io/1solomonwakhungu/charts`.
+The workflow can also be started manually from the GitHub Actions page.

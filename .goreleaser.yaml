@@ -1,0 +1,87 @@
+version: 2
+
+builds:
+  - id: hub
+    main: ./cmd/hub
+    binary: hub
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+  - id: agent
+    main: ./cmd/agent
+    binary: agent
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: hub
+    ids:
+      - hub
+    formats:
+      - tar.gz
+  - id: agent
+    ids:
+      - agent
+    formats:
+      - tar.gz
+
+dockers:
+  - id: hub
+    ids:
+      - hub
+    dockerfile: Dockerfile.hub
+    image_templates:
+      - ghcr.io/1solomonwakhungu/kfleet-hub:{{ .Tag }}
+      - ghcr.io/1solomonwakhungu/kfleet-hub:latest
+    extra_files:
+      - go.mod
+      - go.sum
+      - cmd
+      - internal
+      - pkg
+  - id: agent
+    ids:
+      - agent
+    dockerfile: Dockerfile.agent
+    image_templates:
+      - ghcr.io/1solomonwakhungu/kfleet-agent:{{ .Tag }}
+      - ghcr.io/1solomonwakhungu/kfleet-agent:latest
+    extra_files:
+      - go.mod
+      - go.sum
+      - cmd
+      - internal
+      - pkg
+
+changelog:
+  use: github
+  groups:
+    - title: Features
+      regexp: '^feat(\([[:word:]-]+\))?!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^fix(\([[:word:]-]+\))?!?:.+$'
+      order: 1
+    - title: Documentation
+      regexp: '^docs(\([[:word:]-]+\))?!?:.+$'
+      order: 2
+    - title: Maintenance
+      regexp: '^(build|chore|ci|perf|refactor|style|test)(\([[:word:]-]+\))?!?:.+$'
+      order: 3
+    - title: Other changes
+      order: 999
