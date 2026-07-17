@@ -71,6 +71,7 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, http.StatusInternalServerError, "failed to register cluster")
 		return
 	}
+	s.broadcast.Broadcast(ClusterUpdate{Type: "registered", Cluster: cluster})
 
 	response := api.RegisterClusterResponse{
 		ClusterID: cluster.ID,
@@ -82,10 +83,15 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
-	err := s.store.DeleteCluster(r.Context(), r.PathValue("id"))
+	cluster, err := s.store.GetCluster(r.Context(), r.PathValue("id"))
 	if handleStoreError(w, err) {
 		return
 	}
+	err = s.store.DeleteCluster(r.Context(), cluster.ID)
+	if handleStoreError(w, err) {
+		return
+	}
+	s.broadcast.Broadcast(ClusterUpdate{Type: "deleted", Cluster: cluster})
 	w.WriteHeader(http.StatusNoContent)
 }
 

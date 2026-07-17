@@ -3,6 +3,7 @@ module github.com/1solomonwakhungu/kfleet
 go 1.23.0
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/google/uuid v1.6.0
 	k8s.io/api v0.32.0
 	k8s.io/apimachinery v0.32.0

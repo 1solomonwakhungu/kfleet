@@ -20,15 +20,17 @@ type Server struct {
 	cfg        *config.Config
 	logger     *slog.Logger
 	store      store.Store
+	broadcast  *BroadcastHub
 	httpServer *http.Server
 }
 
 // New constructs a hub server with its routes configured.
 func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	server := &Server{
-		cfg:    cfg,
-		logger: logger,
-		store:  st,
+		cfg:       cfg,
+		logger:    logger,
+		store:     st,
+		broadcast: NewBroadcastHub(logger),
 	}
 
 	mux := http.NewServeMux()
@@ -44,6 +46,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	server.registerClusterRoutes(mux)
+	mux.HandleFunc("GET /ws/clusters", server.handleWSClusters)
 
 	server.httpServer = &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -56,6 +59,10 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 // Start serves HTTP requests until the context is cancelled or the server
 // returns an error. Cancellation triggers a graceful shutdown.
 func (s *Server) Start(ctx context.Context) error {
+	hubCtx, stopHub := context.WithCancel(ctx)
+	defer stopHub()
+	go s.broadcast.Run(hubCtx)
+
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- s.httpServer.ListenAndServe()
