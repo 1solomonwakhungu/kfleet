@@ -26,6 +26,12 @@ type RegisterClusterResponse struct {
 	Token     string `json:"token"`
 }
 
+// AgentRegistrationStatus describes whether a registered agent is approved.
+type AgentRegistrationStatus struct {
+	ClusterID string `json:"clusterId"`
+	Approved  bool   `json:"approved"`
+}
+
 // ClusterStatusResponse contains cluster metadata and its nodes.
 type ClusterStatusResponse struct {
 	Cluster types.Cluster `json:"cluster"`

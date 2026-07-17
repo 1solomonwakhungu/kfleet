@@ -22,6 +22,71 @@ func (s *Server) registerAgentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/agents/{id}/approve", s.handleAgentApprove)
 	mux.HandleFunc("GET /api/v1/agents/pending", s.handleListPendingAgents)
 	mux.HandleFunc("POST /api/v1/agents/heartbeat", s.handleHeartbeat)
+	mux.HandleFunc("POST /api/v1/agents/{id}/heartbeat", s.handleAgentLiveness)
+	mux.HandleFunc("POST /api/v1/agents/{id}/deregister", s.handleAgentDeregister)
+}
+
+func (s *Server) handleAgentLiveness(w http.ResponseWriter, r *http.Request) {
+	cluster, approved, ok := s.authenticateAgentPath(w, r)
+	if !ok {
+		return
+	}
+	if err := s.store.UpdateHealth(r.Context(), cluster.ID, cluster.Health, time.Now().UTC()); err != nil {
+		handleHeartbeatStoreError(w, err)
+		return
+	}
+	if err := api.WriteJSON(w, http.StatusOK, api.AgentRegistrationStatus{
+		ClusterID: cluster.ID,
+		Approved:  approved,
+	}); err != nil {
+		s.logger.Error("failed to write agent heartbeat response", "error", err)
+	}
+}
+
+func (s *Server) handleAgentDeregister(w http.ResponseWriter, r *http.Request) {
+	cluster, _, ok := s.authenticateAgentPath(w, r)
+	if !ok {
+		return
+	}
+	now := time.Now().UTC()
+	if err := s.store.UpdateHealth(r.Context(), cluster.ID, types.HealthUnreachable, now); err != nil {
+		handleHeartbeatStoreError(w, err)
+		return
+	}
+	cluster.Health = types.HealthUnreachable
+	cluster.LastHeartbeat = now
+	s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) authenticateAgentPath(w http.ResponseWriter, r *http.Request) (types.Cluster, bool, bool) {
+	cluster, err := s.clusterByIDOrName(r, r.PathValue("id"))
+	if err != nil {
+		api.WriteError(w, http.StatusUnauthorized, "invalid agent token")
+		return types.Cluster{}, false, false
+	}
+	token, ok := bearerToken(r.Header.Get("Authorization"))
+	if !ok {
+		api.WriteError(w, http.StatusUnauthorized, "invalid agent token")
+		return types.Cluster{}, false, false
+	}
+	approved, err := s.store.ValidateAgentToken(r.Context(), cluster.ID, hashToken(token))
+	if err != nil {
+		api.WriteError(w, http.StatusUnauthorized, "invalid agent token")
+		return types.Cluster{}, false, false
+	}
+	return cluster, approved, true
+}
+
+func (s *Server) clusterByIDOrName(r *http.Request, idOrName string) (types.Cluster, error) {
+	cluster, err := s.store.GetCluster(r.Context(), idOrName)
+	if err == nil {
+		return cluster, nil
+	}
+	if !errors.Is(err, store.ErrNotFound) {
+		return types.Cluster{}, err
+	}
+	return s.findClusterByName(r, idOrName)
 }
 
 func generateToken() (raw string, hash string) {
