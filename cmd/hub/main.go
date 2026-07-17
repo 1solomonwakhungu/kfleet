@@ -3,17 +3,27 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/1solomonwakhungu/kfleet/internal/config"
+	kfleetmcp "github.com/1solomonwakhungu/kfleet/internal/mcp"
 	"github.com/1solomonwakhungu/kfleet/internal/server"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		if err := kfleetmcp.RunStdio(); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "kfleet MCP server: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("failed to load configuration", "error", err)
