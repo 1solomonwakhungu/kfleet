@@ -1,3 +1,4 @@
+// Package server provides the kfleet hub HTTP server.
 package server
 
 import (

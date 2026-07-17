@@ -1,3 +1,4 @@
+// Package config loads and validates hub runtime configuration.
 package config
 
 import "os"

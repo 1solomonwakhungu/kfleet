@@ -1,3 +1,4 @@
+// Command hub runs the kfleet hub server.
 package main
 
 import (

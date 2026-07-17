@@ -1,3 +1,4 @@
+// Package store defines persistence for hub state.
 package store
 
 // Store defines the persistence operations used by the hub.

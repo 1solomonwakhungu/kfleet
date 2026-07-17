@@ -1,3 +1,4 @@
+// Package registration communicates with the hub registration API.
 package registration
 
 import (
@@ -75,7 +76,9 @@ func (c *Client) postJSON(ctx context.Context, path, token string, payload, resp
 	if err != nil {
 		return fmt.Errorf("send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		_, _ = io.Copy(io.Discard, resp.Body)

@@ -6,6 +6,7 @@ import "time"
 // ClusterHealth describes the observed health of a managed cluster.
 type ClusterHealth string
 
+// Supported cluster health states.
 const (
 	HealthUnknown     ClusterHealth = "unknown"
 	HealthHealthy     ClusterHealth = "healthy"

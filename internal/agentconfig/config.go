@@ -1,3 +1,4 @@
+// Package agentconfig loads and validates agent runtime configuration.
 package agentconfig
 
 import (

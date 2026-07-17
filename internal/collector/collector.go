@@ -1,3 +1,4 @@
+// Package collector gathers Kubernetes cluster state for agent heartbeats.
 package collector
 
 import (

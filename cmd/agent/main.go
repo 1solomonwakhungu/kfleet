@@ -1,3 +1,4 @@
+// Command agent runs the kfleet agent daemon.
 package main
 
 import (
