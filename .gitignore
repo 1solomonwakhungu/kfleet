@@ -11,6 +11,14 @@ node_modules/
 web/dist/
 web/build/
 
+# Keep empty frontend output directories so Go embeds compile before npm builds.
+!web/dist/
+web/dist/*
+!web/dist/.gitkeep
+!internal/hub/web/dist/
+internal/hub/web/dist/*
+!internal/hub/web/dist/.gitkeep
+
 # Environment and local data
 .env
 *.db

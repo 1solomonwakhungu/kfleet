@@ -1,11 +1,16 @@
 .DEFAULT_GOAL := help
 
-.PHONY: build test lint tidy docker-hub docker-agent clean help
+.PHONY: build web-build test lint tidy docker-hub docker-agent clean help
 
-build:
+build: web-build
 	@mkdir -p bin
 	go build -o bin/hub ./cmd/hub
 	go build -o bin/agent ./cmd/agent
+
+web-build:
+	cd web && npm ci && npm run build
+	rm -rf internal/hub/web/dist
+	cp -R web/dist internal/hub/web/dist
 
 test:
 	go test ./... -race -cover
@@ -28,6 +33,7 @@ clean:
 help:
 	@echo "Available targets:"
 	@echo "  build  Build hub and agent binaries"
+	@echo "  web-build  Build the embedded React application"
 	@echo "  test   Run tests with the race detector and coverage"
 	@echo "  lint   Run golangci-lint"
 	@echo "  tidy   Tidy Go module dependencies"

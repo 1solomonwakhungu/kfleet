@@ -1,0 +1,8 @@
+{
+  "date": "2026-07-17",
+  "framework": "Vite + React + TypeScript + Tailwind",
+  "fontStack": "new frontend; Space Grotesk + IBM Plex Sans + JetBrains Mono",
+  "palette": "Midnight dark OKLCH tokens",
+  "motion": "motion-cut with functional status feedback",
+  "spacing": "4pt scale"
+}

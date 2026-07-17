@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/config"
+	hubweb "github.com/1solomonwakhungu/kfleet/internal/hub/web"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
 )
@@ -41,6 +42,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	server.registerAgentRoutes(mux)
 	server.registerClusterRoutes(mux)
 	mux.HandleFunc("GET /ws/clusters", server.handleWSClusters)
+	mux.Handle("/", hubweb.Handler())
 
 	server.httpServer = &http.Server{
 		Addr:              cfg.ListenAddr,
