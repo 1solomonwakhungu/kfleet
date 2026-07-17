@@ -20,5 +20,9 @@ type Store interface {
 	DeleteCluster(ctx context.Context, id string) error
 	UpdateHealth(ctx context.Context, id string, health types.ClusterHealth, lastHeartbeat time.Time) error
 	UpdateSnapshot(ctx context.Context, id string, nodeCount, podCount int, version string) error
+	IssueAgentToken(ctx context.Context, clusterID, tokenHash string) error
+	ValidateAgentToken(ctx context.Context, clusterID, tokenHash string) (approved bool, err error)
+	ApproveAgent(ctx context.Context, clusterID string) error
+	ListPendingAgents(ctx context.Context) ([]types.Cluster, error)
 	Close() error
 }

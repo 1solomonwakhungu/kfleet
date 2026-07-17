@@ -3,7 +3,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/1solomonwakhungu/kfleet/internal/config"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
+	"github.com/1solomonwakhungu/kfleet/pkg/types"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -38,13 +38,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.HandleFunc("POST /api/v1/agents/register", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"token": "stub-token"})
-	})
-	mux.HandleFunc("POST /api/v1/agents/heartbeat", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
+	server.registerAgentRoutes(mux)
 	server.registerClusterRoutes(mux)
 	mux.HandleFunc("GET /ws/clusters", server.handleWSClusters)
 
@@ -62,6 +56,7 @@ func (s *Server) Start(ctx context.Context) error {
 	hubCtx, stopHub := context.WithCancel(ctx)
 	defer stopHub()
 	go s.broadcast.Run(hubCtx)
+	go s.monitorStaleClusters(hubCtx)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -87,6 +82,46 @@ func (s *Server) Start(ctx context.Context) error {
 			return nil
 		}
 		return err
+	}
+}
+
+func (s *Server) heartbeatInterval() time.Duration {
+	if s.cfg.HeartbeatInterval > 0 {
+		return s.cfg.HeartbeatInterval
+	}
+	return 30 * time.Second
+}
+
+func (s *Server) monitorStaleClusters(ctx context.Context) {
+	ticker := time.NewTicker(s.heartbeatInterval())
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			s.markStaleClusters(ctx, now.UTC())
+		}
+	}
+}
+
+func (s *Server) markStaleClusters(ctx context.Context, now time.Time) {
+	clusters, err := s.store.ListClusters(ctx)
+	if err != nil {
+		s.logger.Error("failed to list clusters for staleness check", "error", err)
+		return
+	}
+	cutoff := now.Add(-3 * s.heartbeatInterval())
+	for _, cluster := range clusters {
+		if cluster.LastHeartbeat.IsZero() || !cluster.LastHeartbeat.Before(cutoff) || cluster.Health == types.HealthUnreachable {
+			continue
+		}
+		if err := s.store.UpdateHealth(ctx, cluster.ID, types.HealthUnreachable, cluster.LastHeartbeat); err != nil {
+			s.logger.Error("failed to mark cluster unreachable", "cluster_id", cluster.ID, "error", err)
+			continue
+		}
+		cluster.Health = types.HealthUnreachable
+		s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
 	}
 }
 

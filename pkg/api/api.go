@@ -13,8 +13,11 @@ const APIVersion = "v1"
 
 // RegisterClusterRequest is sent when an agent registers a cluster.
 type RegisterClusterRequest struct {
-	Name   string            `json:"name"`
-	Labels map[string]string `json:"labels"`
+	Name         string            `json:"name"`
+	ClusterName  string            `json:"clusterName,omitempty"`
+	Labels       map[string]string `json:"labels"`
+	AgentVersion string            `json:"agentVersion,omitempty"`
+	K8sVersion   string            `json:"k8sVersion,omitempty"`
 }
 
 // RegisterClusterResponse contains the registered cluster identity and token.

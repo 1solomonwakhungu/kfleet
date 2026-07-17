@@ -85,3 +85,78 @@ func TestSQLiteStoreClusterLifecycle(t *testing.T) {
 		t.Fatalf("GetCluster() after delete error = %v, want ErrNotFound", err)
 	}
 }
+
+func TestSQLiteStoreAgentApprovalLifecycle(t *testing.T) {
+	t.Parallel()
+
+	st, err := Open(filepath.Join(t.TempDir(), "kfleet.db"))
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := st.Close(); err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	})
+
+	ctx := context.Background()
+	cluster := types.Cluster{
+		ID:           "cluster-agent",
+		Name:         "agent-cluster",
+		Health:       types.HealthUnknown,
+		RegisteredAt: time.Now().UTC(),
+		Labels:       map[string]string{},
+	}
+	if err := st.CreateCluster(ctx, cluster); err != nil {
+		t.Fatalf("CreateCluster() error = %v", err)
+	}
+	if err := st.IssueAgentToken(ctx, cluster.ID, "hash-one"); err != nil {
+		t.Fatalf("IssueAgentToken() error = %v", err)
+	}
+
+	approved, err := st.ValidateAgentToken(ctx, cluster.ID, "hash-one")
+	if err != nil || approved {
+		t.Fatalf("ValidateAgentToken() = (%v, %v), want (false, nil)", approved, err)
+	}
+	if _, err := st.ValidateAgentToken(ctx, cluster.ID, "wrong-hash"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ValidateAgentToken() wrong hash error = %v, want ErrNotFound", err)
+	}
+
+	pending, err := st.ListPendingAgents(ctx)
+	if err != nil {
+		t.Fatalf("ListPendingAgents() error = %v", err)
+	}
+	if len(pending) != 1 || pending[0].ID != cluster.ID {
+		t.Fatalf("ListPendingAgents() = %#v, want cluster %q", pending, cluster.ID)
+	}
+
+	if err := st.ApproveAgent(ctx, cluster.ID); err != nil {
+		t.Fatalf("ApproveAgent() error = %v", err)
+	}
+	approved, err = st.ValidateAgentToken(ctx, cluster.ID, "hash-one")
+	if err != nil || !approved {
+		t.Fatalf("ValidateAgentToken() = (%v, %v), want (true, nil)", approved, err)
+	}
+	pending, err = st.ListPendingAgents(ctx)
+	if err != nil || len(pending) != 0 {
+		t.Fatalf("ListPendingAgents() after approval = (%#v, %v), want empty", pending, err)
+	}
+
+	if err := st.IssueAgentToken(ctx, cluster.ID, "hash-two"); err != nil {
+		t.Fatalf("IssueAgentToken() rotation error = %v", err)
+	}
+	if _, err := st.ValidateAgentToken(ctx, cluster.ID, "hash-one"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ValidateAgentToken() old token error = %v, want ErrNotFound", err)
+	}
+	approved, err = st.ValidateAgentToken(ctx, cluster.ID, "hash-two")
+	if err != nil || approved {
+		t.Fatalf("ValidateAgentToken() rotated = (%v, %v), want pending", approved, err)
+	}
+
+	if err := st.ApproveAgent(ctx, "missing"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ApproveAgent() missing error = %v, want ErrNotFound", err)
+	}
+	if err := st.IssueAgentToken(ctx, "missing", "hash"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("IssueAgentToken() missing error = %v, want ErrNotFound", err)
+	}
+}

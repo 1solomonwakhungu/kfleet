@@ -25,6 +25,16 @@ CREATE TABLE IF NOT EXISTS clusters (
 	labels TEXT
 )`
 
+const createAgentsTable = `
+CREATE TABLE IF NOT EXISTS agents (
+	cluster_id TEXT PRIMARY KEY,
+	token_hash TEXT NOT NULL,
+	approved INTEGER NOT NULL DEFAULT 0 CHECK (approved IN (0, 1)),
+	issued_at TIMESTAMP NOT NULL,
+	last_heartbeat TIMESTAMP,
+	FOREIGN KEY (cluster_id) REFERENCES clusters(id) ON DELETE CASCADE
+)`
+
 type sqliteStore struct {
 	db *sql.DB
 }
@@ -43,6 +53,10 @@ func Open(dbPath string) (Store, error) {
 	if _, err := db.Exec(createClustersTable); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate sqlite database: %w", err)
+	}
+	if _, err := db.Exec(createAgentsTable); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrate agents table: %w", err)
 	}
 
 	return &sqliteStore{db: db}, nil
@@ -138,7 +152,77 @@ func (s *sqliteStore) UpdateHealth(
 	if err != nil {
 		return fmt.Errorf("update cluster health: %w", err)
 	}
+	if err := requireAffectedRow(result); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `
+		UPDATE agents SET last_heartbeat = ? WHERE cluster_id = ?`, lastHeartbeat, id); err != nil {
+		return fmt.Errorf("update agent heartbeat: %w", err)
+	}
+	return nil
+}
+
+func (s *sqliteStore) IssueAgentToken(ctx context.Context, clusterID, tokenHash string) error {
+	result, err := s.db.ExecContext(ctx, `
+		INSERT INTO agents (cluster_id, token_hash, approved, issued_at, last_heartbeat)
+		SELECT id, ?, 0, ?, NULL FROM clusters WHERE id = ?
+		ON CONFLICT(cluster_id) DO UPDATE SET
+			token_hash = excluded.token_hash,
+			approved = 0,
+			issued_at = excluded.issued_at,
+			last_heartbeat = NULL`, tokenHash, time.Now().UTC(), clusterID)
+	if err != nil {
+		return fmt.Errorf("issue agent token: %w", err)
+	}
 	return requireAffectedRow(result)
+}
+
+func (s *sqliteStore) ValidateAgentToken(ctx context.Context, clusterID, tokenHash string) (bool, error) {
+	var approved int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT approved FROM agents WHERE cluster_id = ? AND token_hash = ?`, clusterID, tokenHash).Scan(&approved)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrNotFound
+	}
+	if err != nil {
+		return false, fmt.Errorf("validate agent token: %w", err)
+	}
+	return approved == 1, nil
+}
+
+func (s *sqliteStore) ApproveAgent(ctx context.Context, clusterID string) error {
+	result, err := s.db.ExecContext(ctx, `UPDATE agents SET approved = 1 WHERE cluster_id = ?`, clusterID)
+	if err != nil {
+		return fmt.Errorf("approve agent: %w", err)
+	}
+	return requireAffectedRow(result)
+}
+
+func (s *sqliteStore) ListPendingAgents(ctx context.Context) ([]types.Cluster, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT c.id, c.name, c.health, c.version, c.node_count, c.pod_count,
+		       c.registered_at, c.last_heartbeat, c.labels
+		FROM clusters c
+		JOIN agents a ON a.cluster_id = c.id
+		WHERE a.approved = 0
+		ORDER BY a.issued_at, c.name`)
+	if err != nil {
+		return nil, fmt.Errorf("list pending agents: %w", err)
+	}
+	defer rows.Close()
+
+	clusters := make([]types.Cluster, 0)
+	for rows.Next() {
+		cluster, err := scanCluster(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan pending agent: %w", err)
+		}
+		clusters = append(clusters, cluster)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list pending agents: %w", err)
+	}
+	return clusters, nil
 }
 
 func (s *sqliteStore) UpdateSnapshot(
