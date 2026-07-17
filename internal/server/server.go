@@ -39,6 +39,10 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ready"))
+	})
 	server.registerAgentRoutes(mux)
 	server.registerClusterRoutes(mux)
 	mux.HandleFunc("GET /ws/clusters", server.handleWSClusters)

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: kfleet-hub
+description: Central hub for kfleet multi-cluster Kubernetes management
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/1solomonwakhungu/kfleet
+sources:
+  - https://github.com/1solomonwakhungu/kfleet
+keywords:
+  - kubernetes
+  - multi-cluster
+  - fleet
+  - management
+maintainers:
+  - name: Solomon Wakhungu
