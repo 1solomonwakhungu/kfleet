@@ -1,0 +1,21 @@
+# Go
+bin/
+dist/
+*.test
+*.out
+coverage.*
+vendor/
+
+# Node
+node_modules/
+web/dist/
+web/build/
+
+# Environment and local data
+.env
+*.db
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
