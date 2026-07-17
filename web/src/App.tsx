@@ -1,15 +1,23 @@
+import { Link, Route, Routes } from 'react-router-dom'
+
+import { Dashboard } from './pages/Dashboard'
+
+function DetailPlaceholder() {
+  return (
+    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <Link to="/" className="inline-flex min-h-11 items-center whitespace-nowrap text-sm font-semibold text-accent">
+        ← Back to clusters
+      </Link>
+      <p className="mt-8 text-muted">Cluster detail is being prepared.</p>
+    </main>
+  )
+}
+
 export function App() {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-7xl items-center px-4 py-16 sm:px-6 lg:px-8">
-      <section>
-        <p className="font-mono text-sm text-muted">kfleet hub</p>
-        <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-foreground">
-          Fleet visibility is coming online.
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-muted">
-          The embedded web application is ready for cluster dashboards and live hub updates.
-        </p>
-      </section>
-    </main>
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/clusters/:id" element={<DetailPlaceholder />} />
+    </Routes>
   )
 }

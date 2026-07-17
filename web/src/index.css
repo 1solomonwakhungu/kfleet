@@ -18,6 +18,15 @@
   --color-accent-ink: oklch(16% 0.02 60);
   --color-danger: oklch(55% 0.18 25);
   --color-danger-ink: oklch(96% 0.008 25);
+  --color-danger-soft: oklch(24% 0.05 25);
+  --color-healthy: oklch(72% 0.16 150);
+  --color-healthy-soft: oklch(24% 0.04 150);
+  --color-degraded: oklch(78% 0.15 85);
+  --color-degraded-soft: oklch(25% 0.04 85);
+  --color-unreachable: oklch(66% 0.2 25);
+  --color-unreachable-soft: oklch(24% 0.05 25);
+  --color-unknown: oklch(66% 0.014 250);
+  --color-unknown-soft: oklch(25% 0.014 250);
   --color-focus: oklch(78% 0.16 80);
   --font-display: 'Space Grotesk', 'IBM Plex Sans', ui-sans-serif, sans-serif;
   --font-body: 'IBM Plex Sans', ui-sans-serif, sans-serif;
