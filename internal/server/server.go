@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/config"
+	"github.com/1solomonwakhungu/kfleet/internal/store"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -18,11 +19,18 @@ const shutdownTimeout = 5 * time.Second
 type Server struct {
 	cfg        *config.Config
 	logger     *slog.Logger
+	store      store.Store
 	httpServer *http.Server
 }
 
 // New constructs a hub server with its routes configured.
-func New(cfg *config.Config, logger *slog.Logger) *Server {
+func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
+	server := &Server{
+		cfg:    cfg,
+		logger: logger,
+		store:  st,
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -35,16 +43,14 @@ func New(cfg *config.Config, logger *slog.Logger) *Server {
 	mux.HandleFunc("POST /api/v1/agents/heartbeat", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
+	server.registerClusterRoutes(mux)
 
-	return &Server{
-		cfg:    cfg,
-		logger: logger,
-		httpServer: &http.Server{
-			Addr:              cfg.ListenAddr,
-			Handler:           mux,
-			ReadHeaderTimeout: 5 * time.Second,
-		},
+	server.httpServer = &http.Server{
+		Addr:              cfg.ListenAddr,
+		Handler:           server.withLogging(mux),
+		ReadHeaderTimeout: 5 * time.Second,
 	}
+	return server
 }
 
 // Start serves HTTP requests until the context is cancelled or the server
@@ -75,4 +81,17 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 		return err
 	}
+}
+
+// withLogging logs the method, path, and duration of every HTTP request.
+func (s *Server) withLogging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		started := time.Now()
+		next.ServeHTTP(w, r)
+		s.logger.Info("http request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"duration", time.Since(started),
+		)
+	})
 }

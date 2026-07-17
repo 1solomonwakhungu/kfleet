@@ -10,6 +10,7 @@ import (
 
 	"github.com/1solomonwakhungu/kfleet/internal/config"
 	"github.com/1solomonwakhungu/kfleet/internal/server"
+	"github.com/1solomonwakhungu/kfleet/internal/store"
 )
 
 func main() {
@@ -23,11 +24,21 @@ func main() {
 		Level: logLevel(cfg.LogLevel),
 	}))
 	slog.SetDefault(logger)
+	st, err := store.Open(cfg.DBPath)
+	if err != nil {
+		logger.Error("failed to open cluster store", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := st.Close(); err != nil {
+			logger.Error("failed to close cluster store", "error", err)
+		}
+	}()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	srv := server.New(cfg, logger)
+	srv := server.New(cfg, logger, st)
 	logger.Info("starting hub server", "address", cfg.ListenAddr)
 	if err := srv.Start(ctx); err != nil {
 		logger.Error("hub server stopped with an error", "error", err)
