@@ -1,8 +1,8 @@
 # Go
 bin/
-hub
-agent
-mcp
+/hub
+/agent
+/mcp
 dist/
 *.test
 *.out
