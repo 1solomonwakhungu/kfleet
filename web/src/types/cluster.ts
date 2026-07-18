@@ -11,3 +11,26 @@ export interface Cluster {
   lastHeartbeat: string
   labels: Record<string, string>
 }
+
+export interface ClusterNode {
+  name: string
+  role: string
+  status: string
+  version: string
+  os: string
+  arch: string
+  capacity: Record<string, string>
+  allocatable: Record<string, string>
+}
+
+export interface ClusterStatus {
+  cluster: Cluster
+  nodes: ClusterNode[]
+}
+
+export type ClusterUpdateType = 'added' | 'updated' | 'deleted'
+
+export interface ClusterUpdate {
+  type: ClusterUpdateType
+  cluster: Cluster
+}

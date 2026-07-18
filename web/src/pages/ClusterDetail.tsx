@@ -50,7 +50,7 @@ export default function ClusterDetail() {
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold">{detail.cluster?.name ?? 'Loading…'}</h1>
         {detail.cluster && <HealthBadge health={detail.cluster.health} />}
-        {detail.cluster && <span className="text-sm text-muted-foreground">k8s {detail.cluster.version || 'unknown'}</span>}
+        {detail.cluster && <span className="text-sm text-muted-foreground">k8s {detail.cluster.k8sVersion || 'unknown'}</span>}
       </div>
 
       {detail.statusError && (
