@@ -1,10 +1,8 @@
-version: "2"
-
 run:
   timeout: 5m
 
 linters:
-  default: none
+  disable-all: true
   enable:
     - errcheck
     - govet
@@ -13,8 +11,5 @@ linters:
     - unused
     - misspell
     - revive
-
-formatters:
-  enable:
     - gofmt
     - goimports
