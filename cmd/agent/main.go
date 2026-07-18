@@ -78,7 +78,6 @@ func run(
 			continue
 		}
 		backoff.Reset()
-		delayBeforeRegister = false
 		if registration.Approved {
 			logger.Info("agent registered", "cluster_id", registration.ClusterID)
 		} else {

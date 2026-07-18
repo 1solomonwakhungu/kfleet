@@ -115,6 +115,6 @@ func (h *BroadcastHub) removeClient(client *wsClient, closeConnection bool) {
 	close(client.send)
 	close(client.closed)
 	if closeConnection && client.conn != nil {
-		_ = client.conn.CloseNow()
+		_ = client.conn.CloseNow() //nolint:errcheck // best-effort close during client removal
 	}
 }

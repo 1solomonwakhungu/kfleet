@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // pure-Go SQLite driver; registers with database/sql for CGO-free builds
 )
 
 const createClustersTable = `
