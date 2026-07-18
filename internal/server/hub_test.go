@@ -55,7 +55,11 @@ func TestBroadcastHubDeliversClusterUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("websocket.Dial() error = %v", err)
 	}
-	defer conn.CloseNow()
+	defer func() {
+		if err := conn.CloseNow(); err != nil {
+			t.Logf("websocket close error: %v", err)
+		}
+	}()
 
 	readCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
