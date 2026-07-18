@@ -115,6 +115,8 @@ func (h *BroadcastHub) removeClient(client *wsClient, closeConnection bool) {
 	close(client.send)
 	close(client.closed)
 	if closeConnection && client.conn != nil {
-		_ = client.conn.CloseNow() //nolint:errcheck // best-effort close during client removal
+		if err := client.conn.CloseNow(); err != nil {
+			h.logger.Debug("websocket close error during client removal", "error", err)
+		}
 	}
 }
