@@ -1,100 +1,238 @@
+import { useMemo, useState } from 'react'
+import { AlertTriangle, RefreshCw, SearchX, ServerOff } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { ClusterCard } from '../components/ClusterCard'
+import { DashboardSkeleton } from '../components/dashboard/DashboardSkeleton'
+import { FleetControls, type FleetSort, type HealthFilter } from '../components/dashboard/FleetControls'
+import { FleetSummary } from '../components/dashboard/FleetSummary'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { useClusters } from '../hooks/useClusters'
-import type { ClusterHealth } from '../types/cluster'
+import type { Cluster, ClusterHealth } from '../types/cluster'
 
-const summaryHealth: ClusterHealth[] = ['healthy', 'degraded', 'unreachable']
+const healthPriority: Record<ClusterHealth, number> = {
+  unreachable: 0,
+  degraded: 1,
+  unknown: 2,
+  healthy: 3,
+}
 
-const summaryClasses: Record<ClusterHealth, string> = {
-  healthy: 'text-healthy',
-  degraded: 'text-degraded',
-  unreachable: 'text-unreachable',
-  unknown: 'text-unknown',
+function compareText(left: string, right: string) {
+  const normalizedLeft = left.toLowerCase()
+  const normalizedRight = right.toLowerCase()
+  if (normalizedLeft < normalizedRight) return -1
+  if (normalizedLeft > normalizedRight) return 1
+  if (left < right) return -1
+  if (left > right) return 1
+  return 0
+}
+
+function compareByName(left: Cluster, right: Cluster) {
+  return compareText(left.name, right.name) || compareText(left.id, right.id)
+}
+
+function heartbeatTimestamp(value: string) {
+  const timestamp = Date.parse(value)
+  return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp
+}
+
+function sortClusters(left: Cluster, right: Cluster, sort: FleetSort) {
+  if (sort === 'health') {
+    return healthPriority[left.health] - healthPriority[right.health] || compareByName(left, right)
+  }
+
+  if (sort === 'heartbeat') {
+    return heartbeatTimestamp(right.lastHeartbeat) - heartbeatTimestamp(left.lastHeartbeat) || compareByName(left, right)
+  }
+
+  return compareByName(left, right)
+}
+
+function matchesSearch(cluster: Cluster, query: string) {
+  if (!query) return true
+
+  const searchableLabels = Object.entries(cluster.labels).flatMap(([key, value]) => [
+    key,
+    value,
+    `${key}=${value}`,
+    `${key}:${value}`,
+  ])
+
+  return [cluster.name, ...searchableLabels].some((value) => value.toLowerCase().includes(query))
 }
 
 export function Dashboard() {
   const navigate = useNavigate()
   const { clusters, loading, error, refresh } = useClusters()
-  const counts = clusters.reduce<Record<ClusterHealth, number>>(
-    (result, cluster) => ({ ...result, [cluster.health]: result[cluster.health] + 1 }),
-    { healthy: 0, degraded: 0, unreachable: 0, unknown: 0 },
-  )
+  const [search, setSearch] = useState('')
+  const [healthFilter, setHealthFilter] = useState<HealthFilter>('all')
+  const [sort, setSort] = useState<FleetSort>('health')
+
+  const visibleClusters = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return clusters
+      .filter((cluster) => healthFilter === 'all' || cluster.health === healthFilter)
+      .filter((cluster) => matchesSearch(cluster, query))
+      .sort((left, right) => sortClusters(left, right, sort))
+  }, [clusters, healthFilter, search, sort])
+
+  const hasActiveControls = search.trim().length > 0 || healthFilter !== 'all' || sort !== 'health'
+  const resetControls = () => {
+    setSearch('')
+    setHealthFilter('all')
+    setSort('health')
+  }
 
   return (
-    <main className="mx-auto min-h-dvh max-w-[100rem] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-      <header className="flex flex-col gap-6 border-b border-border pb-7 lg:flex-row lg:items-end lg:justify-between">
+    <main className="mx-auto min-h-dvh max-w-[100rem] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <header className="flex flex-col gap-5 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <p className="font-mono text-sm text-accent">kfleet hub</p>
+          <p className="text-sm font-semibold text-blue-400">kFLEET hub</p>
           <h1 className="mt-2 min-w-0 font-display text-3xl font-bold tracking-tight [overflow-wrap:anywhere] sm:text-4xl">
-            Cluster fleet
+            Fleet dashboard
           </h1>
-          <p className="mt-2 max-w-2xl text-muted">Health and capacity across every registered Kubernetes cluster.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted sm:text-base">
+            Operational health, capacity, and agent freshness across registered Kubernetes clusters.
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3" aria-label="Fleet health summary">
-          <span className="font-mono text-sm text-muted">
-            <strong className="text-lg text-foreground">{clusters.length}</strong> total
-          </span>
-          {summaryHealth.map((health) => (
-            <span key={health} className="font-mono text-sm capitalize text-muted">
-              <strong className={`text-lg ${summaryClasses[health]}`}>{counts[health]}</strong> {health}
-            </span>
-          ))}
+        <div className="flex items-center gap-3">
+          <p className="hidden whitespace-nowrap font-mono text-xs text-muted lg:block">Auto-refresh · 5s</p>
+          <Button
+            className="bg-blue-600 text-white hover:bg-blue-500 hover:brightness-100 focus-visible:outline-blue-400"
+            onClick={() => void refresh()}
+            disabled={loading}
+          >
+            <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} aria-hidden="true" />
+            {loading ? 'Refreshing…' : 'Refresh fleet'}
+          </Button>
         </div>
       </header>
 
-      {error && (
-        <section className="mt-6 flex flex-col gap-3 rounded-lg bg-danger-soft p-4 text-danger sm:flex-row sm:items-center sm:justify-between" role="alert">
-          <p>Clusters could not be loaded. Check the hub connection and retry.</p>
-          <Button variant="outline" size="sm" onClick={() => void refresh()}>
-            Retry
-          </Button>
-        </section>
-      )}
+      {loading ? (
+        <DashboardSkeleton />
+      ) : (
+        <>
+          <FleetSummary clusters={clusters} />
 
-      <section className="mt-7" aria-busy={loading} aria-live="polite">
-        {loading ? (
-          <DashboardSkeleton />
-        ) : clusters.length === 0 ? (
-          <div className="grid min-h-64 place-items-center rounded-lg bg-surface px-6 text-center">
-            <div>
-              <p className="font-display text-xl font-bold">No clusters registered</p>
-              <p className="mt-2 text-muted">Connect a kfleet agent to begin monitoring a cluster.</p>
+          {error && clusters.length > 0 && (
+            <Card className="mt-5 flex flex-col gap-4 border border-unreachable/40 bg-danger-soft p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
+              <div className="flex min-w-0 items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-unreachable" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground">The latest fleet snapshot could not be loaded.</p>
+                  <p className="mt-1 break-words text-sm text-muted">Showing the last available data. {error.message}</p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="shrink-0 bg-blue-600 text-white hover:bg-blue-500 hover:brightness-100 focus-visible:outline-blue-400"
+                onClick={() => void refresh()}
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                Retry
+              </Button>
+            </Card>
+          )}
+
+          {clusters.length > 0 && (
+            <FleetControls
+              search={search}
+              onSearchChange={setSearch}
+              health={healthFilter}
+              onHealthChange={setHealthFilter}
+              sort={sort}
+              onSortChange={setSort}
+              resultCount={visibleClusters.length}
+              totalCount={clusters.length}
+              hasActiveControls={hasActiveControls}
+              onReset={resetControls}
+            />
+          )}
+
+          <section className="mt-5" aria-labelledby="cluster-inventory-heading">
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <h2 id="cluster-inventory-heading" className="font-display text-lg font-bold tracking-tight">
+                Cluster inventory
+              </h2>
+              {clusters.length > 0 && (
+                <p className="whitespace-nowrap font-mono text-xs text-muted" role="status" aria-live="polite" aria-atomic="true">
+                  {visibleClusters.length} of {clusters.length}
+                </p>
+              )}
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {clusters.map((cluster) => (
-              <ClusterCard
-                key={cluster.id}
-                cluster={cluster}
-                onClick={() => navigate(`/clusters/${encodeURIComponent(cluster.id)}`)}
+
+            {error && clusters.length === 0 ? (
+              <DashboardState
+                icon={AlertTriangle}
+                title="Fleet data is unavailable"
+                description={`The hub did not return a cluster snapshot. ${error.message}`}
+                actionLabel="Retry connection"
+                onAction={() => void refresh()}
+                danger
               />
-            ))}
-          </div>
-        )}
-      </section>
+            ) : clusters.length === 0 ? (
+              <DashboardState
+                icon={ServerOff}
+                title="No clusters registered"
+                description="Connect a kFLEET agent to this hub to begin monitoring its Kubernetes cluster."
+                actionLabel="Check again"
+                onAction={() => void refresh()}
+              />
+            ) : visibleClusters.length === 0 ? (
+              <DashboardState
+                icon={SearchX}
+                title="No clusters match these controls"
+                description="Try a different cluster name or label, or broaden the health filter."
+                actionLabel="Reset controls"
+                onAction={resetControls}
+              />
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {visibleClusters.map((cluster) => (
+                  <ClusterCard
+                    key={cluster.id}
+                    cluster={cluster}
+                    onClick={() => navigate(`/clusters/${encodeURIComponent(cluster.id)}`)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </main>
   )
 }
 
-function DashboardSkeleton() {
+interface DashboardStateProps {
+  icon: typeof ServerOff
+  title: string
+  description: string
+  actionLabel: string
+  onAction: () => void
+  danger?: boolean
+}
+
+function DashboardState({ icon: Icon, title, description, actionLabel, onAction, danger = false }: DashboardStateProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-label="Loading clusters">
-      {Array.from({ length: 8 }, (_, index) => (
-        <Card key={index} className="h-64 animate-pulse p-5">
-          <div className="h-5 w-2/3 rounded bg-elevated" />
-          <div className="mt-8 grid grid-cols-2 gap-5">
-            <div className="h-12 rounded bg-elevated" />
-            <div className="h-12 rounded bg-elevated" />
-            <div className="h-12 rounded bg-elevated" />
-            <div className="h-12 rounded bg-elevated" />
-          </div>
-          <div className="mt-7 h-4 w-3/4 rounded bg-elevated" />
-        </Card>
-      ))}
-    </div>
+    <Card className="grid min-h-72 place-items-center border border-dashed border-border px-6 py-12 text-center">
+      <div className="max-w-lg">
+        <span className={danger
+          ? 'mx-auto grid h-12 w-12 place-items-center rounded-lg border border-unreachable/40 bg-danger-soft text-unreachable'
+          : 'mx-auto grid h-12 w-12 place-items-center rounded-lg border border-border bg-elevated text-blue-400'}>
+          <Icon className="h-6 w-6" aria-hidden="true" />
+        </span>
+        <h3 className="mt-5 font-display text-xl font-bold tracking-tight">{title}</h3>
+        <p className="mt-2 break-words text-sm leading-6 text-muted">{description}</p>
+        <Button
+          className="mt-5 bg-blue-600 text-white hover:bg-blue-500 hover:brightness-100 focus-visible:outline-blue-400"
+          onClick={onAction}
+        >
+          {actionLabel === 'Reset controls' ? null : <RefreshCw className="h-4 w-4" aria-hidden="true" />}
+          {actionLabel}
+        </Button>
+      </div>
+    </Card>
   )
 }
