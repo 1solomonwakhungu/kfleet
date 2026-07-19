@@ -28,7 +28,13 @@ export interface ClusterStatus {
   nodes: ClusterNode[]
 }
 
-export type ClusterUpdateType = 'added' | 'updated' | 'deleted'
+export type ClusterUpdateType =
+  | 'registered'
+  | 'health_changed'
+  | 'snapshot'
+  | 'deleted'
+  | 'added'
+  | 'updated'
 
 export interface ClusterUpdate {
   type: ClusterUpdateType

@@ -13,6 +13,17 @@ function idle<T>(initial: T): ResourceState<T> {
   return { data: initial, loading: true, error: null };
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === 'AbortError'
+    : error instanceof Error && error.name === 'AbortError';
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof ApiError || error instanceof Error) return error.message;
+  return 'Request failed';
+}
+
 export function useClusterDetail(clusterId: string | undefined) {
   const [cluster, setCluster] = useState<Cluster | null>(null);
   const [nodes, setNodes] = useState<ClusterNode[]>([]);
@@ -27,19 +38,27 @@ export function useClusterDetail(clusterId: string | undefined) {
 
   const load = useCallback(
     async (signal: AbortSignal) => {
-      if (!clusterId) return;
+      if (!clusterId) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
+      setStatusError(null);
 
       try {
         const status = await api.getClusterStatus(clusterId, signal);
+        if (signal.aborted) return;
         setCluster(status.cluster);
         setNodes(status.nodes);
         setStatusError(null);
       } catch (err) {
-        if (err instanceof ApiError) setStatusError(err.message);
+        if (signal.aborted) return;
+        if (!isAbortError(err)) setStatusError(errorMessage(err));
       } finally {
-        setLoading(false);
+        if (!signal.aborted) setLoading(false);
       }
+
+      if (signal.aborted) return;
 
       async function fetchResource<T>(
         fn: (id: string, ns: string | undefined, signal: AbortSignal) => Promise<T>,
@@ -49,11 +68,11 @@ export function useClusterDetail(clusterId: string | undefined) {
         set({ data: fallback, loading: true, error: null });
         try {
           const data = await fn(clusterId as string, namespace, signal);
+          if (signal.aborted) return;
           set({ data, loading: false, error: null });
         } catch (err) {
-          if (err instanceof ApiError) {
-            set({ data: fallback, loading: false, error: err.message });
-          }
+          if (signal.aborted) return;
+          set({ data: fallback, loading: false, error: isAbortError(err) ? null : errorMessage(err) });
         }
       }
 
@@ -64,9 +83,10 @@ export function useClusterDetail(clusterId: string | undefined) {
         fetchResource(api.getEvents, setEvents, []),
       ]);
 
+      if (signal.aborted) return;
       try {
         const ns = await api.getNamespaces(clusterId, signal);
-        setNamespaces(ns);
+        if (!signal.aborted) setNamespaces(ns);
       } catch {
         // Endpoint may not exist yet; namespaces are derived from pods below instead.
       }

@@ -26,22 +26,33 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     signal,
   });
 
-  if (!res.ok) {
-    let body: unknown;
+  const text = await res.text();
+  let body: unknown;
+  if (text) {
     try {
-      body = await res.json();
+      body = JSON.parse(text) as unknown;
     } catch {
-      body = await res.text().catch(() => undefined);
+      if (res.ok) {
+        throw new ApiError(res.status, 'response was not valid JSON', text);
+      }
+      body = text;
     }
-    const message = isErrorBody(body) ? body.error : `request failed with status ${res.status}`;
+  }
+
+  if (!res.ok) {
+    const message = isErrorBody(body)
+      ? body.error
+      : typeof body === 'string'
+        ? body
+        : `request failed with status ${res.status}`;
     throw new ApiError(res.status, message, body);
   }
 
-  if (res.status === 204) {
+  if (body === undefined) {
     return undefined as T;
   }
 
-  return (await res.json()) as T;
+  return body as T;
 }
 
 function qs(params: Record<string, string | undefined>): string {
@@ -50,23 +61,27 @@ function qs(params: Record<string, string | undefined>): string {
   return `?${new URLSearchParams(entries).toString()}`;
 }
 
+function clusterPath(id: string, suffix = ''): string {
+  return `/clusters/${encodeURIComponent(id)}${suffix}`;
+}
+
 export const api = {
   // Backed by GET /api/v1/clusters (internal/server/handlers_clusters.go).
   listClusters: (signal?: AbortSignal) => get<{ clusters: Cluster[] }>('/clusters', signal).then((r) => r.clusters),
   // Backed by GET /api/v1/clusters/{id}.
-  getCluster: (id: string, signal?: AbortSignal) => get<Cluster>(`/clusters/${id}`, signal),
+  getCluster: (id: string, signal?: AbortSignal) => get<Cluster>(clusterPath(id), signal),
   // Backed by GET /api/v1/clusters/{id}/status.
-  getClusterStatus: (id: string, signal?: AbortSignal) => get<ClusterStatus>(`/clusters/${id}/status`, signal),
+  getClusterStatus: (id: string, signal?: AbortSignal) => get<ClusterStatus>(clusterPath(id, '/status'), signal),
   // Backed by GET /api/v1/clusters/{id}/events (currently a stub that always returns []).
   getEvents: (id: string, ns?: string, signal?: AbortSignal) =>
-    get<EventInfo[]>(`/clusters/${id}/events${qs({ namespace: ns })}`, signal),
+    get<EventInfo[]>(`${clusterPath(id, '/events')}${qs({ namespace: ns })}`, signal),
   // Not implemented server-side yet; follows the same route convention as the
   // handlers above so the UI can slot in once the hub adds these endpoints.
   getPods: (id: string, ns?: string, signal?: AbortSignal) =>
-    get<PodInfo[]>(`/clusters/${id}/pods${qs({ namespace: ns })}`, signal),
+    get<PodInfo[]>(`${clusterPath(id, '/pods')}${qs({ namespace: ns })}`, signal),
   getServices: (id: string, ns?: string, signal?: AbortSignal) =>
-    get<ServiceInfo[]>(`/clusters/${id}/services${qs({ namespace: ns })}`, signal),
+    get<ServiceInfo[]>(`${clusterPath(id, '/services')}${qs({ namespace: ns })}`, signal),
   getDeployments: (id: string, ns?: string, signal?: AbortSignal) =>
-    get<DeploymentInfo[]>(`/clusters/${id}/deployments${qs({ namespace: ns })}`, signal),
-  getNamespaces: (id: string, signal?: AbortSignal) => get<string[]>(`/clusters/${id}/namespaces`, signal),
+    get<DeploymentInfo[]>(`${clusterPath(id, '/deployments')}${qs({ namespace: ns })}`, signal),
+  getNamespaces: (id: string, signal?: AbortSignal) => get<string[]>(clusterPath(id, '/namespaces'), signal),
 };

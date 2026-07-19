@@ -9,6 +9,23 @@ export type WSStatus = 'connecting' | 'open' | 'closed';
 type Listener = (msg: ClusterUpdate) => void;
 type StatusListener = (status: WSStatus) => void;
 
+function isClusterUpdate(value: unknown): value is ClusterUpdate {
+  if (typeof value !== 'object' || value === null) return false;
+  const update = value as { type?: unknown; cluster?: unknown };
+  if (
+    update.type !== 'registered' &&
+    update.type !== 'health_changed' &&
+    update.type !== 'snapshot' &&
+    update.type !== 'deleted' &&
+    update.type !== 'added' &&
+    update.type !== 'updated'
+  ) {
+    return false;
+  }
+  if (typeof update.cluster !== 'object' || update.cluster === null) return false;
+  return typeof (update.cluster as { id?: unknown }).id === 'string';
+}
+
 // Connects to GET /ws/clusters (internal/server/handlers_ws.go). The hub
 // pings at the raw WebSocket protocol level, which browsers answer
 // automatically and never surface to JS, so liveness here is tracked with
@@ -26,6 +43,10 @@ export class WSManager {
   connect(): void {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
     this.manuallyClosed = false;
     this.open();
@@ -46,8 +67,8 @@ export class WSManager {
 
     ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data) as ClusterUpdate;
-        this.listeners.forEach((cb) => cb(msg));
+        const msg: unknown = JSON.parse(event.data);
+        if (isClusterUpdate(msg)) this.listeners.forEach((cb) => cb(msg));
       } catch {
         // ignore malformed frames
       }
