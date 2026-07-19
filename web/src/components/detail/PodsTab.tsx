@@ -1,15 +1,17 @@
 import { useMemo } from 'react';
+import { FileText, RotateCcw } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { PodInfo } from '@/types/resources';
+import { ResourceState, ResourceTablePanel, ResourceTableSkeleton } from './ResourceTabState';
 
 const PHASE_STYLES: Record<string, string> = {
-  Running: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  Pending: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  Failed: 'bg-red-500/15 text-red-400 border-red-500/30',
-  Succeeded: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  Unknown: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
+  Running: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  Pending: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+  Failed: 'border-red-500/30 bg-red-500/10 text-red-300',
+  Succeeded: 'border-sky-500/30 bg-sky-500/10 text-sky-300',
+  Unknown: 'border-zinc-500/30 bg-zinc-500/10 text-zinc-300',
 };
 
 function age(iso: string): string {
@@ -33,49 +35,92 @@ interface PodsTabProps {
 }
 
 export function PodsTab({ pods, loading, error, search, onSelectPod }: PodsTabProps) {
+  const query = search.trim().toLowerCase();
   const filtered = useMemo(
-    () => pods.filter((p) => p.name.toLowerCase().includes(search.toLowerCase())),
-    [pods, search],
+    () =>
+      pods.filter((pod) =>
+        [pod.name, pod.namespace, pod.nodeName, pod.phase].some((value) => value.toLowerCase().includes(query)),
+      ),
+    [pods, query],
   );
 
   if (error) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">Pods are not available for this cluster yet.</p>;
+    return <ResourceState kind="error" title="Unable to load pods" description={error} />;
   }
   if (loading && pods.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">Loading pods…</p>;
+    return <ResourceTableSkeleton label="Loading pods" columns={7} />;
   }
   if (filtered.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">No pods found.</p>;
+    return (
+      <ResourceState
+        kind="empty"
+        title={query ? 'No matching pods' : 'No pods found'}
+        description={
+          query ? `No pod matches “${search.trim()}”. Try a name, namespace, node, or phase.` : 'No pods were returned for this namespace.'
+        }
+      />
+    );
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Namespace</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Ready</TableHead>
-          <TableHead>Restarts</TableHead>
-          <TableHead>Age</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filtered.map((pod) => (
-          <TableRow key={`${pod.namespace}/${pod.name}`} className="cursor-pointer" onClick={() => onSelectPod?.(pod)}>
-            <TableCell className="font-medium">{pod.name}</TableCell>
-            <TableCell>{pod.namespace}</TableCell>
-            <TableCell>
-              <Badge variant="outline" className={cn(PHASE_STYLES[pod.phase] ?? PHASE_STYLES.Unknown)}>
-                {pod.phase}
-              </Badge>
-            </TableCell>
-            <TableCell>{pod.ready ? '1/1' : '0/1'}</TableCell>
-            <TableCell className={cn(pod.restartCount > 5 && 'font-semibold text-red-400')}>{pod.restartCount}</TableCell>
-            <TableCell>{age(pod.startTime)}</TableCell>
+    <ResourceTablePanel label="Pods" count={filtered.length} noun="pod">
+      <Table className="min-w-[920px]">
+        <caption className="sr-only">Pods, their scheduling location, phase, readiness, restarts, and age</caption>
+        <TableHeader className="bg-background">
+          <TableRow>
+            <TableHead scope="col" className="w-[28%]">Name</TableHead>
+            <TableHead scope="col">Namespace</TableHead>
+            <TableHead scope="col">Phase</TableHead>
+            <TableHead scope="col">Ready</TableHead>
+            <TableHead scope="col" className="text-right">Restarts</TableHead>
+            <TableHead scope="col">Node</TableHead>
+            <TableHead scope="col" className="text-right">Age</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {filtered.map((pod) => (
+            <TableRow key={`${pod.namespace}/${pod.name}`} className="hover:bg-blue-500/5">
+              <TableCell>
+                {onSelectPod ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelectPod(pod)}
+                    className="group inline-flex min-h-11 max-w-full items-center gap-2 rounded-sm text-left font-semibold text-blue-300 outline-none hover:text-blue-200 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:text-blue-400"
+                    aria-label={`View logs for pod ${pod.name} in namespace ${pod.namespace}`}
+                  >
+                    <span className="truncate">{pod.name}</span>
+                    <FileText className="h-3.5 w-3.5 shrink-0 opacity-60 group-hover:opacity-100" aria-hidden="true" />
+                  </button>
+                ) : (
+                  <span className="font-semibold text-foreground">{pod.name}</span>
+                )}
+              </TableCell>
+              <TableCell className="text-muted">{pod.namespace}</TableCell>
+              <TableCell>
+                <Badge variant="outline" className={cn('border', PHASE_STYLES[pod.phase] ?? PHASE_STYLES.Unknown)}>
+                  {pod.phase || 'Unknown'}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <span className={cn('inline-flex items-center gap-1.5 font-medium', pod.ready ? 'text-emerald-300' : 'text-amber-300')}>
+                  <span className={cn('h-1.5 w-1.5 rounded-full', pod.ready ? 'bg-emerald-400' : 'bg-amber-400')} aria-hidden="true" />
+                  {pod.ready ? 'Ready' : 'Not ready'}
+                </span>
+              </TableCell>
+              <TableCell className={cn('text-right font-mono tabular-nums', pod.restartCount > 0 && 'text-amber-300')}>
+                <span className="inline-flex items-center gap-1.5">
+                  {pod.restartCount > 0 && <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />}
+                  {pod.restartCount}
+                </span>
+              </TableCell>
+              <TableCell className="max-w-48 truncate font-mono text-xs text-muted" title={pod.nodeName || undefined}>
+                {pod.nodeName || 'Unscheduled'}
+              </TableCell>
+              <TableCell className="text-right font-mono tabular-nums text-muted">{age(pod.startTime)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </ResourceTablePanel>
   );
 }
