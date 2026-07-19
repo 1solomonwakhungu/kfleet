@@ -4,6 +4,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
 )
@@ -36,6 +37,72 @@ type AgentRegistrationStatus struct {
 type ClusterStatusResponse struct {
 	Cluster types.Cluster `json:"cluster"`
 	Nodes   []types.Node  `json:"nodes"`
+}
+
+// ClusterSnapshotRequest is the collector wire format accepted by the hub.
+// It deliberately lives outside internal/agent so the hub does not depend on
+// agent implementation packages.
+type ClusterSnapshotRequest struct {
+	Nodes        []SnapshotNode       `json:"nodes"`
+	Pods         []SnapshotPod        `json:"pods"`
+	Services     []SnapshotService    `json:"services"`
+	Deployments  []SnapshotDeployment `json:"deployments"`
+	Events       []SnapshotEvent      `json:"events"`
+	NodeCount    int                  `json:"nodeCount"`
+	PodCount     int                  `json:"podCount"`
+	K8sVersion   string               `json:"k8sVersion"`
+	CollectedAt  time.Time            `json:"collectedAt"`
+	AgentVersion string               `json:"agentVersion"`
+}
+
+// SnapshotNode is the node shape emitted by the agent collector.
+type SnapshotNode struct {
+	Name           string   `json:"name"`
+	Status         string   `json:"status"`
+	K8sVersion     string   `json:"k8sVersion"`
+	Roles          []string `json:"roles"`
+	CPUCapacity    string   `json:"cpuCapacity"`
+	MemoryCapacity string   `json:"memoryCapacity"`
+}
+
+// SnapshotPod is the pod shape emitted by the agent collector.
+type SnapshotPod struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Phase     string `json:"phase"`
+	Restarts  int32  `json:"restarts"`
+	Node      string `json:"node"`
+}
+
+// SnapshotService is the service shape emitted by the agent collector.
+type SnapshotService struct {
+	Namespace   string   `json:"namespace"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	ClusterIP   string   `json:"clusterIP"`
+	ExternalIPs []string `json:"externalIPs"`
+	Ports       []string `json:"ports"`
+}
+
+// SnapshotDeployment is the deployment shape emitted by the agent collector.
+type SnapshotDeployment struct {
+	Namespace         string `json:"namespace"`
+	Name              string `json:"name"`
+	DesiredReplicas   int32  `json:"desiredReplicas"`
+	ReadyReplicas     int32  `json:"readyReplicas"`
+	AvailableReplicas int32  `json:"availableReplicas"`
+}
+
+// SnapshotEvent is the event shape emitted by the agent collector.
+type SnapshotEvent struct {
+	Namespace      string    `json:"namespace"`
+	Name           string    `json:"name"`
+	Type           string    `json:"type"`
+	Reason         string    `json:"reason"`
+	Message        string    `json:"message"`
+	InvolvedObject string    `json:"involvedObject"`
+	Count          int32     `json:"count"`
+	LastTimestamp  time.Time `json:"lastTimestamp"`
 }
 
 // ListClustersResponse contains all registered clusters.

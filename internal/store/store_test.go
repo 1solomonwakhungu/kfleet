@@ -160,3 +160,116 @@ func TestSQLiteStoreAgentApprovalLifecycle(t *testing.T) {
 		t.Fatalf("IssueAgentToken() missing error = %v, want ErrNotFound", err)
 	}
 }
+
+func TestSQLiteStoreReplaceSnapshot(t *testing.T) {
+	t.Parallel()
+
+	st, err := Open(filepath.Join(t.TempDir(), "kfleet.db"))
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := st.Close(); err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	})
+
+	ctx := context.Background()
+	cluster := types.Cluster{
+		ID:           "snapshot-cluster",
+		Name:         "snapshot",
+		Health:       types.HealthUnknown,
+		RegisteredAt: time.Now().UTC(),
+		Labels:       map[string]string{},
+	}
+	if err := st.CreateCluster(ctx, cluster); err != nil {
+		t.Fatalf("CreateCluster() error = %v", err)
+	}
+	if err := st.IssueAgentToken(ctx, cluster.ID, "token-hash"); err != nil {
+		t.Fatalf("IssueAgentToken() error = %v", err)
+	}
+
+	firstHeartbeat := time.Date(2026, time.July, 19, 12, 0, 0, 0, time.UTC)
+	first := types.ClusterSnapshot{
+		Nodes: []types.Node{
+			{Name: "node-a", Status: "Ready", Ready: true, Roles: []string{"worker"}},
+			{Name: "node-b", Status: "NotReady", Ready: false, Roles: []string{}},
+		},
+		Pods: []types.Pod{
+			{Name: "api", Namespace: "apps", Phase: "Running"},
+			{Name: "dns", Namespace: "kube-system", Phase: "Running"},
+		},
+		Services:    []types.Service{{Name: "api", Namespace: "apps", Type: "ClusterIP"}},
+		Deployments: []types.Deployment{{Name: "api", Namespace: "apps", DesiredReplicas: 2}},
+		Events:      []types.Event{{Namespace: "apps", Reason: "Started", Message: "started"}},
+	}
+	if err := st.ReplaceSnapshot(ctx, cluster.ID, first, "v1.31.1", types.HealthDegraded, firstHeartbeat); err != nil {
+		t.Fatalf("ReplaceSnapshot(first) error = %v", err)
+	}
+	invalid := first
+	invalid.Nodes = []types.Node{
+		{Name: "duplicate", Status: "Ready", Ready: true},
+		{Name: "duplicate", Status: "Ready", Ready: true},
+	}
+	if err := st.ReplaceSnapshot(ctx, cluster.ID, invalid, "invalid", types.HealthHealthy, firstHeartbeat.Add(30*time.Second)); err == nil {
+		t.Fatal("ReplaceSnapshot(invalid) error = nil, want duplicate node error")
+	}
+	unchangedNodes, err := st.ListNodes(ctx, cluster.ID)
+	if err != nil || len(unchangedNodes) != 2 || unchangedNodes[0].Name != "node-a" || unchangedNodes[1].Name != "node-b" {
+		t.Fatalf("ListNodes() after rollback = (%#v, %v), want original nodes", unchangedNodes, err)
+	}
+	unchangedCluster, err := st.GetCluster(ctx, cluster.ID)
+	if err != nil || unchangedCluster.Version != "v1.31.1" || !unchangedCluster.LastHeartbeat.Equal(firstHeartbeat) {
+		t.Fatalf("GetCluster() after rollback = (%#v, %v), want original metadata", unchangedCluster, err)
+	}
+
+	secondHeartbeat := firstHeartbeat.Add(time.Minute)
+	second := types.ClusterSnapshot{
+		Nodes:       []types.Node{{Name: "node-c", Status: "Ready", Ready: true, Roles: []string{}}},
+		Pods:        []types.Pod{{Name: "worker", Namespace: "batch", Phase: "Running"}},
+		Services:    []types.Service{},
+		Deployments: []types.Deployment{},
+		Events:      []types.Event{},
+	}
+	if err := st.ReplaceSnapshot(ctx, cluster.ID, second, "v1.32.0", types.HealthHealthy, secondHeartbeat); err != nil {
+		t.Fatalf("ReplaceSnapshot(second) error = %v", err)
+	}
+
+	gotCluster, err := st.GetCluster(ctx, cluster.ID)
+	if err != nil {
+		t.Fatalf("GetCluster() error = %v", err)
+	}
+	if gotCluster.NodeCount != 1 || gotCluster.PodCount != 1 || gotCluster.Version != "v1.32.0" ||
+		gotCluster.Health != types.HealthHealthy || !gotCluster.LastHeartbeat.Equal(secondHeartbeat) {
+		t.Fatalf("cluster metadata = %#v, want replacement metadata", gotCluster)
+	}
+
+	nodes, err := st.ListNodes(ctx, cluster.ID)
+	if err != nil || len(nodes) != 1 || nodes[0].Name != "node-c" {
+		t.Fatalf("ListNodes() = (%#v, %v), want only node-c", nodes, err)
+	}
+	pods, err := st.ListPods(ctx, cluster.ID, "")
+	if err != nil || len(pods) != 1 || pods[0].Name != "worker" {
+		t.Fatalf("ListPods() = (%#v, %v), want only worker", pods, err)
+	}
+	appsPods, err := st.ListPods(ctx, cluster.ID, "apps")
+	if err != nil || len(appsPods) != 0 {
+		t.Fatalf("ListPods(apps) = (%#v, %v), want empty", appsPods, err)
+	}
+	namespaces, err := st.ListNamespaces(ctx, cluster.ID)
+	if err != nil || !reflect.DeepEqual(namespaces, []string{"batch"}) {
+		t.Fatalf("ListNamespaces() = (%#v, %v), want [batch]", namespaces, err)
+	}
+	services, err := st.ListServices(ctx, cluster.ID, "")
+	if err != nil || len(services) != 0 {
+		t.Fatalf("ListServices() = (%#v, %v), want empty", services, err)
+	}
+	deployments, err := st.ListDeployments(ctx, cluster.ID, "")
+	if err != nil || len(deployments) != 0 {
+		t.Fatalf("ListDeployments() = (%#v, %v), want empty", deployments, err)
+	}
+	events, err := st.ListEvents(ctx, cluster.ID, "")
+	if err != nil || len(events) != 0 {
+		t.Fatalf("ListEvents() = (%#v, %v), want empty", events, err)
+	}
+}

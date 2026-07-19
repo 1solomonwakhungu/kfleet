@@ -59,3 +59,42 @@ type Event struct {
 	Count         int32     `json:"count"`
 	LastTimestamp time.Time `json:"lastTimestamp"`
 }
+
+// ServicePort describes a port exposed by a Kubernetes service.
+type ServicePort struct {
+	Name       string `json:"name"`
+	Port       int32  `json:"port"`
+	TargetPort int32  `json:"targetPort"`
+	Protocol   string `json:"protocol"`
+}
+
+// Service describes a Kubernetes service in a cluster snapshot.
+type Service struct {
+	Name        string        `json:"name"`
+	Namespace   string        `json:"namespace"`
+	Type        string        `json:"type"`
+	ClusterIP   string        `json:"clusterIP"`
+	ExternalIPs []string      `json:"externalIPs"`
+	Ports       []ServicePort `json:"ports"`
+	Age         string        `json:"age"`
+}
+
+// Deployment describes the replica state of a Kubernetes deployment.
+type Deployment struct {
+	Name              string `json:"name"`
+	Namespace         string `json:"namespace"`
+	ReadyReplicas     int32  `json:"readyReplicas"`
+	DesiredReplicas   int32  `json:"desiredReplicas"`
+	UpdatedReplicas   int32  `json:"updatedReplicas"`
+	AvailableReplicas int32  `json:"availableReplicas"`
+	Age               string `json:"age"`
+}
+
+// ClusterSnapshot is the normalized, durable resource state for one cluster.
+type ClusterSnapshot struct {
+	Nodes       []Node
+	Pods        []Pod
+	Services    []Service
+	Deployments []Deployment
+	Events      []Event
+}

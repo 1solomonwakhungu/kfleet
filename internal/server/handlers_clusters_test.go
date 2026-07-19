@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/1solomonwakhungu/kfleet/internal/config"
@@ -78,6 +79,198 @@ func TestRegisterClusterRejectsEmptyName(t *testing.T) {
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusBadRequest)
+	}
+}
+
+func TestClusterSnapshotPostAuthenticationAndApproval(t *testing.T) {
+	tests := []struct {
+		name       string
+		path       func(api.RegisterClusterResponse) string
+		token      func(api.RegisterClusterResponse) string
+		approve    bool
+		wantStatus int
+	}{
+		{
+			name:       "approved by ID",
+			path:       func(reg api.RegisterClusterResponse) string { return "/api/v1/clusters/" + reg.ClusterID + "/status" },
+			token:      func(reg api.RegisterClusterResponse) string { return reg.Token },
+			approve:    true,
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "approved by exact name",
+			path:       func(api.RegisterClusterResponse) string { return "/api/v1/clusters/production/status" },
+			token:      func(reg api.RegisterClusterResponse) string { return reg.Token },
+			approve:    true,
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "pending agent",
+			path:       func(reg api.RegisterClusterResponse) string { return "/api/v1/clusters/" + reg.ClusterID + "/status" },
+			token:      func(reg api.RegisterClusterResponse) string { return reg.Token },
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "invalid token",
+			path:       func(reg api.RegisterClusterResponse) string { return "/api/v1/clusters/" + reg.ClusterID + "/status" },
+			token:      func(api.RegisterClusterResponse) string { return "wrong" },
+			approve:    true,
+			wantStatus: http.StatusUnauthorized,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, registration := registeredAgent(t)
+			if tt.approve {
+				approveAgent(t, server, registration.ClusterID)
+			}
+			response := agentRequest(t, server, http.MethodPost, tt.path(registration), tt.token(registration), snapshotPayload())
+			defer response.Body.Close()
+			if response.StatusCode != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", response.StatusCode, tt.wantStatus)
+			}
+		})
+	}
+
+	server := newTestHTTPServer(t)
+	unknown := agentRequest(t, server, http.MethodPost, "/api/v1/clusters/missing/status", "token", snapshotPayload())
+	defer unknown.Body.Close()
+	if unknown.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown cluster status = %d, want %d", unknown.StatusCode, http.StatusNotFound)
+	}
+}
+
+func TestClusterSnapshotPersistsResourceEndpoints(t *testing.T) {
+	server, registration := registeredAgent(t)
+	approveAgent(t, server, registration.ClusterID)
+
+	posted := agentRequest(t, server, http.MethodPost, "/api/v1/clusters/production/status", registration.Token, snapshotPayload())
+	if posted.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(posted.Body)
+		posted.Body.Close()
+		t.Fatalf("snapshot status = %d, want %d: %s", posted.StatusCode, http.StatusOK, body)
+	}
+	var postedCluster types.Cluster
+	decodeResponse(t, posted, &postedCluster)
+	if postedCluster.NodeCount != 2 || postedCluster.PodCount != 2 || postedCluster.Version != "v1.31.1" || postedCluster.Health != types.HealthDegraded || postedCluster.LastHeartbeat.IsZero() {
+		t.Fatalf("posted cluster = %#v, want degraded snapshot metadata", postedCluster)
+	}
+
+	statusResponse := request(t, server, http.MethodGet, "/api/v1/clusters/"+registration.ClusterID+"/status", "")
+	var status api.ClusterStatusResponse
+	decodeResponse(t, statusResponse, &status)
+	if len(status.Nodes) != 2 || status.Nodes[0].Name != "node-a" || !status.Nodes[0].Ready || status.Nodes[1].Ready {
+		t.Fatalf("status nodes = %#v, want persisted nodes", status.Nodes)
+	}
+
+	assertResourceList(t, server, "/api/v1/clusters/"+registration.ClusterID+"/pods", []types.Pod{}, 2)
+	assertResourceList(t, server, "/api/v1/clusters/"+registration.ClusterID+"/pods?namespace=apps", []types.Pod{}, 1)
+	assertResourceList(t, server, "/api/v1/clusters/"+registration.ClusterID+"/services", []types.Service{}, 2)
+	assertResourceList(t, server, "/api/v1/clusters/"+registration.ClusterID+"/services?namespace=apps", []types.Service{}, 1)
+	assertResourceList(t, server, "/api/v1/clusters/"+registration.ClusterID+"/deployments", []types.Deployment{}, 2)
+	assertResourceList(t, server, "/api/v1/clusters/"+registration.ClusterID+"/deployments?namespace=apps", []types.Deployment{}, 1)
+	assertResourceList(t, server, "/api/v1/clusters/"+registration.ClusterID+"/events", []types.Event{}, 2)
+	assertResourceList(t, server, "/api/v1/clusters/"+registration.ClusterID+"/events?namespace=apps", []types.Event{}, 1)
+
+	namespacesResponse := request(t, server, http.MethodGet, "/api/v1/clusters/"+registration.ClusterID+"/namespaces", "")
+	var namespaces []string
+	decodeResponse(t, namespacesResponse, &namespaces)
+	if got := strings.Join(namespaces, ","); got != "apps,kube-system" {
+		t.Fatalf("namespaces = %q, want apps,kube-system", got)
+	}
+}
+
+func TestClusterResourceEndpointsReturnEmptyArrays(t *testing.T) {
+	server := newTestHTTPServer(t)
+	registered := request(t, server, http.MethodPost, "/api/v1/clusters/register", `{"name":"empty"}`)
+	var registration api.RegisterClusterResponse
+	decodeResponse(t, registered, &registration)
+
+	for _, suffix := range []string{"pods", "services", "deployments", "events", "namespaces"} {
+		response := request(t, server, http.MethodGet, "/api/v1/clusters/"+registration.ClusterID+"/"+suffix, "")
+		body, err := io.ReadAll(response.Body)
+		response.Body.Close()
+		if err != nil {
+			t.Fatalf("read %s response: %v", suffix, err)
+		}
+		if response.StatusCode != http.StatusOK || strings.TrimSpace(string(body)) != "[]" {
+			t.Fatalf("%s response = (%d, %q), want (200, [])", suffix, response.StatusCode, body)
+		}
+	}
+}
+
+func TestClusterSnapshotRejectsMalformedAndOversizedBodies(t *testing.T) {
+	server, registration := registeredAgent(t)
+	approveAgent(t, server, registration.ClusterID)
+	path := "/api/v1/clusters/" + registration.ClusterID + "/status"
+
+	malformed := agentRequest(t, server, http.MethodPost, path, registration.Token, `{"nodes":`)
+	defer malformed.Body.Close()
+	if malformed.StatusCode != http.StatusBadRequest {
+		t.Fatalf("malformed status = %d, want %d", malformed.StatusCode, http.StatusBadRequest)
+	}
+
+	oversized := agentRequest(t, server, http.MethodPost, path, registration.Token, `{"padding":"`+strings.Repeat("x", maxSnapshotBodyBytes)+`"}`)
+	defer oversized.Body.Close()
+	if oversized.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized status = %d, want %d", oversized.StatusCode, http.StatusRequestEntityTooLarge)
+	}
+}
+
+func registeredAgent(t *testing.T) (*httptest.Server, api.RegisterClusterResponse) {
+	t.Helper()
+	server := newTestHTTPServer(t)
+	response := agentRequest(t, server, http.MethodPost, "/api/v1/agents/register", "", `{"name":"production"}`)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("register agent status = %d, want %d", response.StatusCode, http.StatusCreated)
+	}
+	var registration api.RegisterClusterResponse
+	decodeResponse(t, response, &registration)
+	return server, registration
+}
+
+func approveAgent(t *testing.T, server *httptest.Server, clusterID string) {
+	t.Helper()
+	response := agentRequest(t, server, http.MethodPost, "/api/v1/agents/"+clusterID+"/approve", "", "")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("approve status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+}
+
+func snapshotPayload() string {
+	return `{
+		"nodes":[
+			{"name":"node-a","status":"Ready","k8sVersion":"v1.31.1","roles":["control-plane"],"cpuCapacity":"4","memoryCapacity":"8Gi"},
+			{"name":"node-b","status":"NotReady","k8sVersion":"v1.31.1","roles":["worker"],"cpuCapacity":"8","memoryCapacity":"16Gi"}
+		],
+		"pods":[
+			{"namespace":"apps","name":"api","phase":"Running","restarts":2,"node":"node-a"},
+			{"namespace":"kube-system","name":"dns","phase":"Running","restarts":0,"node":"node-b"}
+		],
+		"services":[
+			{"namespace":"apps","name":"api","type":"ClusterIP","clusterIP":"10.0.0.1","externalIPs":[],"ports":["http:80/TCP"]},
+			{"namespace":"kube-system","name":"dns","type":"ClusterIP","clusterIP":"10.0.0.10","externalIPs":[],"ports":["dns:53/UDP"]}
+		],
+		"deployments":[
+			{"namespace":"apps","name":"api","desiredReplicas":3,"readyReplicas":3,"availableReplicas":3},
+			{"namespace":"kube-system","name":"dns","desiredReplicas":2,"readyReplicas":2,"availableReplicas":2}
+		],
+		"events":[
+			{"namespace":"apps","name":"api-started","type":"Normal","reason":"Started","message":"Started container","involvedObject":"Pod/api","count":1,"lastTimestamp":"2026-07-19T12:00:00Z"},
+			{"namespace":"kube-system","name":"dns-failed","type":"Warning","reason":"Unhealthy","message":"Readiness failed","involvedObject":"Pod/dns","count":2,"lastTimestamp":"2026-07-19T12:01:00Z"}
+		],
+		"nodeCount":2,"podCount":2,"k8sVersion":"v1.31.1","collectedAt":"2026-07-19T12:01:00Z","agentVersion":"0.1.0"
+	}`
+}
+
+func assertResourceList[T any](t *testing.T, server *httptest.Server, path string, target []T, want int) {
+	t.Helper()
+	response := request(t, server, http.MethodGet, path, "")
+	decodeResponse(t, response, &target)
+	if len(target) != want {
+		t.Fatalf("GET %s returned %d resources, want %d", path, len(target), want)
 	}
 }
 
