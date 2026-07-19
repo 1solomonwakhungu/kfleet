@@ -1,6 +1,6 @@
-/* Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4 */
-/* Hallmark · genre: atmospheric · macrostructure: Workbench · theme: Midnight · tone: austere technical · anchor hue: 250 · enrichment: none · nav: N9 · footer: none */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;700&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@700&display=swap');
+/* Hallmark · pre-emit critique: P5 H4 E5 S5 R5 V4 */
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench (preserved) · theme: Cobalt Dark · tone: austere technical · anchor hue: 262 · contrast: pass (40–41) · tokens: pass (48) */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -8,47 +8,101 @@
 
 :root {
   color-scheme: dark;
-  --color-paper: oklch(15% 0.012 250);
-  --color-paper-2: oklch(19% 0.014 250);
-  --color-paper-3: oklch(23% 0.016 250);
-  --color-rule: oklch(35% 0.015 250);
-  --color-muted: oklch(72% 0.014 250);
-  --color-ink: oklch(95% 0.008 250);
-  --color-accent: oklch(75% 0.15 60);
-  --color-accent-ink: oklch(16% 0.02 60);
-  --color-danger: oklch(55% 0.18 25);
-  --color-danger-ink: oklch(96% 0.008 25);
-  --color-danger-soft: oklch(24% 0.05 25);
-  --color-healthy: oklch(72% 0.16 150);
-  --color-healthy-soft: oklch(24% 0.04 150);
-  --color-degraded: oklch(78% 0.15 85);
-  --color-degraded-soft: oklch(25% 0.04 85);
-  --color-unreachable: oklch(66% 0.2 25);
-  --color-unreachable-soft: oklch(24% 0.05 25);
-  --color-unknown: oklch(66% 0.014 250);
-  --color-unknown-soft: oklch(25% 0.014 250);
-  --color-focus: oklch(78% 0.16 80);
+
+  /* shadcn/ui semantic color channels (OKLCH). */
+  --background: 0.129 0.042 264.695;
+  --foreground: 0.968 0.007 247.896;
+  --card: 0.182 0.04 265;
+  --card-foreground: 0.968 0.007 247.896;
+  --popover: 0.208 0.042 265.755;
+  --popover-foreground: 0.968 0.007 247.896;
+  --primary: 0.546 0.245 262.881;
+  --primary-foreground: 0.985 0.003 247.858;
+  --secondary: 0.238 0.041 262;
+  --secondary-foreground: 0.929 0.013 255.508;
+  --muted: 0.238 0.041 262;
+  --muted-foreground: 0.704 0.04 256.788;
+  --accent: 0.488 0.243 264.376;
+  --accent-foreground: 0.985 0.003 247.858;
+  --destructive: 0.577 0.245 27.325;
+  --destructive-foreground: 0.971 0.013 17.38;
+  --border: 0.279 0.041 260.031;
+  --input: 0.5 0.044 257.35;
+  --ring: 0.809 0.105 251.813;
+  --radius: 0.625rem;
+
+  /* Supporting interaction colors. */
+  --link: 0.707 0.165 254.624;
+  --selection: 0.488 0.243 264.376;
+  --selection-foreground: 0.985 0.003 247.858;
+  --scrollbar-track: 0.129 0.042 264.695;
+  --scrollbar-thumb: 0.5 0.044 257.35;
+  --scrollbar-thumb-hover: 0.554 0.046 257.417;
+
+  /* Operational states remain distinct from the action palette. */
+  --healthy: 0.765 0.177 163.223;
+  --healthy-soft: 0.213 0.052 166;
+  --degraded: 0.828 0.189 84.429;
+  --degraded-soft: 0.225 0.052 83;
+  --unreachable: 0.712 0.194 13.428;
+  --unreachable-soft: 0.222 0.058 13;
+  --unknown: 0.704 0.04 256.788;
+  --unknown-soft: 0.238 0.041 262;
+  --destructive-text: 0.704 0.191 22.216;
+  --danger-soft: 0.218 0.061 27;
+
+  /* Backward-compatible variables used by the existing application. */
+  --color-paper: oklch(var(--background));
+  --color-paper-2: oklch(var(--card));
+  --color-paper-3: oklch(var(--secondary));
+  --color-rule: oklch(var(--border));
+  --color-muted: oklch(var(--muted-foreground));
+  --color-ink: oklch(var(--foreground));
+  --color-accent: oklch(var(--primary));
+  --color-accent-ink: oklch(var(--primary-foreground));
+  --color-danger: oklch(var(--destructive));
+  --color-danger-ink: oklch(var(--destructive-foreground));
+  --color-danger-soft: oklch(var(--danger-soft));
+  --color-healthy: oklch(var(--healthy));
+  --color-healthy-soft: oklch(var(--healthy-soft));
+  --color-degraded: oklch(var(--degraded));
+  --color-degraded-soft: oklch(var(--degraded-soft));
+  --color-unreachable: oklch(var(--unreachable));
+  --color-unreachable-soft: oklch(var(--unreachable-soft));
+  --color-unknown: oklch(var(--unknown));
+  --color-unknown-soft: oklch(var(--unknown-soft));
+  --color-focus: oklch(var(--ring));
+
   --font-display: 'Space Grotesk', 'IBM Plex Sans', ui-sans-serif, sans-serif;
-  --font-body: 'IBM Plex Sans', ui-sans-serif, sans-serif;
+  --font-body: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
   --space-xs: 0.5rem;
   --space-sm: 0.75rem;
   --space-md: 1rem;
   --space-lg: 1.5rem;
   --space-xl: 2.5rem;
   --space-2xl: 4rem;
+  --space-3xl: 6rem;
+
   --text-sm: 0.8rem;
   --text-base: 1rem;
   --text-md: 1.25rem;
   --text-lg: 1.5625rem;
+
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --dur-micro: 120ms;
   --dur-short: 200ms;
   --dur-long: 400ms;
-  --radius-sm: 0.375rem;
-  --radius-md: 0.625rem;
+
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-md: calc(var(--radius) - 0.125rem);
+  --radius-lg: var(--radius);
+
   font-family: var(--font-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -59,33 +113,106 @@ body {
   min-width: 320px;
   min-height: 100%;
   overflow-x: clip;
-  background: var(--color-paper);
-  color: var(--color-ink);
+  background-color: oklch(var(--background));
+  color: oklch(var(--foreground));
+}
+
+html {
+  scrollbar-gutter: stable;
 }
 
 body {
   margin: 0;
   min-height: 100dvh;
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
+button,
+[role='button'],
+input,
+select,
+textarea {
+  accent-color: oklch(var(--primary));
+}
+
+::placeholder {
+  color: oklch(var(--muted-foreground));
+  opacity: 1;
+}
+
+::selection {
+  background-color: oklch(var(--selection));
+  color: oklch(var(--selection-foreground));
+}
+
 :focus-visible {
-  outline: 2px solid var(--color-focus);
+  outline: 2px solid oklch(var(--ring));
   outline-offset: 2px;
 }
 
+* {
+  scrollbar-color: oklch(var(--scrollbar-thumb)) oklch(var(--scrollbar-track));
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+::-webkit-scrollbar-track {
+  background-color: oklch(var(--scrollbar-track));
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid oklch(var(--scrollbar-track));
+  border-radius: var(--radius);
+  background-color: oklch(var(--scrollbar-thumb));
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(var(--scrollbar-thumb-hover));
+}
+
+@layer utilities {
+  /* Legacy text utilities retain their original readable semantics. */
+  .text-muted {
+    color: oklch(var(--muted-foreground));
+  }
+
+  .text-accent {
+    color: oklch(var(--link));
+  }
+
+  .text-danger,
+  .text-destructive {
+    color: oklch(var(--destructive-text));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {
-    animation-duration: 150ms !important;
+    animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
-    transition-duration: 150ms !important;
+    transition-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
