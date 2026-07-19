@@ -22,7 +22,7 @@ func TestAgentRegistrationApprovalAndHeartbeat(t *testing.T) {
 	httpServer, _, _ := newAgentTestServer(t, 30*time.Second)
 
 	register := agentRequest(t, httpServer, http.MethodPost, "/api/v1/agents/register", "", `{
-		"name":"production","labels":{"region":"us-central1"}
+		"name":"production","labels":{"region":"us-central1"},"agentVersion":"0.1.0","k8sVersion":"v1.32.3"
 	}`)
 	if register.StatusCode != http.StatusCreated {
 		t.Fatalf("register status = %d, want %d", register.StatusCode, http.StatusCreated)
@@ -41,6 +41,9 @@ func TestAgentRegistrationApprovalAndHeartbeat(t *testing.T) {
 	decodeResponse(t, pending, &pendingList)
 	if len(pendingList.Clusters) != 1 || pendingList.Clusters[0].ID != registration.ClusterID {
 		t.Fatalf("pending agents = %#v, want registered agent", pendingList)
+	}
+	if pendingList.Clusters[0].AgentVersion != "0.1.0" || pendingList.Clusters[0].Version != "v1.32.3" {
+		t.Fatalf("pending agent versions = (%q, %q), want reported versions", pendingList.Clusters[0].AgentVersion, pendingList.Clusters[0].Version)
 	}
 
 	heartbeatBody := `{"clusterId":"` + registration.ClusterID + `","nodeCount":3,"healthyNodes":3,"podCount":12,"version":"v1.31.1"}`
@@ -79,6 +82,27 @@ func TestAgentRegistrationApprovalAndHeartbeat(t *testing.T) {
 	missingApprove.Body.Close()
 }
 
+func TestAgentRegistrationRequiresConfiguredBootstrapToken(t *testing.T) {
+	httpServer, _, _ := newAgentTestServerWithConfig(t, &config.Config{
+		ListenAddr:        ":0",
+		RegistrationToken: "bootstrap-token",
+	})
+
+	for _, token := range []string{"", "wrong-token"} {
+		response := agentRequest(t, httpServer, http.MethodPost, "/api/v1/agents/register", token, `{"name":"secured"}`)
+		response.Body.Close()
+		if response.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("registration with token %q status = %d, want %d", token, response.StatusCode, http.StatusUnauthorized)
+		}
+	}
+
+	response := agentRequest(t, httpServer, http.MethodPost, "/api/v1/agents/register", "bootstrap-token", `{"name":"secured"}`)
+	response.Body.Close()
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("registration with bootstrap token status = %d, want %d", response.StatusCode, http.StatusCreated)
+	}
+}
+
 func TestStalenessMarksClusterUnreachable(t *testing.T) {
 	_, srv, st := newAgentTestServer(t, time.Second)
 	ctx := context.Background()
@@ -105,13 +129,17 @@ func TestStalenessMarksClusterUnreachable(t *testing.T) {
 }
 
 func newAgentTestServer(t *testing.T, interval time.Duration) (*httptest.Server, *Server, store.Store) {
+	return newAgentTestServerWithConfig(t, &config.Config{ListenAddr: ":0", HeartbeatInterval: interval})
+}
+
+func newAgentTestServerWithConfig(t *testing.T, cfg *config.Config) (*httptest.Server, *Server, store.Store) {
 	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "kfleet.db"))
 	if err != nil {
 		t.Fatalf("store.Open() error = %v", err)
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	srv := New(&config.Config{ListenAddr: ":0", HeartbeatInterval: interval}, logger, st)
+	srv := New(cfg, logger, st)
 	httpServer := httptest.NewServer(srv.httpServer.Handler)
 	t.Cleanup(func() {
 		httpServer.Close()

@@ -20,6 +20,7 @@ type Config struct {
 	DBPath            string
 	LogLevel          string
 	HeartbeatInterval time.Duration
+	RegistrationToken string
 }
 
 // Load reads hub configuration from the environment, applying defaults where
@@ -39,6 +40,7 @@ func Load() (*Config, error) {
 		DBPath:            envOrDefault("KFLEET_DB_PATH", defaultDBPath),
 		LogLevel:          envOrDefault("KFLEET_LOG_LEVEL", defaultLogLevel),
 		HeartbeatInterval: heartbeatInterval,
+		RegistrationToken: os.Getenv("KFLEET_REGISTRATION_TOKEN"),
 	}, nil
 }
 

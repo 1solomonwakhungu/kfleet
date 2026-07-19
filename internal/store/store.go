@@ -20,7 +20,7 @@ type Store interface {
 	DeleteCluster(ctx context.Context, id string) error
 	UpdateHealth(ctx context.Context, id string, health types.ClusterHealth, lastHeartbeat time.Time) error
 	UpdateSnapshot(ctx context.Context, id string, nodeCount, podCount int, version string) error
-	ReplaceSnapshot(ctx context.Context, id string, snapshot types.ClusterSnapshot, version string, health types.ClusterHealth, lastHeartbeat time.Time) error
+	ReplaceSnapshot(ctx context.Context, id string, snapshot types.ClusterSnapshot, version, agentVersion string, health types.ClusterHealth, lastHeartbeat time.Time) error
 	ListNodes(ctx context.Context, clusterID string) ([]types.Node, error)
 	ListPods(ctx context.Context, clusterID, namespace string) ([]types.Pod, error)
 	ListServices(ctx context.Context, clusterID, namespace string) ([]types.Service, error)

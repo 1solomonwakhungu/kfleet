@@ -153,7 +153,7 @@ func TestClusterSnapshotPersistsResourceEndpoints(t *testing.T) {
 	}
 	var postedCluster types.Cluster
 	decodeResponse(t, posted, &postedCluster)
-	if postedCluster.NodeCount != 2 || postedCluster.PodCount != 2 || postedCluster.Version != "v1.31.1" || postedCluster.Health != types.HealthDegraded || postedCluster.LastHeartbeat.IsZero() {
+	if postedCluster.NodeCount != 2 || postedCluster.PodCount != 2 || postedCluster.Version != "v1.31.1" || postedCluster.AgentVersion != "0.1.0" || postedCluster.Health != types.HealthDegraded || postedCluster.LastHeartbeat.IsZero() {
 		t.Fatalf("posted cluster = %#v, want degraded snapshot metadata", postedCluster)
 	}
 

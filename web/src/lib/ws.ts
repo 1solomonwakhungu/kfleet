@@ -1,4 +1,5 @@
-import type { ClusterUpdate } from '@/types/cluster';
+import { normalizeCluster, type WireCluster } from '@/lib/api';
+import type { ClusterUpdate, ClusterUpdateType } from '@/types/cluster';
 
 const MIN_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30000;
@@ -9,7 +10,12 @@ export type WSStatus = 'connecting' | 'open' | 'closed';
 type Listener = (msg: ClusterUpdate) => void;
 type StatusListener = (status: WSStatus) => void;
 
-function isClusterUpdate(value: unknown): value is ClusterUpdate {
+interface WireClusterUpdate {
+  type: ClusterUpdateType;
+  cluster: WireCluster;
+}
+
+function isClusterUpdate(value: unknown): value is WireClusterUpdate {
   if (typeof value !== 'object' || value === null) return false;
   const update = value as { type?: unknown; cluster?: unknown };
   if (
@@ -68,7 +74,10 @@ export class WSManager {
     ws.onmessage = (event) => {
       try {
         const msg: unknown = JSON.parse(event.data);
-        if (isClusterUpdate(msg)) this.listeners.forEach((cb) => cb(msg));
+        if (isClusterUpdate(msg)) {
+          const update: ClusterUpdate = { ...msg, cluster: normalizeCluster(msg.cluster) };
+          this.listeners.forEach((cb) => cb(update));
+        }
       } catch {
         // ignore malformed frames
       }

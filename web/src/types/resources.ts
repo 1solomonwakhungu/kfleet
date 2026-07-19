@@ -1,7 +1,4 @@
-// PodInfo and EventInfo mirror pkg/types.Pod and pkg/types.Event exactly.
-// ServiceInfo and DeploymentInfo have no backing Go type or handler yet;
-// they follow the same REST convention as the existing cluster routes so
-// the UI can slot in once the hub grows those endpoints.
+// Resource types mirror the persisted snapshot models in pkg/types.
 
 export interface PodInfo {
   name: string;

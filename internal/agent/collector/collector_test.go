@@ -17,6 +17,7 @@ import (
 
 func TestCollect(t *testing.T) {
 	replicas := int32(3)
+	baseTime := time.Now().UTC().Add(-time.Hour)
 	objects := []runtime.Object{
 		&corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{Name: "node-1", Labels: map[string]string{"node-role.kubernetes.io/control-plane": ""}},
@@ -34,11 +35,12 @@ func TestCollect(t *testing.T) {
 			Spec:       corev1.PodSpec{NodeName: "node-1"},
 			Status: corev1.PodStatus{
 				Phase:             corev1.PodRunning,
-				ContainerStatuses: []corev1.ContainerStatus{{RestartCount: 2}},
+				StartTime:         &metav1.Time{Time: baseTime},
+				ContainerStatuses: []corev1.ContainerStatus{{RestartCount: 2, Ready: true}},
 			},
 		},
 		&corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "default", CreationTimestamp: metav1.NewTime(baseTime)},
 			Spec: corev1.ServiceSpec{
 				Type:      corev1.ServiceTypeClusterIP,
 				ClusterIP: "10.0.0.1",
@@ -46,12 +48,11 @@ func TestCollect(t *testing.T) {
 			},
 		},
 		&appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "default", CreationTimestamp: metav1.NewTime(baseTime)},
 			Spec:       appsv1.DeploymentSpec{Replicas: &replicas},
-			Status:     appsv1.DeploymentStatus{ReadyReplicas: 2, AvailableReplicas: 2},
+			Status:     appsv1.DeploymentStatus{ReadyReplicas: 2, UpdatedReplicas: 2, AvailableReplicas: 2},
 		},
 	}
-	baseTime := time.Now().UTC().Add(-time.Hour)
 	for index := range 105 {
 		objects = append(objects, &corev1.Event{
 			ObjectMeta:    metav1.ObjectMeta{Name: fmt.Sprintf("event-%03d", index), Namespace: "default"},
@@ -71,11 +72,14 @@ func TestCollect(t *testing.T) {
 	if state.Nodes[0].Status != "Ready" || len(state.Nodes[0].Roles) != 1 || state.Nodes[0].Roles[0] != "control-plane" {
 		t.Fatalf("node info = %#v", state.Nodes[0])
 	}
-	if state.Pods[0].Restarts != 2 || state.Pods[0].Node != "node-1" {
+	if state.Pods[0].Restarts != 2 || state.Pods[0].Node != "node-1" || !state.Pods[0].Ready || !state.Pods[0].StartTime.Equal(baseTime) {
 		t.Fatalf("pod info = %#v", state.Pods[0])
 	}
 	if len(state.Services) != 1 || len(state.Deployments) != 1 {
 		t.Fatalf("resource counts = services %d, deployments %d", len(state.Services), len(state.Deployments))
+	}
+	if state.Services[0].Age == "" || state.Deployments[0].Age == "" || state.Deployments[0].UpdatedReplicas != 2 {
+		t.Fatalf("resource metadata = service %#v, deployment %#v", state.Services[0], state.Deployments[0])
 	}
 	if len(state.Events) != maxEvents || state.Events[0].Name != "event-104" {
 		t.Fatalf("events = %d, first = %q; want latest 100", len(state.Events), state.Events[0].Name)

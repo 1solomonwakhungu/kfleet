@@ -13,6 +13,7 @@ import (
 
 	"github.com/1solomonwakhungu/kfleet/internal/agent/collector"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
+	"github.com/1solomonwakhungu/kfleet/internal/agent/health"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/registrar"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/reporter"
 )
@@ -45,7 +46,29 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
-	run(ctx, cfg, clusterCollector, agentRegistrar, logger)
+
+	healthErrors := make(chan error, 1)
+	go func() {
+		healthErrors <- health.Serve(ctx, cfg.HealthAddress)
+	}()
+	agentDone := make(chan struct{})
+	go func() {
+		defer close(agentDone)
+		run(ctx, cfg, clusterCollector, agentRegistrar, logger)
+	}()
+
+	select {
+	case err := <-healthErrors:
+		if err != nil {
+			logger.Error("agent health server failed", "error", err)
+			stop()
+		}
+		<-agentDone
+		if err != nil {
+			os.Exit(1)
+		}
+	case <-agentDone:
+	}
 }
 
 func run(

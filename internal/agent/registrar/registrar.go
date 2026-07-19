@@ -23,12 +23,13 @@ const (
 
 // Registrar communicates with the hub's agent lifecycle API.
 type Registrar struct {
-	hubURL       string
-	token        string
-	clusterName  string
-	agentVersion string
-	labels       map[string]string
-	client       *http.Client
+	hubURL            string
+	registrationToken string
+	token             string
+	clusterName       string
+	agentVersion      string
+	labels            map[string]string
+	client            *http.Client
 }
 
 // RegisterRequest is sent to register or re-register an agent.
@@ -48,12 +49,13 @@ type RegisterResponse struct {
 // New constructs a registrar from agent configuration.
 func New(cfg *config.Config, labels map[string]string) *Registrar {
 	return &Registrar{
-		hubURL:       strings.TrimRight(cfg.HubURL, "/"),
-		token:        cfg.HubToken,
-		clusterName:  cfg.ClusterName,
-		agentVersion: agentVersion,
-		labels:       labels,
-		client:       &http.Client{Timeout: requestTimeout},
+		hubURL:            strings.TrimRight(cfg.HubURL, "/"),
+		registrationToken: cfg.HubToken,
+		token:             cfg.HubToken,
+		clusterName:       cfg.ClusterName,
+		agentVersion:      agentVersion,
+		labels:            labels,
+		client:            &http.Client{Timeout: requestTimeout},
 	}
 }
 
@@ -73,7 +75,7 @@ func (r *Registrar) Register(ctx context.Context, k8sVersion string) (*RegisterR
 	if err != nil {
 		return nil, fmt.Errorf("create registration request: %w", err)
 	}
-	r.setHeaders(request, true)
+	r.setHeaders(request, true, r.registrationToken)
 	response, err := r.client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("register agent: %w", err)
@@ -126,7 +128,7 @@ func (r *Registrar) postLifecycle(ctx context.Context, action string) error {
 	if err != nil {
 		return fmt.Errorf("create agent %s request: %w", action, err)
 	}
-	r.setHeaders(request, false)
+	r.setHeaders(request, false, r.token)
 	response, err := r.client.Do(request)
 	if err != nil {
 		return fmt.Errorf("send agent %s: %w", action, err)
@@ -139,9 +141,9 @@ func (r *Registrar) postLifecycle(ctx context.Context, action string) error {
 	return nil
 }
 
-func (r *Registrar) setHeaders(request *http.Request, jsonBody bool) {
+func (r *Registrar) setHeaders(request *http.Request, jsonBody bool, token string) {
 	if jsonBody {
 		request.Header.Set("Content-Type", "application/json")
 	}
-	request.Header.Set("Authorization", "Bearer "+r.token)
+	request.Header.Set("Authorization", "Bearer "+token)
 }

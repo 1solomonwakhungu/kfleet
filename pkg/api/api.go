@@ -67,11 +67,13 @@ type SnapshotNode struct {
 
 // SnapshotPod is the pod shape emitted by the agent collector.
 type SnapshotPod struct {
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	Phase     string `json:"phase"`
-	Restarts  int32  `json:"restarts"`
-	Node      string `json:"node"`
+	Namespace string    `json:"namespace"`
+	Name      string    `json:"name"`
+	Phase     string    `json:"phase"`
+	Restarts  int32     `json:"restarts"`
+	Node      string    `json:"node"`
+	Ready     bool      `json:"ready"`
+	StartTime time.Time `json:"startTime"`
 }
 
 // SnapshotService is the service shape emitted by the agent collector.
@@ -82,6 +84,7 @@ type SnapshotService struct {
 	ClusterIP   string   `json:"clusterIP"`
 	ExternalIPs []string `json:"externalIPs"`
 	Ports       []string `json:"ports"`
+	Age         string   `json:"age"`
 }
 
 // SnapshotDeployment is the deployment shape emitted by the agent collector.
@@ -91,6 +94,8 @@ type SnapshotDeployment struct {
 	DesiredReplicas   int32  `json:"desiredReplicas"`
 	ReadyReplicas     int32  `json:"readyReplicas"`
 	AvailableReplicas int32  `json:"availableReplicas"`
+	UpdatedReplicas   int32  `json:"updatedReplicas"`
+	Age               string `json:"age"`
 }
 
 // SnapshotEvent is the event shape emitted by the agent collector.

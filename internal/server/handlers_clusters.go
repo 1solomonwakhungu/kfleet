@@ -164,7 +164,7 @@ func (s *Server) handleClusterSnapshot(w http.ResponseWriter, r *http.Request) {
 	snapshot := normalizeSnapshot(cluster.ID, request)
 	health := snapshotHealth(snapshot.Nodes)
 	now := time.Now().UTC()
-	if err := s.store.ReplaceSnapshot(r.Context(), cluster.ID, snapshot, request.K8sVersion, health, now); err != nil {
+	if err := s.store.ReplaceSnapshot(r.Context(), cluster.ID, snapshot, request.K8sVersion, request.AgentVersion, health, now); err != nil {
 		s.logger.Error("failed to persist cluster snapshot", "cluster_id", cluster.ID, "error", err)
 		if handleStoreError(w, err) {
 			return
@@ -296,6 +296,8 @@ func normalizeSnapshot(clusterID string, request api.ClusterSnapshotRequest) typ
 			Phase:        pod.Phase,
 			NodeName:     pod.Node,
 			RestartCount: pod.Restarts,
+			Ready:        pod.Ready,
+			StartTime:    pod.StartTime,
 		})
 	}
 	for _, service := range request.Services {
@@ -310,6 +312,7 @@ func normalizeSnapshot(clusterID string, request api.ClusterSnapshotRequest) typ
 			ClusterIP:   service.ClusterIP,
 			ExternalIPs: nonNilSlice(service.ExternalIPs),
 			Ports:       ports,
+			Age:         service.Age,
 		})
 	}
 	for _, deployment := range request.Deployments {
@@ -319,6 +322,8 @@ func normalizeSnapshot(clusterID string, request api.ClusterSnapshotRequest) typ
 			ReadyReplicas:     deployment.ReadyReplicas,
 			DesiredReplicas:   deployment.DesiredReplicas,
 			AvailableReplicas: deployment.AvailableReplicas,
+			UpdatedReplicas:   deployment.UpdatedReplicas,
+			Age:               deployment.Age,
 		})
 	}
 	for _, event := range request.Events {

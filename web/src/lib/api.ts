@@ -65,18 +65,36 @@ function clusterPath(id: string, suffix = ''): string {
   return `/clusters/${encodeURIComponent(id)}${suffix}`;
 }
 
+export interface WireCluster extends Omit<Cluster, 'k8sVersion' | 'agentVersion' | 'registeredAt' | 'labels'> {
+  version?: string;
+  k8sVersion?: string;
+  agentVersion?: string;
+  registeredAt?: string;
+  labels?: Record<string, string> | null;
+}
+
+export function normalizeCluster(cluster: WireCluster): Cluster {
+  return {
+    ...cluster,
+    k8sVersion: cluster.k8sVersion ?? cluster.version ?? '',
+    agentVersion: cluster.agentVersion ?? '',
+    registeredAt: cluster.registeredAt ?? '',
+    labels: cluster.labels ?? {},
+  };
+}
+
 export const api = {
   // Backed by GET /api/v1/clusters (internal/server/handlers_clusters.go).
-  listClusters: (signal?: AbortSignal) => get<{ clusters: Cluster[] }>('/clusters', signal).then((r) => r.clusters),
+  listClusters: (signal?: AbortSignal) => get<{ clusters: WireCluster[] }>('/clusters', signal).then((r) => r.clusters.map(normalizeCluster)),
   // Backed by GET /api/v1/clusters/{id}.
-  getCluster: (id: string, signal?: AbortSignal) => get<Cluster>(clusterPath(id), signal),
+  getCluster: (id: string, signal?: AbortSignal) => get<WireCluster>(clusterPath(id), signal).then(normalizeCluster),
   // Backed by GET /api/v1/clusters/{id}/status.
-  getClusterStatus: (id: string, signal?: AbortSignal) => get<ClusterStatus>(clusterPath(id, '/status'), signal),
-  // Backed by GET /api/v1/clusters/{id}/events (currently a stub that always returns []).
+  getClusterStatus: (id: string, signal?: AbortSignal) =>
+    get<Omit<ClusterStatus, 'cluster'> & { cluster: WireCluster }>(clusterPath(id, '/status'), signal)
+      .then((status) => ({ ...status, cluster: normalizeCluster(status.cluster) })),
+  // Backed by persisted snapshot resource endpoints in handlers_clusters.go.
   getEvents: (id: string, ns?: string, signal?: AbortSignal) =>
     get<EventInfo[]>(`${clusterPath(id, '/events')}${qs({ namespace: ns })}`, signal),
-  // Not implemented server-side yet; follows the same route convention as the
-  // handlers above so the UI can slot in once the hub adds these endpoints.
   getPods: (id: string, ns?: string, signal?: AbortSignal) =>
     get<PodInfo[]>(`${clusterPath(id, '/pods')}${qs({ namespace: ns })}`, signal),
   getServices: (id: string, ns?: string, signal?: AbortSignal) =>

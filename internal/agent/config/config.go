@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-const defaultReportInterval = 30 * time.Second
+const (
+	defaultReportInterval = 30 * time.Second
+	defaultHealthAddress  = ":8081"
+)
 
 // Config contains the agent runtime configuration.
 type Config struct {
@@ -18,6 +21,7 @@ type Config struct {
 	HubToken       string
 	ReportInterval time.Duration
 	Kubeconfig     string
+	HealthAddress  string
 }
 
 // Load reads agent configuration from environment variables.
@@ -49,5 +53,13 @@ func Load() (*Config, error) {
 		HubToken:       os.Getenv("KFLEET_HUB_TOKEN"),
 		ReportInterval: interval,
 		Kubeconfig:     os.Getenv("KUBECONFIG"),
+		HealthAddress:  envOrDefault("KFLEET_HEALTH_ADDR", defaultHealthAddress),
 	}, nil
+}
+
+func envOrDefault(key, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		return value
+	}
+	return fallback
 }

@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -105,6 +106,10 @@ func hashToken(raw string) string {
 }
 
 func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
+	if !s.validRegistrationToken(r.Header.Get("Authorization")) {
+		api.WriteError(w, http.StatusUnauthorized, "invalid registration token")
+		return
+	}
 	var request api.RegisterClusterRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		api.WriteError(w, http.StatusBadRequest, "invalid request body")
@@ -125,6 +130,8 @@ func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
 			ID:           uuid.NewString(),
 			Name:         name,
 			Health:       types.HealthUnknown,
+			Version:      request.K8sVersion,
+			AgentVersion: request.AgentVersion,
 			RegisteredAt: time.Now().UTC(),
 			Labels:       request.Labels,
 		}
@@ -153,9 +160,30 @@ func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
 
 	s.broadcast.Broadcast(ClusterUpdate{Type: "registered", Cluster: cluster})
 	response := api.RegisterClusterResponse{ClusterID: cluster.ID, Token: rawToken}
-	if err := api.WriteJSON(w, http.StatusCreated, response); err != nil {
+	approved, err := s.store.ValidateAgentToken(r.Context(), cluster.ID, tokenHash)
+	if err != nil {
+		s.logger.Error("failed to read agent approval", "cluster_id", cluster.ID, "error", err)
+		api.WriteError(w, http.StatusInternalServerError, "failed to register agent")
+		return
+	}
+	status := http.StatusCreated
+	if approved {
+		status = http.StatusOK
+	}
+	if err := api.WriteJSON(w, status, response); err != nil {
 		s.logger.Error("failed to write agent registration response", "error", err)
 	}
+}
+
+func (s *Server) validRegistrationToken(authorization string) bool {
+	if s.cfg.RegistrationToken == "" {
+		return true
+	}
+	token, ok := bearerToken(authorization)
+	if !ok || len(token) != len(s.cfg.RegistrationToken) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.RegistrationToken)) == 1
 }
 
 func (s *Server) findClusterByName(r *http.Request, name string) (types.Cluster, error) {

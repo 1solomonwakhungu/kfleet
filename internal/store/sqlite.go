@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS clusters (
 	name TEXT UNIQUE NOT NULL,
 	health TEXT NOT NULL,
 	version TEXT,
+	agent_version TEXT NOT NULL DEFAULT '',
 	node_count INTEGER,
 	pod_count INTEGER,
 	registered_at TIMESTAMP,
@@ -145,6 +146,10 @@ func Open(dbPath string) (Store, error) {
 			return nil, fmt.Errorf("migrate %s table: %w", migration.name, err)
 		}
 	}
+	if err := ensureColumn(db, "clusters", "agent_version", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrate clusters agent_version column: %w", err)
+	}
 
 	return &sqliteStore{db: db}, nil
 }
@@ -157,13 +162,14 @@ func (s *sqliteStore) CreateCluster(ctx context.Context, cluster types.Cluster) 
 
 	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO clusters (
-			id, name, health, version, node_count, pod_count,
+			id, name, health, version, agent_version, node_count, pod_count,
 			registered_at, last_heartbeat, labels
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		cluster.ID,
 		cluster.Name,
 		cluster.Health,
 		cluster.Version,
+		cluster.AgentVersion,
 		cluster.NodeCount,
 		cluster.PodCount,
 		cluster.RegisteredAt,
@@ -178,7 +184,7 @@ func (s *sqliteStore) CreateCluster(ctx context.Context, cluster types.Cluster) 
 
 func (s *sqliteStore) GetCluster(ctx context.Context, id string) (types.Cluster, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, name, health, version, node_count, pod_count,
+		SELECT id, name, health, version, agent_version, node_count, pod_count,
 		       registered_at, last_heartbeat, labels
 		FROM clusters
 		WHERE id = ?`, id)
@@ -195,7 +201,7 @@ func (s *sqliteStore) GetCluster(ctx context.Context, id string) (types.Cluster,
 
 func (s *sqliteStore) ListClusters(ctx context.Context) ([]types.Cluster, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, name, health, version, node_count, pod_count,
+		SELECT id, name, health, version, agent_version, node_count, pod_count,
 		       registered_at, last_heartbeat, labels
 		FROM clusters
 		ORDER BY registered_at, name`)
@@ -255,7 +261,6 @@ func (s *sqliteStore) IssueAgentToken(ctx context.Context, clusterID, tokenHash 
 		SELECT id, ?, 0, ?, NULL FROM clusters WHERE id = ?
 		ON CONFLICT(cluster_id) DO UPDATE SET
 			token_hash = excluded.token_hash,
-			approved = 0,
 			issued_at = excluded.issued_at,
 			last_heartbeat = NULL`, tokenHash, time.Now().UTC(), clusterID)
 	if err != nil {
@@ -287,7 +292,7 @@ func (s *sqliteStore) ApproveAgent(ctx context.Context, clusterID string) error 
 
 func (s *sqliteStore) ListPendingAgents(ctx context.Context) ([]types.Cluster, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT c.id, c.name, c.health, c.version, c.node_count, c.pod_count,
+		SELECT c.id, c.name, c.health, c.version, c.agent_version, c.node_count, c.pod_count,
 		       c.registered_at, c.last_heartbeat, c.labels
 		FROM clusters c
 		JOIN agents a ON a.cluster_id = c.id
@@ -332,7 +337,7 @@ func (s *sqliteStore) ReplaceSnapshot(
 	ctx context.Context,
 	id string,
 	snapshot types.ClusterSnapshot,
-	version string,
+	version, agentVersion string,
 	health types.ClusterHealth,
 	lastHeartbeat time.Time,
 ) (err error) {
@@ -348,8 +353,8 @@ func (s *sqliteStore) ReplaceSnapshot(
 
 	result, err := tx.ExecContext(ctx, `
 		UPDATE clusters
-		SET node_count = ?, pod_count = ?, version = ?, health = ?, last_heartbeat = ?
-		WHERE id = ?`, len(snapshot.Nodes), len(snapshot.Pods), version, health, lastHeartbeat, id)
+		SET node_count = ?, pod_count = ?, version = ?, agent_version = ?, health = ?, last_heartbeat = ?
+		WHERE id = ?`, len(snapshot.Nodes), len(snapshot.Pods), version, agentVersion, health, lastHeartbeat, id)
 	if err != nil {
 		return fmt.Errorf("update snapshot metadata: %w", err)
 	}
@@ -653,6 +658,7 @@ func scanCluster(scanner clusterScanner) (types.Cluster, error) {
 		&cluster.Name,
 		&cluster.Health,
 		&cluster.Version,
+		&cluster.AgentVersion,
 		&cluster.NodeCount,
 		&cluster.PodCount,
 		&cluster.RegisteredAt,
@@ -665,6 +671,42 @@ func scanCluster(scanner clusterScanner) (types.Cluster, error) {
 		return types.Cluster{}, fmt.Errorf("decode cluster labels: %w", err)
 	}
 	return cluster, nil
+}
+
+func ensureColumn(db *sql.DB, table, column, definition string) error {
+	rows, err := db.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return err
+	}
+	found := false
+	for rows.Next() {
+		var (
+			cid        int
+			name       string
+			columnType string
+			notNull    int
+			defaultVal sql.NullString
+			primaryKey int
+		)
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultVal, &primaryKey); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if name == column {
+			found = true
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if found {
+		return nil
+	}
+	_, err = db.Exec("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition)
+	return err
 }
 
 func requireAffectedRow(result sql.Result) error {

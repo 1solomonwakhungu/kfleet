@@ -10,8 +10,6 @@ export function ApplicationShell() {
   const location = useLocation()
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
-  const dashboardProvidesMainLandmark = location.pathname === '/'
-  const isClusterRoute = location.pathname.startsWith('/clusters/')
 
   useEffect(() => {
     setMobileNavigationOpen(false)
@@ -30,11 +28,6 @@ export function ApplicationShell() {
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [mobileNavigationOpen])
-
-  const contentClassName = cn(
-    'min-w-0 flex-1',
-    isClusterRoute && 'mx-auto w-full max-w-[100rem] px-4 sm:px-6 lg:px-8',
-  )
 
   return (
     <div className="min-h-dvh bg-background text-foreground lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -86,15 +79,9 @@ export function ApplicationShell() {
           )}
         </header>
 
-        {dashboardProvidesMainLandmark ? (
-          <div id="main-content" className={contentClassName} tabIndex={-1}>
-            <Outlet />
-          </div>
-        ) : (
-          <main id="main-content" className={contentClassName} tabIndex={-1}>
-            <Outlet />
-          </main>
-        )}
+        <div id="main-content" className="min-w-0 flex-1" tabIndex={-1}>
+          <Outlet />
+        </div>
       </div>
     </div>
   )

@@ -11,6 +11,7 @@ const cluster = (id: string, name = id): Cluster => ({
   k8sVersion: '1.31',
   agentVersion: '0.1',
   lastHeartbeat: '2026-07-19T12:00:00Z',
+  registeredAt: '2026-07-19T11:00:00Z',
   labels: {},
 });
 

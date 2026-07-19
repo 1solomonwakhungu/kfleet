@@ -1,4 +1,4 @@
-import { LayoutDashboard, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, Users, type LucideIcon } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 
 import { cn } from '../../lib/utils'
@@ -20,6 +20,13 @@ export const primaryNavigationItems: readonly NavigationItem[] = [
     icon: LayoutDashboard,
     end: true,
     activePathPrefixes: ['/clusters/'],
+  },
+  {
+    label: 'Agents',
+    description: 'Pending approvals',
+    to: '/agents',
+    icon: Users,
+    end: true,
   },
 ]
 

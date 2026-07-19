@@ -15,10 +15,17 @@ spec:
         {{- include "kfleet-agent.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "kfleet-agent.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
+        runAsGroup: 65532
         fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: agent
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -26,11 +33,16 @@ spec:
           securityContext:
             runAsNonRoot: true
             runAsUser: 65532
+            runAsGroup: 65532
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
+          ports:
+            - name: health
+              containerPort: {{ .Values.health.port }}
+              protocol: TCP
           env:
             - name: KFLEET_HUB_URL
               value: {{ required "hub.url is required" .Values.hub.url | quote }}
@@ -38,6 +50,8 @@ spec:
               value: {{ required "cluster.name is required" .Values.cluster.name | quote }}
             - name: KFLEET_REPORT_INTERVAL
               value: {{ .Values.reportInterval | quote }}
+            - name: KFLEET_HEALTH_ADDR
+              value: {{ printf ":%v" .Values.health.port | quote }}
             - name: KFLEET_HUB_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -52,24 +66,24 @@ spec:
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 8081
+              port: health
             initialDelaySeconds: 10
             periodSeconds: 30
           readinessProbe:
             httpGet:
-              path: /healthz
-              port: 8081
+              path: /readyz
+              port: health
             initialDelaySeconds: 5
             periodSeconds: 10
-          {{- with .Values.nodeSelector }}
-          nodeSelector:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .Values.affinity }}
-          affinity:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .Values.tolerations }}
-          tolerations:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

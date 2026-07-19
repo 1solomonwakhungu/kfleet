@@ -51,6 +51,7 @@ func New(cfg *config.Config) (*Collector, error) {
 
 // Collect lists cluster-wide resources and returns a point-in-time snapshot.
 func (c *Collector) Collect(ctx context.Context) (*ClusterState, error) {
+	collectedAt := time.Now().UTC()
 	nodes, err := c.clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
@@ -80,7 +81,7 @@ func (c *Collector) Collect(ctx context.Context) (*ClusterState, error) {
 		Events:       make([]EventInfo, 0, min(len(events.Items), maxEvents)),
 		NodeCount:    len(nodes.Items),
 		PodCount:     len(pods.Items),
-		CollectedAt:  time.Now().UTC(),
+		CollectedAt:  collectedAt,
 		AgentVersion: agentVersion,
 	}
 	for _, node := range nodes.Items {
@@ -94,10 +95,10 @@ func (c *Collector) Collect(ctx context.Context) (*ClusterState, error) {
 		state.Pods = append(state.Pods, podInfo(pod))
 	}
 	for _, service := range services.Items {
-		state.Services = append(state.Services, serviceInfo(service))
+		state.Services = append(state.Services, serviceInfo(service, collectedAt))
 	}
 	for _, deployment := range deployments.Items {
-		state.Deployments = append(state.Deployments, deploymentInfo(deployment))
+		state.Deployments = append(state.Deployments, deploymentInfo(deployment, collectedAt))
 	}
 	sort.Slice(events.Items, func(i, j int) bool {
 		return eventTimestamp(events.Items[i]).After(eventTimestamp(events.Items[j]))
@@ -149,8 +150,10 @@ func nodeInfo(node corev1.Node) NodeInfo {
 
 func podInfo(pod corev1.Pod) PodInfo {
 	var restarts int32
+	ready := len(pod.Status.ContainerStatuses) > 0
 	for _, status := range pod.Status.ContainerStatuses {
 		restarts += status.RestartCount
+		ready = ready && status.Ready
 	}
 	for _, status := range pod.Status.InitContainerStatuses {
 		restarts += status.RestartCount
@@ -161,10 +164,12 @@ func podInfo(pod corev1.Pod) PodInfo {
 		Phase:     string(pod.Status.Phase),
 		Restarts:  restarts,
 		Node:      pod.Spec.NodeName,
+		Ready:     ready,
+		StartTime: timestampValue(pod.Status.StartTime),
 	}
 }
 
-func serviceInfo(service corev1.Service) ServiceInfo {
+func serviceInfo(service corev1.Service, collectedAt time.Time) ServiceInfo {
 	ports := make([]string, 0, len(service.Spec.Ports))
 	for _, port := range service.Spec.Ports {
 		value := strconv.Itoa(int(port.Port)) + "/" + string(port.Protocol)
@@ -180,10 +185,11 @@ func serviceInfo(service corev1.Service) ServiceInfo {
 		ClusterIP:   service.Spec.ClusterIP,
 		ExternalIPs: append([]string(nil), service.Spec.ExternalIPs...),
 		Ports:       ports,
+		Age:         formatAge(service.CreationTimestamp.Time, collectedAt),
 	}
 }
 
-func deploymentInfo(deployment appsv1.Deployment) DeploymentInfo {
+func deploymentInfo(deployment appsv1.Deployment, collectedAt time.Time) DeploymentInfo {
 	var desired int32
 	if deployment.Spec.Replicas != nil {
 		desired = *deployment.Spec.Replicas
@@ -194,6 +200,35 @@ func deploymentInfo(deployment appsv1.Deployment) DeploymentInfo {
 		DesiredReplicas:   desired,
 		ReadyReplicas:     deployment.Status.ReadyReplicas,
 		AvailableReplicas: deployment.Status.AvailableReplicas,
+		UpdatedReplicas:   deployment.Status.UpdatedReplicas,
+		Age:               formatAge(deployment.CreationTimestamp.Time, collectedAt),
+	}
+}
+
+func timestampValue(value *metav1.Time) time.Time {
+	if value == nil {
+		return time.Time{}
+	}
+	return value.Time
+}
+
+func formatAge(createdAt, collectedAt time.Time) string {
+	if createdAt.IsZero() {
+		return ""
+	}
+	age := collectedAt.Sub(createdAt)
+	if age < 0 {
+		age = 0
+	}
+	switch {
+	case age < time.Minute:
+		return strconv.Itoa(int(age/time.Second)) + "s"
+	case age < time.Hour:
+		return strconv.Itoa(int(age/time.Minute)) + "m"
+	case age < 24*time.Hour:
+		return strconv.Itoa(int(age/time.Hour)) + "h"
+	default:
+		return strconv.Itoa(int(age/(24*time.Hour))) + "d"
 	}
 }
 

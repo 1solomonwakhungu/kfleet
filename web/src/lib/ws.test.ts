@@ -47,6 +47,7 @@ const cluster: Cluster = {
   k8sVersion: '1.31',
   agentVersion: '0.1',
   lastHeartbeat: '2026-07-19T12:00:00Z',
+  registeredAt: '2026-07-19T11:00:00Z',
   labels: {},
 };
 
@@ -94,6 +95,37 @@ describe('WSManager', () => {
     FakeWebSocket.instances[0].receive(JSON.stringify(update));
 
     expect(listener).toHaveBeenCalledWith(update);
+  });
+
+  it('normalizes the hub cluster wire shape before notifying listeners', () => {
+    const listener = vi.fn();
+    manager.subscribe(listener);
+    manager.connect();
+
+    FakeWebSocket.instances[0].receive(JSON.stringify({
+      type: 'snapshot',
+      cluster: {
+        id: 'cluster-a',
+        name: 'Cluster A',
+        health: 'healthy',
+        version: 'v1.32.3',
+        agentVersion: '0.2.0',
+        nodeCount: 5,
+        podCount: 42,
+        registeredAt: '2026-07-19T11:00:00Z',
+        lastHeartbeat: '2026-07-19T12:00:00Z',
+        labels: null,
+      },
+    }));
+
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'snapshot',
+      cluster: expect.objectContaining({
+        k8sVersion: 'v1.32.3',
+        agentVersion: '0.2.0',
+        labels: {},
+      }),
+    }));
   });
 
   it('cancels a queued reconnect when connect is requested explicitly', () => {

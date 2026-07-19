@@ -11,6 +11,7 @@ func TestLoad(t *testing.T) {
 	t.Setenv("KFLEET_HUB_TOKEN", "secret")
 	t.Setenv("KFLEET_REPORT_INTERVAL", "45s")
 	t.Setenv("KUBECONFIG", "/tmp/kubeconfig")
+	t.Setenv("KFLEET_HEALTH_ADDR", "127.0.0.1:19090")
 
 	cfg, err := Load()
 	if err != nil {
@@ -19,7 +20,7 @@ func TestLoad(t *testing.T) {
 	if cfg.HubURL != "https://hub.example.test" || cfg.ClusterName != "production" || cfg.HubToken != "secret" {
 		t.Fatalf("Load() identity config = %#v", cfg)
 	}
-	if cfg.ReportInterval != 45*time.Second || cfg.Kubeconfig != "/tmp/kubeconfig" {
+	if cfg.ReportInterval != 45*time.Second || cfg.Kubeconfig != "/tmp/kubeconfig" || cfg.HealthAddress != "127.0.0.1:19090" {
 		t.Fatalf("Load() runtime config = %#v", cfg)
 	}
 }
@@ -34,6 +35,9 @@ func TestLoadDefaultReportInterval(t *testing.T) {
 	}
 	if cfg.ReportInterval != 30*time.Second {
 		t.Fatalf("ReportInterval = %v, want 30s", cfg.ReportInterval)
+	}
+	if cfg.HealthAddress != ":8081" {
+		t.Fatalf("HealthAddress = %q, want :8081", cfg.HealthAddress)
 	}
 }
 

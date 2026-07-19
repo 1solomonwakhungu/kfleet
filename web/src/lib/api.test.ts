@@ -14,9 +14,19 @@ describe('api', () => {
   });
 
   it('URL-encodes cluster IDs in every cluster-scoped path', async () => {
-    fetchMock.mockImplementation(async () =>
-      new Response('[]', { headers: { 'Content-Type': 'application/json' } }),
-    );
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      const cluster = {
+        id: 'cluster', name: 'Cluster', health: 'unknown', version: '',
+        nodeCount: 0, podCount: 0, lastHeartbeat: '', registeredAt: '', labels: {},
+      };
+      const body = url.endsWith('/status')
+        ? { cluster, nodes: [] }
+        : /\/clusters\/[^/]+$/.test(url)
+          ? cluster
+          : [];
+      return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
+    });
 
     const id = 'fleet/us central?#%';
     await api.getCluster(id);
@@ -117,5 +127,48 @@ describe('api', () => {
       '/api/v1/clusters/cluster',
       expect.objectContaining({ signal: controller.signal }),
     );
+  });
+
+  it('normalizes hub cluster and node wire shapes for the UI', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      cluster: {
+        id: 'cluster-a',
+        name: 'Cluster A',
+        health: 'healthy',
+        version: 'v1.32.3',
+        agentVersion: '0.1.0',
+        nodeCount: 1,
+        podCount: 12,
+        registeredAt: '2026-07-19T11:00:00Z',
+        lastHeartbeat: '2026-07-19T12:00:00Z',
+        labels: null,
+      },
+      nodes: [{
+        name: 'node-a',
+        status: 'Ready',
+        roles: ['control-plane'],
+        version: 'v1.32.3',
+        cpuCapacity: '8',
+        memoryCapacity: '16Gi',
+        ready: true,
+      }],
+    })));
+
+    await expect(api.getClusterStatus('cluster-a')).resolves.toEqual({
+      cluster: expect.objectContaining({
+        k8sVersion: 'v1.32.3',
+        agentVersion: '0.1.0',
+        labels: {},
+      }),
+      nodes: [{
+        name: 'node-a',
+        status: 'Ready',
+        roles: ['control-plane'],
+        version: 'v1.32.3',
+        cpuCapacity: '8',
+        memoryCapacity: '16Gi',
+        ready: true,
+      }],
+    });
   });
 });

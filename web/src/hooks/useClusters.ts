@@ -12,6 +12,7 @@ interface APICluster {
   agentVersion?: string
   version?: string
   lastHeartbeat?: string
+  registeredAt?: string
   labels?: Record<string, string> | null
 }
 
@@ -35,6 +36,7 @@ function toCluster(cluster: APICluster): Cluster {
     k8sVersion: cluster.k8sVersion ?? cluster.version ?? '',
     agentVersion: cluster.agentVersion ?? '',
     lastHeartbeat: cluster.lastHeartbeat ?? '',
+    registeredAt: cluster.registeredAt ?? '',
     labels: cluster.labels ?? {},
   }
 }

@@ -20,6 +20,7 @@ type Cluster struct {
 	Name          string            `json:"name"`
 	Health        ClusterHealth     `json:"health"`
 	Version       string            `json:"version"`
+	AgentVersion  string            `json:"agentVersion"`
 	NodeCount     int               `json:"nodeCount"`
 	PodCount      int               `json:"podCount"`
 	RegisteredAt  time.Time         `json:"registeredAt"`

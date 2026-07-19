@@ -28,9 +28,9 @@ type RuntimeCluster = Cluster & {
 };
 
 type RuntimeNode = ClusterNode & {
-  ready?: boolean;
-  cpuCapacity?: string;
-  memoryCapacity?: string;
+  ready: boolean;
+  cpuCapacity: string;
+  memoryCapacity: string;
 };
 
 interface TimestampValue {
@@ -338,8 +338,7 @@ function getCapacity(node: ClusterNode, key: 'cpu' | 'memory' | 'pods'): string 
   if (key === 'cpu' && runtimeNode.cpuCapacity) return runtimeNode.cpuCapacity;
   if (key === 'memory' && runtimeNode.memoryCapacity) return runtimeNode.memoryCapacity;
 
-  const value = node.capacity?.[key];
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+  return null;
 }
 
 function formatCpuTotal(values: string[]): string | null {

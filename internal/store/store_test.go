@@ -149,8 +149,8 @@ func TestSQLiteStoreAgentApprovalLifecycle(t *testing.T) {
 		t.Fatalf("ValidateAgentToken() old token error = %v, want ErrNotFound", err)
 	}
 	approved, err = st.ValidateAgentToken(ctx, cluster.ID, "hash-two")
-	if err != nil || approved {
-		t.Fatalf("ValidateAgentToken() rotated = (%v, %v), want pending", approved, err)
+	if err != nil || !approved {
+		t.Fatalf("ValidateAgentToken() rotated = (%v, %v), want approval preserved", approved, err)
 	}
 
 	if err := st.ApproveAgent(ctx, "missing"); !errors.Is(err, ErrNotFound) {
@@ -203,7 +203,7 @@ func TestSQLiteStoreReplaceSnapshot(t *testing.T) {
 		Deployments: []types.Deployment{{Name: "api", Namespace: "apps", DesiredReplicas: 2}},
 		Events:      []types.Event{{Namespace: "apps", Reason: "Started", Message: "started"}},
 	}
-	if err := st.ReplaceSnapshot(ctx, cluster.ID, first, "v1.31.1", types.HealthDegraded, firstHeartbeat); err != nil {
+	if err := st.ReplaceSnapshot(ctx, cluster.ID, first, "v1.31.1", "0.1.0", types.HealthDegraded, firstHeartbeat); err != nil {
 		t.Fatalf("ReplaceSnapshot(first) error = %v", err)
 	}
 	invalid := first
@@ -211,7 +211,7 @@ func TestSQLiteStoreReplaceSnapshot(t *testing.T) {
 		{Name: "duplicate", Status: "Ready", Ready: true},
 		{Name: "duplicate", Status: "Ready", Ready: true},
 	}
-	if err := st.ReplaceSnapshot(ctx, cluster.ID, invalid, "invalid", types.HealthHealthy, firstHeartbeat.Add(30*time.Second)); err == nil {
+	if err := st.ReplaceSnapshot(ctx, cluster.ID, invalid, "invalid", "invalid", types.HealthHealthy, firstHeartbeat.Add(30*time.Second)); err == nil {
 		t.Fatal("ReplaceSnapshot(invalid) error = nil, want duplicate node error")
 	}
 	unchangedNodes, err := st.ListNodes(ctx, cluster.ID)
@@ -231,7 +231,7 @@ func TestSQLiteStoreReplaceSnapshot(t *testing.T) {
 		Deployments: []types.Deployment{},
 		Events:      []types.Event{},
 	}
-	if err := st.ReplaceSnapshot(ctx, cluster.ID, second, "v1.32.0", types.HealthHealthy, secondHeartbeat); err != nil {
+	if err := st.ReplaceSnapshot(ctx, cluster.ID, second, "v1.32.0", "0.2.0", types.HealthHealthy, secondHeartbeat); err != nil {
 		t.Fatalf("ReplaceSnapshot(second) error = %v", err)
 	}
 
@@ -239,7 +239,7 @@ func TestSQLiteStoreReplaceSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCluster() error = %v", err)
 	}
-	if gotCluster.NodeCount != 1 || gotCluster.PodCount != 1 || gotCluster.Version != "v1.32.0" ||
+	if gotCluster.NodeCount != 1 || gotCluster.PodCount != 1 || gotCluster.Version != "v1.32.0" || gotCluster.AgentVersion != "0.2.0" ||
 		gotCluster.Health != types.HealthHealthy || !gotCluster.LastHeartbeat.Equal(secondHeartbeat) {
 		t.Fatalf("cluster metadata = %#v, want replacement metadata", gotCluster)
 	}
