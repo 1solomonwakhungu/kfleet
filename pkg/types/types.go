@@ -17,6 +17,7 @@ const (
 // Cluster describes a Kubernetes cluster registered with kfleet.
 type Cluster struct {
 	ID            string            `json:"id"`
+	TenantID      string            `json:"-"`
 	Name          string            `json:"name"`
 	Health        ClusterHealth     `json:"health"`
 	Version       string            `json:"version"`
@@ -41,13 +42,22 @@ type Node struct {
 
 // Pod describes the runtime state of a Kubernetes pod.
 type Pod struct {
-	Name         string    `json:"name"`
-	Namespace    string    `json:"namespace"`
-	Phase        string    `json:"phase"`
-	NodeName     string    `json:"nodeName"`
-	RestartCount int32     `json:"restartCount"`
-	Ready        bool      `json:"ready"`
-	StartTime    time.Time `json:"startTime"`
+	Name                      string    `json:"name"`
+	Namespace                 string    `json:"namespace"`
+	Phase                     string    `json:"phase"`
+	NodeName                  string    `json:"nodeName"`
+	RestartCount              int32     `json:"restartCount"`
+	Ready                     bool      `json:"ready"`
+	StartTime                 time.Time `json:"startTime"`
+	SecurityContextKnown      bool      `json:"securityContextKnown"`
+	Privileged                bool      `json:"privileged"`
+	RunAsNonRoot              bool      `json:"runAsNonRoot"`
+	ReadOnlyRootFilesystem    bool      `json:"readOnlyRootFilesystem"`
+	AllowsPrivilegeEscalation bool      `json:"allowsPrivilegeEscalation"`
+	CapabilitiesDroppedAll    bool      `json:"capabilitiesDroppedAll"`
+	HostNetwork               bool      `json:"hostNetwork"`
+	HostPID                   bool      `json:"hostPID"`
+	HostIPC                   bool      `json:"hostIPC"`
 }
 
 // Event describes an event observed in a managed cluster.
@@ -82,13 +92,21 @@ type Service struct {
 
 // Deployment describes the replica state of a Kubernetes deployment.
 type Deployment struct {
-	Name              string `json:"name"`
-	Namespace         string `json:"namespace"`
-	ReadyReplicas     int32  `json:"readyReplicas"`
-	DesiredReplicas   int32  `json:"desiredReplicas"`
-	UpdatedReplicas   int32  `json:"updatedReplicas"`
-	AvailableReplicas int32  `json:"availableReplicas"`
-	Age               string `json:"age"`
+	Name              string   `json:"name"`
+	Namespace         string   `json:"namespace"`
+	ReadyReplicas     int32    `json:"readyReplicas"`
+	DesiredReplicas   int32    `json:"desiredReplicas"`
+	UpdatedReplicas   int32    `json:"updatedReplicas"`
+	AvailableReplicas int32    `json:"availableReplicas"`
+	Age               string   `json:"age"`
+	ConfigHash        string   `json:"configHash"`
+	Images            []string `json:"images"`
+}
+
+// Namespace describes configuration attached to a Kubernetes namespace.
+type Namespace struct {
+	Name   string            `json:"name"`
+	Labels map[string]string `json:"labels"`
 }
 
 // ClusterSnapshot is the normalized, durable resource state for one cluster.
@@ -97,5 +115,6 @@ type ClusterSnapshot struct {
 	Pods        []Pod
 	Services    []Service
 	Deployments []Deployment
+	Namespaces  []Namespace
 	Events      []Event
 }

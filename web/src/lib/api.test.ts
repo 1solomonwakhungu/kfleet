@@ -36,6 +36,7 @@ describe('api', () => {
     await api.getServices(id);
     await api.getDeployments(id);
     await api.getNamespaces(id);
+    await api.getClusterPolicyResults(id);
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25',
@@ -45,6 +46,7 @@ describe('api', () => {
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/services',
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/deployments',
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/namespaces',
+      '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/policy-results',
     ]);
   });
 
