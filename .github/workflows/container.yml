@@ -47,7 +47,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/1solomonwakhungu/kfleet-hub:main
-            ghcr.io/1solomonwakhungu/kfleet-hub:${{ github.sha }}
+            ghcr.io/1solomonwakhungu/kfleet-public-demo:main
+            ghcr.io/1solomonwakhungu/kfleet-public-demo:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
