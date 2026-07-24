@@ -61,7 +61,7 @@ Deployment order:
 
 1. Merge the kfleet PR so CI publishes `ghcr.io/1solomonwakhungu/kfleet-hub:main`.
 2. Merge the homelab PR so Flux registers `deploy/homelab`.
-3. Run the homelab `Repair GHCR pull secrets` workflow if the namespace does
-   not yet contain `ghcr-pull`.
+3. Provision the cluster-managed `ghcr-pull` secret in `kfleet-demo` using the
+   homelab registry-secret runbook. Do not commit or mount registry credentials.
 4. Confirm Flux readiness, pod readiness, response headers, synthetic metadata,
    blocked mutations, and HTTP 200 from `https://kfleet.sullylab.de`.
