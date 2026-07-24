@@ -31,5 +31,43 @@ type Store interface {
 	ValidateAgentToken(ctx context.Context, clusterID, tokenHash string) (approved bool, err error)
 	ApproveAgent(ctx context.Context, clusterID string) error
 	ListPendingAgents(ctx context.Context) ([]types.Cluster, error)
+
+	// AppendEvent durably records an operational timeline event. It returns
+	// inserted=false without error when an event with the same cluster, kind,
+	// and dedupe key already exists, so retried callers stay idempotent.
+	AppendEvent(ctx context.Context, event types.OperationalEvent) (inserted bool, err error)
+	// ListTimelineEvents returns operational events matching filter, ordered by
+	// occurrence time newest first, with cursor pagination via EventFilter.Before.
+	ListTimelineEvents(ctx context.Context, filter EventFilter) (EventPage, error)
+	// PruneEventsBefore deletes operational events older than cutoff and
+	// returns the number of rows removed. It is the retention mechanism that
+	// keeps the durable timeline bounded.
+	PruneEventsBefore(ctx context.Context, cutoff time.Time) (int64, error)
+
 	Close() error
+}
+
+// EventFilter narrows ListTimelineEvents results.
+type EventFilter struct {
+	// ClusterID restricts results to one cluster; empty means fleet-wide.
+	ClusterID string
+	// Since restricts to events at or after this time, if set.
+	Since *time.Time
+	// Until restricts to events strictly before this time, if set.
+	Until *time.Time
+	// Before is the ID of the last event from the previous page. The store uses
+	// its occurrence time and ID as a stable pagination position. Zero starts
+	// from the newest event.
+	Before int64
+	// Limit caps the number of events returned. Non-positive values fall back
+	// to a package default.
+	Limit int
+}
+
+// EventPage is one page of operational events.
+type EventPage struct {
+	Events []types.OperationalEvent
+	// NextCursor is the value to pass as EventFilter.Before to fetch the next
+	// page, or zero if there are no more events.
+	NextCursor int64
 }

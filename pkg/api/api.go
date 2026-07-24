@@ -130,6 +130,26 @@ type ErrorResponse struct {
 	Code  int    `json:"code"`
 }
 
+// ListTimelineEventsResponse is a paginated page of operational events.
+type ListTimelineEventsResponse struct {
+	Events []types.OperationalEvent `json:"events"`
+	// NextCursor, when non-zero, is passed as the "before" query parameter to
+	// fetch the next (older) page of events.
+	NextCursor int64 `json:"nextCursor,omitempty"`
+}
+
+// RecordPolicyFindingRequest reports a policy or compliance finding to be
+// appended to a cluster's operational timeline. This is metadata history
+// only: never include secrets, kubeconfigs, or raw workload manifests.
+type RecordPolicyFindingRequest struct {
+	RuleID     string            `json:"ruleId"`
+	Resource   string            `json:"resource"`
+	Severity   string            `json:"severity"`
+	Message    string            `json:"message"`
+	Details    map[string]string `json:"details,omitempty"`
+	OccurredAt time.Time         `json:"occurredAt,omitempty"`
+}
+
 // WriteJSON writes v as a JSON response with the supplied HTTP status.
 func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	w.Header().Set("Content-Type", "application/json")

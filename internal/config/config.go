@@ -12,6 +12,7 @@ const (
 	defaultDBPath            = "./kfleet.db"
 	defaultLogLevel          = "info"
 	defaultHeartbeatInterval = 30 * time.Second
+	defaultEventRetention    = 90 * 24 * time.Hour
 )
 
 // Config contains the hub server configuration.
@@ -20,6 +21,7 @@ type Config struct {
 	DBPath            string
 	LogLevel          string
 	HeartbeatInterval time.Duration
+	EventRetention    time.Duration
 	RegistrationToken string
 }
 
@@ -35,11 +37,20 @@ func Load() (*Config, error) {
 		}
 		heartbeatInterval = parsed
 	}
+	eventRetention := defaultEventRetention
+	if value := os.Getenv("KFLEET_EVENT_RETENTION"); value != "" {
+		parsed, err := time.ParseDuration(value)
+		if err != nil || parsed <= 0 {
+			return nil, fmt.Errorf("KFLEET_EVENT_RETENTION must be a positive duration")
+		}
+		eventRetention = parsed
+	}
 	return &Config{
 		ListenAddr:        envOrDefault("KFLEET_LISTEN_ADDR", defaultListenAddr),
 		DBPath:            envOrDefault("KFLEET_DB_PATH", defaultDBPath),
 		LogLevel:          envOrDefault("KFLEET_LOG_LEVEL", defaultLogLevel),
 		HeartbeatInterval: heartbeatInterval,
+		EventRetention:    eventRetention,
 		RegistrationToken: os.Getenv("KFLEET_REGISTRATION_TOKEN"),
 	}, nil
 }

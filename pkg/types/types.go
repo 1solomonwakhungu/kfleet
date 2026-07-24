@@ -99,3 +99,35 @@ type ClusterSnapshot struct {
 	Deployments []Deployment
 	Events      []Event
 }
+
+// OperationalEventKind categorizes an entry in the fleet operational event timeline.
+type OperationalEventKind string
+
+// Supported operational event kinds.
+const (
+	EventClusterRegistered    OperationalEventKind = "cluster_registered"
+	EventAgentApproved        OperationalEventKind = "agent_approved"
+	EventHeartbeatStateChange OperationalEventKind = "heartbeat_state_change"
+	EventVersionChanged       OperationalEventKind = "version_changed"
+	EventAgentReconnected     OperationalEventKind = "agent_reconnected"
+	EventAgentDisconnected    OperationalEventKind = "agent_disconnected"
+	EventPolicyFinding        OperationalEventKind = "policy_finding"
+)
+
+// OperationalEvent is a durable, append-only record of a fleet lifecycle
+// occurrence: registration, approval, heartbeat transitions, version changes,
+// reconnects, and policy findings. Details must only carry metadata safe for
+// long-term retention; never secrets, kubeconfigs, or raw workload manifests.
+type OperationalEvent struct {
+	ID         int64                `json:"id"`
+	ClusterID  string               `json:"clusterId"`
+	Kind       OperationalEventKind `json:"kind"`
+	Message    string               `json:"message"`
+	Details    map[string]string    `json:"details,omitempty"`
+	OccurredAt time.Time            `json:"occurredAt"`
+
+	// DedupeKey scopes idempotent insertion of otherwise-identical events (for
+	// example, a retried request replaying the same transition). It is never
+	// serialized to API responses.
+	DedupeKey string `json:"-"`
+}

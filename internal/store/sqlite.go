@@ -106,6 +106,38 @@ CREATE TABLE IF NOT EXISTS snapshot_events (
 	FOREIGN KEY (cluster_id) REFERENCES clusters(id) ON DELETE CASCADE
 )`
 
+// operational_events is a durable, append-only audit log distinct from
+// snapshot_events (which is replaced wholesale on every heartbeat). Rows are
+// never updated, only inserted and, by retention policy, pruned by age.
+// dedupe_key is nullable: SQLite treats each NULL as distinct for the purposes
+// of the UNIQUE constraint, so events without a meaningful idempotency key
+// (dedupe_key = NULL) never collide, while events sharing a non-null
+// dedupe_key for the same cluster and kind are suppressed on retry.
+const createOperationalEventsTable = `
+CREATE TABLE IF NOT EXISTS operational_events (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	cluster_id TEXT NOT NULL,
+	kind TEXT NOT NULL,
+	message TEXT NOT NULL,
+	details TEXT NOT NULL DEFAULT '{}',
+	occurred_at TIMESTAMP NOT NULL,
+	dedupe_key TEXT,
+	UNIQUE (cluster_id, kind, dedupe_key)
+)`
+
+const createOperationalEventsClusterIndex = `
+CREATE INDEX IF NOT EXISTS idx_operational_events_cluster_time
+	ON operational_events (cluster_id, occurred_at, id)`
+
+const createOperationalEventsOccurredIndex = `
+CREATE INDEX IF NOT EXISTS idx_operational_events_time
+	ON operational_events (occurred_at, id)`
+
+const (
+	defaultEventPageLimit = 50
+	maxEventPageLimit     = 500
+)
+
 type sqliteStore struct {
 	db *sql.DB
 }
@@ -140,6 +172,9 @@ func Open(dbPath string) (Store, error) {
 		{name: "snapshot services", sql: createSnapshotServicesTable},
 		{name: "snapshot deployments", sql: createSnapshotDeploymentsTable},
 		{name: "snapshot events", sql: createSnapshotEventsTable},
+		{name: "operational events", sql: createOperationalEventsTable},
+		{name: "operational events cluster index", sql: createOperationalEventsClusterIndex},
+		{name: "operational events occurred index", sql: createOperationalEventsOccurredIndex},
 	} {
 		if _, err := db.Exec(migration.sql); err != nil {
 			_ = db.Close()
@@ -642,6 +677,115 @@ func (s *sqliteStore) ListNamespaces(ctx context.Context, clusterID string) ([]s
 	return namespaces, nil
 }
 
+func (s *sqliteStore) AppendEvent(ctx context.Context, event types.OperationalEvent) (bool, error) {
+	details := event.Details
+	if details == nil {
+		details = map[string]string{}
+	}
+	detailsJSON, err := json.Marshal(details)
+	if err != nil {
+		return false, fmt.Errorf("encode event details: %w", err)
+	}
+	var dedupeKey any
+	if event.DedupeKey != "" {
+		dedupeKey = event.DedupeKey
+	}
+
+	result, err := s.db.ExecContext(ctx, `
+		INSERT INTO operational_events (cluster_id, kind, message, details, occurred_at, dedupe_key)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT (cluster_id, kind, dedupe_key) DO NOTHING`,
+		event.ClusterID, string(event.Kind), event.Message, string(detailsJSON), event.OccurredAt.UTC(), dedupeKey)
+	if err != nil {
+		return false, fmt.Errorf("append event: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("read affected rows: %w", err)
+	}
+	return affected > 0, nil
+}
+
+func (s *sqliteStore) ListTimelineEvents(ctx context.Context, filter EventFilter) (EventPage, error) {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = defaultEventPageLimit
+	}
+	if limit > maxEventPageLimit {
+		limit = maxEventPageLimit
+	}
+
+	query := `
+		SELECT id, cluster_id, kind, message, details, occurred_at
+		FROM operational_events WHERE 1 = 1`
+	args := []any{}
+	if filter.ClusterID != "" {
+		query += " AND cluster_id = ?"
+		args = append(args, filter.ClusterID)
+	}
+	if filter.Since != nil {
+		query += " AND occurred_at >= ?"
+		args = append(args, filter.Since.UTC())
+	}
+	if filter.Until != nil {
+		query += " AND occurred_at < ?"
+		args = append(args, filter.Until.UTC())
+	}
+	if filter.Before > 0 {
+		var cursorTime time.Time
+		err := s.db.QueryRowContext(ctx,
+			`SELECT occurred_at FROM operational_events WHERE id = ?`, filter.Before,
+		).Scan(&cursorTime)
+		if errors.Is(err, sql.ErrNoRows) {
+			return EventPage{Events: []types.OperationalEvent{}}, nil
+		}
+		if err != nil {
+			return EventPage{}, fmt.Errorf("resolve timeline cursor: %w", err)
+		}
+		query += " AND (occurred_at < ? OR (occurred_at = ? AND id < ?))"
+		args = append(args, cursorTime.UTC(), cursorTime.UTC(), filter.Before)
+	}
+	query += " ORDER BY occurred_at DESC, id DESC LIMIT ?"
+	args = append(args, limit+1)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return EventPage{}, fmt.Errorf("list timeline events: %w", err)
+	}
+	defer rows.Close()
+
+	events := make([]types.OperationalEvent, 0, limit)
+	for rows.Next() {
+		event, err := scanTimelineEvent(rows)
+		if err != nil {
+			return EventPage{}, fmt.Errorf("scan timeline event: %w", err)
+		}
+		events = append(events, event)
+	}
+	if err := rows.Err(); err != nil {
+		return EventPage{}, fmt.Errorf("list timeline events: %w", err)
+	}
+
+	var nextCursor int64
+	if len(events) > limit {
+		events = events[:limit]
+		nextCursor = events[limit-1].ID
+	}
+	return EventPage{Events: events, NextCursor: nextCursor}, nil
+}
+
+func (s *sqliteStore) PruneEventsBefore(ctx context.Context, cutoff time.Time) (int64, error) {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM operational_events WHERE occurred_at < ?`, cutoff.UTC())
+	if err != nil {
+		return 0, fmt.Errorf("prune events: %w", err)
+	}
+	removed, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read affected rows: %w", err)
+	}
+	return removed, nil
+}
+
 func (s *sqliteStore) Close() error {
 	return s.db.Close()
 }
@@ -671,6 +815,27 @@ func scanCluster(scanner clusterScanner) (types.Cluster, error) {
 		return types.Cluster{}, fmt.Errorf("decode cluster labels: %w", err)
 	}
 	return cluster, nil
+}
+
+func scanTimelineEvent(scanner clusterScanner) (types.OperationalEvent, error) {
+	var event types.OperationalEvent
+	var kind, details string
+	if err := scanner.Scan(
+		&event.ID,
+		&event.ClusterID,
+		&kind,
+		&event.Message,
+		&details,
+		&event.OccurredAt,
+	); err != nil {
+		return types.OperationalEvent{}, err
+	}
+	event.Kind = types.OperationalEventKind(kind)
+	event.OccurredAt = event.OccurredAt.UTC()
+	if err := json.Unmarshal([]byte(details), &event.Details); err != nil {
+		return types.OperationalEvent{}, fmt.Errorf("decode event details: %w", err)
+	}
+	return event, nil
 }
 
 func ensureColumn(db *sql.DB, table, column, definition string) error {

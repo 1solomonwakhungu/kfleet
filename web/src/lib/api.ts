@@ -1,5 +1,6 @@
 import type { Cluster, ClusterStatus } from '@/types/cluster';
 import type { PodInfo, EventInfo, ServiceInfo, DeploymentInfo } from '@/types/resources';
+import type { TimelinePage } from '@/types/timeline';
 
 const BASE = '/api/v1';
 
@@ -83,6 +84,22 @@ export function normalizeCluster(cluster: WireCluster): Cluster {
   };
 }
 
+export interface TimelineQuery {
+  since?: string;
+  until?: string;
+  before?: number;
+  limit?: number;
+}
+
+function timelineQuery(query: TimelineQuery): string {
+  return qs({
+    since: query.since,
+    until: query.until,
+    before: query.before ? String(query.before) : undefined,
+    limit: query.limit ? String(query.limit) : undefined,
+  });
+}
+
 export const api = {
   // Backed by GET /api/v1/clusters (internal/server/handlers_clusters.go).
   listClusters: (signal?: AbortSignal) => get<{ clusters: WireCluster[] }>('/clusters', signal).then((r) => r.clusters.map(normalizeCluster)),
@@ -102,4 +119,9 @@ export const api = {
   getDeployments: (id: string, ns?: string, signal?: AbortSignal) =>
     get<DeploymentInfo[]>(`${clusterPath(id, '/deployments')}${qs({ namespace: ns })}`, signal),
   getNamespaces: (id: string, signal?: AbortSignal) => get<string[]>(clusterPath(id, '/namespaces'), signal),
+  // Backed by the durable operational timeline, not Kubernetes snapshot events.
+  getTimeline: (id: string, query: TimelineQuery = {}, signal?: AbortSignal) =>
+    get<TimelinePage>(`${clusterPath(id, '/timeline')}${timelineQuery(query)}`, signal),
+  getFleetTimeline: (query: TimelineQuery = {}, signal?: AbortSignal) =>
+    get<TimelinePage>(`/timeline${timelineQuery(query)}`, signal),
 };

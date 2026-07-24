@@ -41,6 +41,10 @@ ingress:
 registration:
   token: ""
 
+timeline:
+  # Operational events older than this duration are pruned by the hub.
+  retention: 2160h
+
 resources:
   requests:
     cpu: 100m

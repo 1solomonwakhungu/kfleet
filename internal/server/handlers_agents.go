@@ -54,9 +54,14 @@ func (s *Server) handleAgentDeregister(w http.ResponseWriter, r *http.Request) {
 		handleHeartbeatStoreError(w, err)
 		return
 	}
+	previousHealth := cluster.Health
 	cluster.Health = types.HealthUnreachable
 	cluster.LastHeartbeat = now
 	s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
+	if previousHealth != types.HealthUnreachable {
+		s.recordAgentDisconnected(r.Context(), cluster, "deregistered", now)
+		s.recordHeartbeatTransition(r.Context(), cluster, previousHealth, types.HealthUnreachable, now)
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -125,6 +130,7 @@ func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cluster, err := s.findClusterByName(r, name)
+	newlyRegistered := false
 	if errors.Is(err, store.ErrNotFound) {
 		cluster = types.Cluster{
 			ID:           uuid.NewString(),
@@ -140,6 +146,7 @@ func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusInternalServerError, "failed to register agent")
 			return
 		}
+		newlyRegistered = true
 	} else if err != nil {
 		s.logger.Error("failed to find agent cluster", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "failed to register agent")
@@ -159,6 +166,9 @@ func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.broadcast.Broadcast(ClusterUpdate{Type: "registered", Cluster: cluster})
+	if newlyRegistered {
+		s.recordClusterRegistered(r.Context(), cluster)
+	}
 	response := api.RegisterClusterResponse{ClusterID: cluster.ID, Token: rawToken}
 	approved, err := s.store.ValidateAgentToken(r.Context(), cluster.ID, tokenHash)
 	if err != nil {
@@ -216,6 +226,7 @@ func (s *Server) handleAgentApprove(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, http.StatusInternalServerError, "failed to approve agent")
 		return
 	}
+	s.recordAgentApproved(r.Context(), cluster, time.Now().UTC())
 	if err := api.WriteJSON(w, http.StatusOK, cluster); err != nil {
 		s.logger.Error("failed to write approved agent", "error", err)
 	}
@@ -263,15 +274,22 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	previous, err := s.store.GetCluster(r.Context(), request.ClusterID)
+	if err != nil {
+		handleHeartbeatStoreError(w, err)
+		return
+	}
+
 	health := types.HealthDegraded
 	if request.NodeCount > 0 && request.HealthyNodes == request.NodeCount {
 		health = types.HealthHealthy
 	}
+	now := time.Now().UTC()
 	if err := s.store.UpdateSnapshot(r.Context(), request.ClusterID, request.NodeCount, request.PodCount, request.Version); err != nil {
 		handleHeartbeatStoreError(w, err)
 		return
 	}
-	if err := s.store.UpdateHealth(r.Context(), request.ClusterID, health, time.Now().UTC()); err != nil {
+	if err := s.store.UpdateHealth(r.Context(), request.ClusterID, health, now); err != nil {
 		handleHeartbeatStoreError(w, err)
 		return
 	}
@@ -282,6 +300,8 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 	s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
 	s.broadcast.Broadcast(ClusterUpdate{Type: "snapshot", Cluster: cluster})
+	s.recordHeartbeatTransition(r.Context(), cluster, previous.Health, cluster.Health, now)
+	s.recordVersionChanged(r.Context(), cluster, previous.Version, cluster.Version, now)
 	if err := api.WriteJSON(w, http.StatusOK, cluster); err != nil {
 		s.logger.Error("failed to write heartbeat response", "error", err)
 	}
