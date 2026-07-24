@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/pkg/api"
@@ -23,7 +25,33 @@ const requestTimeout = 15 * time.Second
 type Client struct {
 	hubURL     string
 	token      string
+	username   string
+	password   string
 	httpClient *http.Client
+	authMu     sync.Mutex
+	loggedIn   bool
+}
+
+// NewWithCredentials constructs a hub client that establishes a user session
+// with the supplied credentials before its first API request. A dedicated
+// read_only account is recommended for MCP integrations.
+func NewWithCredentials(hubURL, username, password string) (*Client, error) {
+	client, err := New(hubURL, "")
+	if err != nil {
+		return nil, err
+	}
+	username = strings.TrimSpace(username)
+	if username == "" || password == "" {
+		return nil, errors.New("hub username and password are required")
+	}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, fmt.Errorf("create cookie jar: %w", err)
+	}
+	client.username = username
+	client.password = password
+	client.httpClient.Jar = jar
+	return client, nil
 }
 
 // New constructs a hub API client.
@@ -129,24 +157,30 @@ func clusterPath(id, suffix string) string {
 }
 
 func (c *Client) get(ctx context.Context, path string, query url.Values, target any) error {
-	endpoint := c.hubURL + path
-	if len(query) > 0 {
-		endpoint += "?" + query.Encode()
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return fmt.Errorf("create hub request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+	if c.username != "" {
+		if err := c.ensureAuthenticated(ctx); err != nil {
+			return err
+		}
 	}
 
-	response, err := c.httpClient.Do(req)
+	response, err := c.doGet(ctx, path, query)
 	if err != nil {
-		return fmt.Errorf("call hub API: %w", err)
+		return err
 	}
-	defer response.Body.Close()
+	if response.StatusCode == http.StatusUnauthorized && c.username != "" {
+		_ = response.Body.Close()
+		c.authMu.Lock()
+		c.loggedIn = false
+		c.authMu.Unlock()
+		if err := c.ensureAuthenticated(ctx); err != nil {
+			return err
+		}
+		response, err = c.doGet(ctx, path, query)
+		if err != nil {
+			return err
+		}
+	}
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
 		var apiError api.ErrorResponse
@@ -158,5 +192,60 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, target 
 	if err := json.NewDecoder(response.Body).Decode(target); err != nil {
 		return fmt.Errorf("decode hub response: %w", err)
 	}
+	return nil
+}
+
+func (c *Client) doGet(ctx context.Context, path string, query url.Values) (*http.Response, error) {
+	endpoint := c.hubURL + path
+	if len(query) > 0 {
+		endpoint += "?" + query.Encode()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create hub request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+
+	response, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("call hub API: %w", err)
+	}
+	return response, nil
+}
+
+func (c *Client) ensureAuthenticated(ctx context.Context) error {
+	c.authMu.Lock()
+	defer c.authMu.Unlock()
+	if c.loggedIn {
+		return nil
+	}
+
+	payload, err := json.Marshal(api.LoginRequest{Username: c.username, Password: c.password})
+	if err != nil {
+		return fmt.Errorf("encode hub login: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.hubURL+"/api/v1/auth/login", strings.NewReader(string(payload)))
+	if err != nil {
+		return fmt.Errorf("create hub login request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	response, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("authenticate with hub: %w", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+		var apiError api.ErrorResponse
+		if json.Unmarshal(body, &apiError) == nil && apiError.Error != "" {
+			return fmt.Errorf("hub login returned %s: %s", response.Status, apiError.Error)
+		}
+		return fmt.Errorf("hub login returned %s", response.Status)
+	}
+	c.loggedIn = true
 	return nil
 }

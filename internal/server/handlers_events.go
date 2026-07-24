@@ -19,25 +19,47 @@ import (
 const maxPolicyFindingBodyBytes = 64 << 10
 
 func (s *Server) registerEventRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/timeline", s.handleFleetTimeline)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/timeline", s.handleClusterTimeline)
+	mux.HandleFunc("GET /api/v1/timeline", s.requireAuth(s.handleFleetTimeline))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/timeline", s.requireAuth(s.handleClusterTimeline))
 	mux.HandleFunc("POST /api/v1/clusters/{id}/policy-findings", s.handleRecordPolicyFinding)
 }
 
 func (s *Server) handleFleetTimeline(w http.ResponseWriter, r *http.Request) {
-	s.serveTimeline(w, r, "")
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	s.serveTimeline(w, r, tenantID, "")
 }
 
 func (s *Server) handleClusterTimeline(w http.ResponseWriter, r *http.Request) {
-	cluster, err := s.clusterByIDOrName(r, r.PathValue("id"))
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	cluster, err := s.store.GetClusterForTenant(r.Context(), tenantID, r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		clusters, listErr := s.store.ListClustersForTenant(r.Context(), tenantID)
+		if listErr != nil {
+			err = listErr
+		} else {
+			for _, candidate := range clusters {
+				if candidate.Name == r.PathValue("id") {
+					cluster = candidate
+					err = nil
+					break
+				}
+			}
+		}
+	}
 	if handleStoreError(w, err) {
 		return
 	}
-	s.serveTimeline(w, r, cluster.ID)
+	s.serveTimeline(w, r, tenantID, cluster.ID)
 }
 
-func (s *Server) serveTimeline(w http.ResponseWriter, r *http.Request, clusterID string) {
-	filter := store.EventFilter{ClusterID: clusterID}
+func (s *Server) serveTimeline(w http.ResponseWriter, r *http.Request, tenantID, clusterID string) {
+	filter := store.EventFilter{TenantID: tenantID, ClusterID: clusterID}
 	query := r.URL.Query()
 
 	if raw := strings.TrimSpace(query.Get("since")); raw != "" {
@@ -151,6 +173,7 @@ func (s *Server) handleRecordPolicyFinding(w http.ResponseWriter, r *http.Reques
 	})
 
 	inserted, err := s.store.AppendEvent(r.Context(), types.OperationalEvent{
+		TenantID:   cluster.TenantID,
 		ClusterID:  cluster.ID,
 		Kind:       types.EventPolicyFinding,
 		Message:    request.Message,

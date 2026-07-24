@@ -365,6 +365,48 @@ func TestSQLiteStoreEventsSurviveClusterDeletionUntilRetention(t *testing.T) {
 	}
 }
 
+func TestSQLiteStoreTimelineTenantIsolationSurvivesClusterDeletion(t *testing.T) {
+	t.Parallel()
+
+	st, _ := newEventTestStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	clusters := []types.Cluster{
+		{ID: "cluster-a", TenantID: "tenant-a", Name: "alpha", RegisteredAt: now, Labels: map[string]string{}},
+		{ID: "cluster-b", TenantID: "tenant-b", Name: "bravo", RegisteredAt: now, Labels: map[string]string{}},
+	}
+	for _, cluster := range clusters {
+		if err := st.CreateCluster(ctx, cluster); err != nil {
+			t.Fatalf("CreateCluster(%s) error = %v", cluster.ID, err)
+		}
+		if _, err := st.AppendEvent(ctx, types.OperationalEvent{
+			TenantID: cluster.TenantID, ClusterID: cluster.ID,
+			Kind: types.EventClusterRegistered, Message: cluster.Name,
+			OccurredAt: now, DedupeKey: "registered",
+		}); err != nil {
+			t.Fatalf("AppendEvent(%s) error = %v", cluster.ID, err)
+		}
+	}
+	if err := st.DeleteCluster(ctx, "cluster-b"); err != nil {
+		t.Fatalf("DeleteCluster(cluster-b) error = %v", err)
+	}
+
+	pageA, err := st.ListTimelineEvents(ctx, EventFilter{TenantID: "tenant-a"})
+	if err != nil {
+		t.Fatalf("ListTimelineEvents(tenant-a) error = %v", err)
+	}
+	if len(pageA.Events) != 1 || pageA.Events[0].ClusterID != "cluster-a" {
+		t.Fatalf("tenant-a events = %#v, want only cluster-a", pageA.Events)
+	}
+	pageB, err := st.ListTimelineEvents(ctx, EventFilter{TenantID: "tenant-b"})
+	if err != nil {
+		t.Fatalf("ListTimelineEvents(tenant-b) error = %v", err)
+	}
+	if len(pageB.Events) != 1 || pageB.Events[0].ClusterID != "cluster-b" {
+		t.Fatalf("tenant-b events after deletion = %#v, want retained cluster-b", pageB.Events)
+	}
+}
+
 func TestSQLiteStoreHighVolumeEvents(t *testing.T) {
 	t.Parallel()
 

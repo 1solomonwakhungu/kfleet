@@ -17,5 +17,8 @@ type ServiceInfo = api.SnapshotService
 // DeploymentInfo contains deployment replica status.
 type DeploymentInfo = api.SnapshotDeployment
 
+// NamespaceInfo is the compatibility name for collected namespace configuration.
+type NamespaceInfo = api.SnapshotNamespace
+
 // EventInfo contains a recent Kubernetes event.
 type EventInfo = api.SnapshotEvent

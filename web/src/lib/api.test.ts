@@ -5,6 +5,7 @@ describe('api', () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
+    fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
   });
 
@@ -39,6 +40,7 @@ describe('api', () => {
     await api.getDeployments(id);
     await api.getNamespaces(id);
     await api.getTimeline(id);
+    await api.getClusterPolicyResults(id);
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25',
@@ -49,6 +51,7 @@ describe('api', () => {
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/deployments',
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/namespaces',
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/timeline',
+      '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/policy-results',
     ]);
   });
 

@@ -81,3 +81,57 @@ func TestNewRejectsInvalidURL(t *testing.T) {
 		}
 	}
 }
+
+func TestClientAuthenticatesWithCredentials(t *testing.T) {
+	const sessionCookie = "session-token"
+	var loginCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/auth/login":
+			loginCount++
+			var login api.LoginRequest
+			if err := json.NewDecoder(r.Body).Decode(&login); err != nil {
+				t.Fatalf("decode login request error = %v", err)
+			}
+			if login.Username != "reader" || login.Password != "correct-password" {
+				t.Errorf("login = %+v, want configured credentials", login)
+			}
+			http.SetCookie(w, &http.Cookie{Name: "kfleet_session", Value: sessionCookie, Path: "/"})
+			_ = json.NewEncoder(w).Encode(api.UserResponse{Username: "reader", Role: types.RoleReadOnly})
+		case "/api/v1/clusters":
+			cookie, err := r.Cookie("kfleet_session")
+			if err != nil || cookie.Value != sessionCookie {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(api.ListClustersResponse{Clusters: []types.Cluster{{ID: "cluster-1"}}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewWithCredentials(server.URL, "reader", "correct-password")
+	if err != nil {
+		t.Fatalf("NewWithCredentials() error = %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		clusters, err := client.ListClusters(context.Background())
+		if err != nil || len(clusters) != 1 {
+			t.Fatalf("ListClusters() = %#v, %v", clusters, err)
+		}
+	}
+	if loginCount != 1 {
+		t.Fatalf("login requests = %d, want one reused session", loginCount)
+	}
+}
+
+func TestNewWithCredentialsRequiresBothValues(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	defer server.Close()
+	for _, credentials := range [][2]string{{"", "password"}, {"reader", ""}} {
+		if _, err := NewWithCredentials(server.URL, credentials[0], credentials[1]); err == nil {
+			t.Errorf("NewWithCredentials(%q, %q) error = nil, want error", credentials[0], credentials[1])
+		}
+	}
+}
