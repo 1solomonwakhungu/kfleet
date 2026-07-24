@@ -17,6 +17,9 @@ func TestRBACUnauthenticatedRequestsAreRejected(t *testing.T) {
 		method, path string
 	}{
 		{http.MethodGet, "/api/v1/clusters"},
+		{http.MethodGet, "/api/v1/policies"},
+		{http.MethodGet, "/api/v1/policies/results"},
+		{http.MethodGet, "/api/v1/clusters/does-not-matter/policy-results"},
 		{http.MethodPost, "/api/v1/clusters/register"},
 		{http.MethodDelete, "/api/v1/clusters/does-not-matter"},
 		{http.MethodGet, "/api/v1/agents/pending"},
@@ -48,6 +51,8 @@ func TestRBACReadOnlyRoleCanReadButNotMutate(t *testing.T) {
 		method, path string
 	}{
 		{http.MethodGet, "/api/v1/clusters"},
+		{http.MethodGet, "/api/v1/policies"},
+		{http.MethodGet, "/api/v1/policies/results"},
 		{http.MethodGet, "/api/v1/agents/pending"},
 		{http.MethodGet, "/api/v1/auth/me"},
 	}

@@ -130,11 +130,16 @@ func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, http.StatusBadRequest, "cluster name is required")
 		return
 	}
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
 
 	cluster, err := s.findClusterByName(r, name)
 	if errors.Is(err, store.ErrNotFound) {
 		cluster = types.Cluster{
 			ID:           uuid.NewString(),
+			TenantID:     tenantID,
 			Name:         name,
 			Health:       types.HealthUnknown,
 			Version:      request.K8sVersion,
@@ -213,7 +218,11 @@ func (s *Server) validRegistrationToken(ctx context.Context, authorization strin
 }
 
 func (s *Server) findClusterByName(r *http.Request, name string) (types.Cluster, error) {
-	clusters, err := s.store.ListClusters(r.Context())
+	tenantID := store.DefaultTenantID
+	if values := r.Header.Values(tenantHeader); len(values) == 1 && tenantIDPattern.MatchString(strings.TrimSpace(values[0])) {
+		tenantID = strings.TrimSpace(values[0])
+	}
+	clusters, err := s.store.ListClustersForTenant(r.Context(), tenantID)
 	if err != nil {
 		return types.Cluster{}, err
 	}
@@ -228,6 +237,19 @@ func (s *Server) findClusterByName(r *http.Request, name string) (types.Cluster,
 func (s *Server) handleAgentApprove(w http.ResponseWriter, r *http.Request) {
 	actor, _ := authenticatedUser(r.Context())
 	clusterID := r.PathValue("id")
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	_, err := s.store.GetClusterForTenant(r.Context(), tenantID, clusterID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			api.WriteError(w, http.StatusNotFound, "agent not found")
+			return
+		}
+		api.WriteError(w, http.StatusInternalServerError, "failed to approve agent")
+		return
+	}
 	if err := s.store.ApproveAgent(r.Context(), clusterID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			api.WriteError(w, http.StatusNotFound, "agent not found")
@@ -250,7 +272,11 @@ func (s *Server) handleAgentApprove(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListPendingAgents(w http.ResponseWriter, r *http.Request) {
-	clusters, err := s.store.ListPendingAgents(r.Context())
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	clusters, err := s.store.ListPendingAgentsForTenant(r.Context(), tenantID)
 	if err != nil {
 		s.logger.Error("failed to list pending agents", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "failed to list pending agents")
