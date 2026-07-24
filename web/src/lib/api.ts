@@ -1,6 +1,9 @@
 import type { Cluster, ClusterStatus } from '@/types/cluster';
 import type { Alert, AlertStatus } from '@/types/alert';
 import type { PodInfo, EventInfo, ServiceInfo, DeploymentInfo } from '@/types/resources';
+import type { TimelinePage } from '@/types/timeline';
+import type { PolicyResultsResponse } from '@/types/policy';
+import { notifyAuthenticationRequired } from './authApi';
 
 const BASE = '/api/v1';
 
@@ -30,10 +33,12 @@ async function request<T>(method: string, path: string, payload?: unknown, signa
     headers: {
       Accept: 'application/json',
       ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }),
+      ...(method === 'GET' ? {} : { 'X-Kfleet-CSRF': '1' }),
     },
     body: payload === undefined ? undefined : JSON.stringify(payload),
     signal,
   });
+  notifyAuthenticationRequired(res);
 
   const text = await res.text();
   let body: unknown;
@@ -92,6 +97,22 @@ export function normalizeCluster(cluster: WireCluster): Cluster {
   };
 }
 
+export interface TimelineQuery {
+  since?: string;
+  until?: string;
+  before?: number;
+  limit?: number;
+}
+
+function timelineQuery(query: TimelineQuery): string {
+  return qs({
+    since: query.since,
+    until: query.until,
+    before: query.before ? String(query.before) : undefined,
+    limit: query.limit ? String(query.limit) : undefined,
+  });
+}
+
 export const api = {
   // Backed by GET /api/v1/clusters (internal/server/handlers_clusters.go).
   listClusters: (signal?: AbortSignal) => get<{ clusters: WireCluster[] }>('/clusters', signal).then((r) => r.clusters.map(normalizeCluster)),
@@ -120,4 +141,13 @@ export const api = {
       { acknowledgedBy },
       signal,
     ),
+  // Backed by the durable operational timeline, not Kubernetes snapshot events.
+  getTimeline: (id: string, query: TimelineQuery = {}, signal?: AbortSignal) =>
+    get<TimelinePage>(`${clusterPath(id, '/timeline')}${timelineQuery(query)}`, signal),
+  getFleetTimeline: (query: TimelineQuery = {}, signal?: AbortSignal) =>
+    get<TimelinePage>(`/timeline${timelineQuery(query)}`, signal),
+  // Built-in policies are evaluated read-only against the latest tenant snapshot.
+  getPolicyResults: (signal?: AbortSignal) => get<PolicyResultsResponse>('/policies/results', signal),
+  getClusterPolicyResults: (id: string, signal?: AbortSignal) =>
+    get<PolicyResultsResponse>(clusterPath(id, '/policy-results'), signal),
 };

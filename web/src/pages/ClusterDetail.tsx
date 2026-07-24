@@ -12,6 +12,7 @@ import { ServicesTab } from '@/components/detail/ServicesTab';
 import { DeploymentsTab } from '@/components/detail/DeploymentsTab';
 import { EventsTab } from '@/components/detail/EventsTab';
 import { LogsTab } from '@/components/detail/LogsTab';
+import { OperationalTimeline } from '@/components/detail/OperationalTimeline';
 import { useClusterDetail } from '@/hooks/useClusterDetail';
 import type { PodInfo } from '@/types/resources';
 
@@ -175,9 +176,15 @@ export default function ClusterDetail() {
               >
                 Logs
               </TabsTrigger>
+              <TabsTrigger
+                value="timeline"
+                className={tabTriggerClass(tab === 'timeline')}
+              >
+                Timeline
+              </TabsTrigger>
             </TabsList>
           </div>
-          {tab !== 'logs' && (
+          {tab !== 'logs' && tab !== 'timeline' && (
             <div
               className="flex min-w-0 flex-wrap items-center gap-2 [&_button]:h-11"
               aria-label="Resource filters"
@@ -225,6 +232,9 @@ export default function ClusterDetail() {
         </TabsContent>
         <TabsContent value="logs">
           <LogsTab clusterId={id} pods={detail.pods.data} selectedPod={logsPod} onSelectPod={setLogsPod} />
+        </TabsContent>
+        <TabsContent value="timeline">
+          <OperationalTimeline clusterId={id} />
         </TabsContent>
       </Tabs>
     </main>

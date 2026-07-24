@@ -50,6 +50,23 @@ alerts:
   retryBase: 5s
   pollInterval: 1s
 
+timeline:
+  # Operational events older than this duration are pruned by the hub.
+  retention: 2160h
+
+auth:
+  sessionDuration: 24h
+  # Keep false when the hub is served over HTTPS. Set true only for a local
+  # plain-HTTP environment such as the kind quickstart.
+  sessionCookieInsecure: false
+  bootstrapAdmin:
+    # These values create the first admin only when the database has no users.
+    # Supply all three together. Prefer a protected values file or secret
+    # management integration instead of command-line values in production.
+    username: ""
+    email: ""
+    password: ""
+
 resources:
   requests:
     cpu: 100m

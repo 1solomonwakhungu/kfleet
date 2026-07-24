@@ -108,6 +108,7 @@ func (m *Manager) Evaluate(ctx context.Context, cluster types.Cluster) {
 		}
 		alert := types.Alert{
 			ID:             uuid.NewString(),
+			TenantID:       cluster.TenantID,
 			RuleID:         rule.ID,
 			RuleName:       rule.Name,
 			ClusterID:      cluster.ID,

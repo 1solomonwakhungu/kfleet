@@ -23,6 +23,7 @@ type Reporter struct {
 	hubURL      string
 	token       string
 	clusterName string
+	tenantID    string
 	client      *http.Client
 }
 
@@ -32,6 +33,7 @@ func New(cfg *config.Config) *Reporter {
 		hubURL:      strings.TrimRight(cfg.HubURL, "/"),
 		token:       cfg.HubToken,
 		clusterName: cfg.ClusterName,
+		tenantID:    cfg.TenantID,
 		client:      &http.Client{Timeout: requestTimeout},
 	}
 }
@@ -49,12 +51,15 @@ func (r *Reporter) Report(ctx context.Context, state *collector.ClusterState) er
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+r.token)
+	if r.tenantID != "" {
+		req.Header.Set("X-Kfleet-Tenant-ID", r.tenantID)
+	}
 
 	response, err := r.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("report cluster state: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		_, _ = io.Copy(io.Discard, response.Body)
 		return fmt.Errorf("hub returned status %s", response.Status)

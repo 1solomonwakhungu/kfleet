@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Activity, Boxes, Menu, X } from 'lucide-react'
+import { Activity, Boxes, LogOut, Menu, X } from 'lucide-react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 
+import { useAuth } from '../../auth/AuthContext'
 import { Button } from '../ui/button'
 import { cn } from '../../lib/utils'
 import { PrimaryNavigation } from '../navigation/PrimaryNavigation'
 
 export function ApplicationShell() {
+  const { user, logout } = useAuth()
   const location = useLocation()
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
@@ -46,7 +48,14 @@ export function ApplicationShell() {
         <div className="flex min-h-0 flex-1 flex-col px-3 py-5">
           <p className="px-3 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-muted">Workspace</p>
           <PrimaryNavigation className="mt-2" />
-          <EnvironmentStatus className="mt-auto" />
+          <div className="mt-auto space-y-3">
+            <AccountSummary
+              username={user?.username ?? ''}
+              role={user?.role ?? 'read_only'}
+              onLogout={() => void logout()}
+            />
+            <EnvironmentStatus />
+          </div>
         </div>
       </aside>
 
@@ -74,6 +83,12 @@ export function ApplicationShell() {
           {mobileNavigationOpen && (
             <div id="mobile-navigation" className="border-t border-border px-4 pb-4 pt-3 sm:px-6">
               <PrimaryNavigation onNavigate={() => setMobileNavigationOpen(false)} />
+              <AccountSummary
+                className="mt-3"
+                username={user?.username ?? ''}
+                role={user?.role ?? 'read_only'}
+                onLogout={() => void logout()}
+              />
               <EnvironmentStatus className="mt-3" compact />
             </div>
           )}
@@ -84,6 +99,31 @@ export function ApplicationShell() {
         </div>
       </div>
     </div>
+  )
+}
+
+interface AccountSummaryProps {
+  className?: string
+  username: string
+  role: string
+  onLogout: () => void
+}
+
+function AccountSummary({ className, username, role, onLogout }: AccountSummaryProps) {
+  return (
+    <section className={cn('rounded-md border border-border bg-background p-3', className)} aria-label="Signed in user">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{username}</p>
+          <p className="mt-1 font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-muted">
+            {role.replace('_', ' ')}
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" className="px-2" aria-label="Sign out" onClick={onLogout}>
+          <LogOut className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+    </section>
   )
 }
 

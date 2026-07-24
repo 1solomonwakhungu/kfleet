@@ -57,6 +57,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "kfleet-agent.fullname" . }}
                   key: hub-token
+            - name: KFLEET_TENANT_ID
+              value: {{ .Values.tenant.id | quote }}
             {{- if .Values.cluster.labels }}
             - name: KFLEET_CLUSTER_LABELS
               value: {{ .Values.cluster.labels | toJson | quote }}

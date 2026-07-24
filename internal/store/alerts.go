@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS alert_rules (
 const createAlertsTable = `
 CREATE TABLE IF NOT EXISTS alerts (
 	id TEXT PRIMARY KEY,
+	tenant_id TEXT NOT NULL DEFAULT 'default',
 	rule_id TEXT NOT NULL,
 	rule_name TEXT NOT NULL,
 	cluster_id TEXT NOT NULL,
@@ -51,6 +52,10 @@ CREATE TABLE IF NOT EXISTS alerts (
 const createAlertHistoryIndex = `
 CREATE INDEX IF NOT EXISTS idx_alerts_history
 ON alerts(triggered_at DESC, id DESC)`
+
+const createAlertTenantHistoryIndex = `
+CREATE INDEX IF NOT EXISTS idx_alerts_tenant_history
+ON alerts(tenant_id, triggered_at DESC, id DESC)`
 
 const createAlertDeliveryIndex = `
 CREATE INDEX IF NOT EXISTS idx_alerts_delivery
@@ -163,9 +168,9 @@ func (s *sqliteStore) CreateAlertIfDue(
 	err = tx.QueryRowContext(ctx, `
 		SELECT triggered_at
 		FROM alerts
-		WHERE dedupe_key = ?
+		WHERE tenant_id = ? AND dedupe_key = ?
 		ORDER BY triggered_at DESC
-		LIMIT 1`, alert.DedupeKey).Scan(&lastTriggered)
+		LIMIT 1`, normalizeTenantID(alert.TenantID), alert.DedupeKey).Scan(&lastTriggered)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return false, fmt.Errorf("read alert cooldown: %w", err)
 	}
@@ -178,11 +183,11 @@ func (s *sqliteStore) CreateAlertIfDue(
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO alerts (
-			id, rule_id, rule_name, cluster_id, cluster_name, dedupe_key,
+			id, tenant_id, rule_id, rule_name, cluster_id, cluster_name, dedupe_key,
 			health, severity, summary, status, triggered_at, updated_at,
 			delivery_status, delivery_attempts, next_delivery_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		alert.ID, alert.RuleID, alert.RuleName, alert.ClusterID, alert.ClusterName, alert.DedupeKey,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		alert.ID, normalizeTenantID(alert.TenantID), alert.RuleID, alert.RuleName, alert.ClusterID, alert.ClusterName, alert.DedupeKey,
 		alert.Health, alert.Severity, alert.Summary, alert.Status, alert.TriggeredAt, alert.UpdatedAt,
 		alert.DeliveryStatus, alert.DeliveryAttempts, alert.NextDeliveryAt,
 	)
@@ -221,14 +226,38 @@ func (s *sqliteStore) ListAlerts(
 	status types.AlertStatus,
 	limit int,
 ) ([]types.Alert, error) {
+	return s.listAlerts(ctx, "", status, limit)
+}
+
+func (s *sqliteStore) ListAlertsForTenant(
+	ctx context.Context,
+	tenantID string,
+	status types.AlertStatus,
+	limit int,
+) ([]types.Alert, error) {
+	return s.listAlerts(ctx, normalizeTenantID(tenantID), status, limit)
+}
+
+func (s *sqliteStore) listAlerts(
+	ctx context.Context,
+	tenantID string,
+	status types.AlertStatus,
+	limit int,
+) ([]types.Alert, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
 	query := alertSelect + `
 		FROM alerts`
-	args := make([]any, 0, 2)
+	args := make([]any, 0, 3)
+	where := " WHERE "
+	if tenantID != "" {
+		query += where + `tenant_id = ?`
+		args = append(args, tenantID)
+		where = " AND "
+	}
 	if status != "" {
-		query += ` WHERE status = ?`
+		query += where + `status = ?`
 		args = append(args, status)
 	}
 	query += ` ORDER BY triggered_at DESC, id DESC LIMIT ?`
@@ -256,6 +285,20 @@ func (s *sqliteStore) ListAlerts(
 
 func (s *sqliteStore) GetAlert(ctx context.Context, id string) (types.Alert, error) {
 	row := s.db.QueryRowContext(ctx, alertSelect+` FROM alerts WHERE id = ?`, id)
+	return readAlert(row)
+}
+
+func (s *sqliteStore) GetAlertForTenant(ctx context.Context, tenantID, id string) (types.Alert, error) {
+	row := s.db.QueryRowContext(
+		ctx,
+		alertSelect+` FROM alerts WHERE tenant_id = ? AND id = ?`,
+		normalizeTenantID(tenantID),
+		id,
+	)
+	return readAlert(row)
+}
+
+func readAlert(row alertScanner) (types.Alert, error) {
 	alert, err := scanAlert(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return types.Alert{}, ErrNotFound
@@ -271,13 +314,36 @@ func (s *sqliteStore) AcknowledgeAlert(
 	id, acknowledgedBy string,
 	acknowledgedAt time.Time,
 ) error {
-	result, err := s.db.ExecContext(ctx, `
+	return s.acknowledgeAlert(ctx, "", id, acknowledgedBy, acknowledgedAt)
+}
+
+func (s *sqliteStore) AcknowledgeAlertForTenant(
+	ctx context.Context,
+	tenantID, id, acknowledgedBy string,
+	acknowledgedAt time.Time,
+) error {
+	return s.acknowledgeAlert(ctx, normalizeTenantID(tenantID), id, acknowledgedBy, acknowledgedAt)
+}
+
+func (s *sqliteStore) acknowledgeAlert(
+	ctx context.Context,
+	tenantID, id, acknowledgedBy string,
+	acknowledgedAt time.Time,
+) error {
+	query := `
 		UPDATE alerts
 		SET status = ?, acknowledged_at = ?, acknowledged_by = ?, updated_at = ?
-		WHERE id = ? AND status = ?`,
+		WHERE id = ? AND status = ?`
+	args := []any{
 		types.AlertStatusAcknowledged, acknowledgedAt, acknowledgedBy, acknowledgedAt,
 		id, types.AlertStatusFiring,
-	)
+	}
+	if tenantID != "" {
+		query += ` AND tenant_id = ?`
+		args = append(args, tenantID)
+	}
+	result, err := s.db.ExecContext(ctx, `
+		`+query, args...)
 	if err != nil {
 		return fmt.Errorf("acknowledge alert: %w", err)
 	}
@@ -288,10 +354,16 @@ func (s *sqliteStore) AcknowledgeAlert(
 	if affected == 1 {
 		return nil
 	}
-	if _, err := s.GetAlert(ctx, id); errors.Is(err, ErrNotFound) {
+	var getErr error
+	if tenantID == "" {
+		_, getErr = s.GetAlert(ctx, id)
+	} else {
+		_, getErr = s.GetAlertForTenant(ctx, tenantID, id)
+	}
+	if errors.Is(getErr, ErrNotFound) {
 		return ErrNotFound
-	} else if err != nil {
-		return err
+	} else if getErr != nil {
+		return getErr
 	}
 	return ErrInvalidState
 }
@@ -379,7 +451,7 @@ func (s *sqliteStore) RecordAlertDeliveryFailure(
 }
 
 const alertSelect = `
-	SELECT id, rule_id, rule_name, cluster_id, cluster_name, dedupe_key,
+	SELECT id, tenant_id, rule_id, rule_name, cluster_id, cluster_name, dedupe_key,
 	       health, severity, summary, status, triggered_at, updated_at,
 	       acknowledged_at, acknowledged_by, resolved_at, delivery_status,
 	       delivery_attempts, next_delivery_at, last_delivery_error,
@@ -393,7 +465,7 @@ func scanAlert(scanner alertScanner) (types.Alert, error) {
 	var alert types.Alert
 	var acknowledgedAt, resolvedAt, nextDeliveryAt, deliveredAt, deadLetteredAt sql.NullTime
 	err := scanner.Scan(
-		&alert.ID, &alert.RuleID, &alert.RuleName, &alert.ClusterID, &alert.ClusterName, &alert.DedupeKey,
+		&alert.ID, &alert.TenantID, &alert.RuleID, &alert.RuleName, &alert.ClusterID, &alert.ClusterName, &alert.DedupeKey,
 		&alert.Health, &alert.Severity, &alert.Summary, &alert.Status, &alert.TriggeredAt, &alert.UpdatedAt,
 		&acknowledgedAt, &alert.AcknowledgedBy, &resolvedAt, &alert.DeliveryStatus,
 		&alert.DeliveryAttempts, &nextDeliveryAt, &alert.LastDeliveryError,

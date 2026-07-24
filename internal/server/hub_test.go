@@ -42,6 +42,7 @@ func TestBroadcastHubDeliversClusterUpdate(t *testing.T) {
 
 	httpServer := httptest.NewServer(srv.httpServer.Handler)
 	t.Cleanup(httpServer.Close)
+	sessionCookie := sessionCookieFor(t, st, types.RoleReadOnly)
 	readyResponse, err := http.Get(httpServer.URL + "/readyz")
 	if err != nil {
 		t.Fatalf("GET /readyz error = %v", err)
@@ -51,7 +52,9 @@ func TestBroadcastHubDeliversClusterUpdate(t *testing.T) {
 		t.Fatalf("GET /readyz status = %d, want %d", readyResponse.StatusCode, http.StatusOK)
 	}
 	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/clusters"
-	conn, _, err := websocket.Dial(context.Background(), wsURL, nil)
+	conn, _, err := websocket.Dial(context.Background(), wsURL, &websocket.DialOptions{
+		HTTPHeader: http.Header{"Cookie": []string{sessionCookieName + "=" + sessionCookie}},
+	})
 	if err != nil {
 		t.Fatalf("websocket.Dial() error = %v", err)
 	}
@@ -125,5 +128,48 @@ func TestBroadcastHubDropsSlowClientWithoutBlocking(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("Broadcast blocked after dropping a slow client")
+	}
+}
+
+func TestBroadcastHubScopesUpdatesToTenant(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := NewBroadcastHub(logger)
+	ctx, cancel := context.WithCancel(context.Background())
+	go hub.Run(ctx)
+	defer cancel()
+
+	clientA := &wsClient{
+		tenantID: "tenant-a", send: make(chan ClusterUpdate, 1),
+		registered: make(chan struct{}), closed: make(chan struct{}),
+	}
+	clientB := &wsClient{
+		tenantID: "tenant-b", send: make(chan ClusterUpdate, 1),
+		registered: make(chan struct{}), closed: make(chan struct{}),
+	}
+	if !hub.registerClient(clientA) || !hub.registerClient(clientB) {
+		t.Fatal("failed to register tenant clients")
+	}
+	defer hub.unregisterClient(clientA)
+	defer hub.unregisterClient(clientB)
+
+	hub.Broadcast(ClusterUpdate{
+		Type: "snapshot",
+		Cluster: types.Cluster{
+			ID: "a", TenantID: "tenant-a", Name: "alpha",
+		},
+	})
+
+	select {
+	case update := <-clientA.send:
+		if update.Cluster.ID != "a" {
+			t.Fatalf("tenant-a update = %#v, want cluster a", update)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("tenant-a did not receive its update")
+	}
+	select {
+	case update := <-clientB.send:
+		t.Fatalf("tenant-b received tenant-a update: %#v", update)
+	case <-time.After(50 * time.Millisecond):
 	}
 }

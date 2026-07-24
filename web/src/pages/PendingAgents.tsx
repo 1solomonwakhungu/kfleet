@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, LoaderCircle, RefreshCw, ShieldCheck } from 'lucide-react'
 
 import { PendingAgentTable } from '../components/agents/PendingAgentTable'
+import { useAuth } from '../auth/AuthContext'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import {
@@ -19,6 +20,8 @@ function isAbortError(error: unknown): boolean {
 }
 
 function PendingAgentsPage() {
+  const { user } = useAuth()
+  const canApprove = user?.role === 'admin' || user?.role === 'operator'
   const [agents, setAgents] = useState<PendingAgent[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -171,6 +174,7 @@ function PendingAgentsPage() {
             agents={agents}
             approvingIds={approvingIds}
             errors={approvalErrors}
+            canApprove={canApprove}
             onApprove={(agent) => void approve(agent)}
           />
         ) : !loadError ? (
