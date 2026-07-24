@@ -48,6 +48,17 @@ func (s *Server) clearSessionCookie(w http.ResponseWriter) {
 // attached to the request context for downstream handlers.
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if s.cfg.DemoMode && !mutationRequest(r) {
+			user := types.User{
+				ID:       "demo-read-only",
+				Username: "public-demo",
+				Email:    "public-demo@invalid",
+				Role:     types.RoleReadOnly,
+			}
+			next(w, r.WithContext(withAuthenticatedUser(r.Context(), user)))
+			return
+		}
+
 		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil || cookie.Value == "" {
 			api.WriteError(w, http.StatusUnauthorized, "authentication required")

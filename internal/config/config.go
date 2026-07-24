@@ -28,6 +28,7 @@ type Config struct {
 	LogLevel           string
 	HeartbeatInterval  time.Duration
 	RegistrationToken  string
+	DemoMode           bool
 	AlertWebhookURL    string
 	AlertWebhookSecret string
 	AlertMaxAttempts   int
@@ -91,6 +92,14 @@ func Load() (*Config, error) {
 		}
 		eventRetention = parsed
 	}
+	demoMode := false
+	if value := os.Getenv("KFLEET_DEMO_MODE"); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return nil, fmt.Errorf("KFLEET_DEMO_MODE must be a boolean")
+		}
+		demoMode = parsed
+	}
 
 	sessionDuration := defaultSessionDuration
 	if value := os.Getenv("KFLEET_SESSION_DURATION"); value != "" {
@@ -107,6 +116,7 @@ func Load() (*Config, error) {
 		LogLevel:               envOrDefault("KFLEET_LOG_LEVEL", defaultLogLevel),
 		HeartbeatInterval:      heartbeatInterval,
 		RegistrationToken:      os.Getenv("KFLEET_REGISTRATION_TOKEN"),
+		DemoMode:               demoMode,
 		AlertWebhookURL:        webhookURL,
 		AlertWebhookSecret:     webhookSecret,
 		AlertMaxAttempts:       maxAttempts,

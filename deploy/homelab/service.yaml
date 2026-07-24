@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kfleet-demo
+  namespace: kfleet-demo
+  labels:
+    app.kubernetes.io/name: kfleet-demo
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: kfleet-demo
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

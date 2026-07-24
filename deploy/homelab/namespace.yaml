@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kfleet-demo
+  labels:
+    app.sullylab.de/name: kfleet-demo
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kfleet-demo
+  namespace: kfleet-demo
+automountServiceAccountToken: false
