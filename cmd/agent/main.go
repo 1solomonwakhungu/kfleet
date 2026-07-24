@@ -88,19 +88,18 @@ func run(
 
 	delayBeforeRegister := false
 	for ctx.Err() == nil {
-		if delayBeforeRegister && !waitForRetry(ctx, backoff.Next()) {
+		registration, registered := registerWithRetry(
+			ctx,
+			agentRegistrar,
+			k8sVersion,
+			delayBeforeRegister,
+			backoff,
+			waitForRetry,
+			logger,
+		)
+		if !registered {
 			break
 		}
-		registration, err := agentRegistrar.Register(ctx, k8sVersion)
-		if err != nil {
-			if ctx.Err() != nil {
-				break
-			}
-			logger.Error("agent registration failed", "error", err)
-			delayBeforeRegister = true
-			continue
-		}
-		backoff.Reset()
 		if registration.Approved {
 			logger.Info("agent registered", "cluster_id", registration.ClusterID)
 		} else {
@@ -111,7 +110,7 @@ func run(
 		reportCfg.HubToken = agentRegistrar.Token()
 		clusterReporter := reporter.New(&reportCfg)
 		reportState(ctx, clusterCollector, clusterReporter, logger)
-		if runAgentLoop(ctx, cfg.ReportInterval, clusterCollector, clusterReporter, agentRegistrar, logger) {
+		if runAgentLoop(ctx, heartbeatInterval, cfg.ReportInterval, clusterCollector, clusterReporter, agentRegistrar, logger) {
 			break
 		}
 		delayBeforeRegister = true
@@ -124,10 +123,47 @@ func run(
 	}
 }
 
+type registrationClient interface {
+	Register(context.Context, string) (*registrar.RegisterResponse, error)
+}
+
+type retryBackoff interface {
+	Next() time.Duration
+	Reset()
+}
+
+func registerWithRetry(
+	ctx context.Context,
+	agentRegistrar registrationClient,
+	k8sVersion string,
+	delayBeforeRegister bool,
+	backoff retryBackoff,
+	wait func(context.Context, time.Duration) bool,
+	logger *slog.Logger,
+) (*registrar.RegisterResponse, bool) {
+	for ctx.Err() == nil {
+		if delayBeforeRegister && !wait(ctx, backoff.Next()) {
+			return nil, false
+		}
+		registration, err := agentRegistrar.Register(ctx, k8sVersion)
+		if err == nil {
+			backoff.Reset()
+			return registration, true
+		}
+		if ctx.Err() != nil {
+			return nil, false
+		}
+		logger.Error("agent registration failed", "error", err)
+		delayBeforeRegister = true
+	}
+	return nil, false
+}
+
 // runAgentLoop returns true when the root context is cancelled and false when
 // registration should be retried after a heartbeat failure.
 func runAgentLoop(
 	ctx context.Context,
+	heartbeatInterval time.Duration,
 	reportInterval time.Duration,
 	clusterCollector *collector.Collector,
 	clusterReporter *reporter.Reporter,
