@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, BellRing, Check, CircleAlert, LoaderCircle, RefreshCw, type LucideIcon } from 'lucide-react'
 
 import { api } from '../lib/api'
+import { useAuth } from '../auth/AuthContext'
 import type { Alert, AlertDeliveryStatus, AlertStatus } from '../types/alert'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -42,6 +43,8 @@ const statusLabels: Record<AlertStatus, string> = {
 }
 
 export default function AlertsPage() {
+  const { user } = useAuth()
+  const canAcknowledge = user?.role === 'admin' || user?.role === 'operator'
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -72,6 +75,7 @@ export default function AlertsPage() {
   }, [load])
 
   const acknowledge = useCallback(async (alert: Alert) => {
+    if (!canAcknowledge) return
     setAcknowledging((current) => new Set(current).add(alert.id))
     setActionErrors((current) => {
       const next = { ...current }
@@ -93,7 +97,7 @@ export default function AlertsPage() {
         return next
       })
     }
-  }, [])
+  }, [canAcknowledge])
 
   const summary = useMemo(() => ({
     firing: alerts.filter((alert) => alert.status === 'firing').length,
@@ -218,13 +222,13 @@ export default function AlertsPage() {
                       {alert.status === 'firing' ? (
                         <Button
                           size="sm"
-                          disabled={isAcknowledging}
+                          disabled={isAcknowledging || !canAcknowledge}
                           onClick={() => void acknowledge(alert)}
                         >
                           {isAcknowledging
                             ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
                             : <Check className="size-4" aria-hidden="true" />}
-                          {isAcknowledging ? 'Acknowledging...' : 'Acknowledge'}
+                          {isAcknowledging ? 'Acknowledging...' : canAcknowledge ? 'Acknowledge' : 'View only'}
                         </Button>
                       ) : (
                         <span className="text-sm text-muted">{statusLabels[alert.status]}</span>

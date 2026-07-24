@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,11 +14,120 @@ import (
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/config"
+	"github.com/1solomonwakhungu/kfleet/internal/demo"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 )
+
+func TestDemoModeBlocksMutationsAndSetsSecurityHeaders(t *testing.T) {
+	st, err := demo.Open(context.Background())
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	srv := New(&config.Config{ListenAddr: ":0", DemoMode: true}, logger, st)
+	httpServer := httptest.NewServer(srv.httpServer.Handler)
+	t.Cleanup(httpServer.Close)
+
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		req, err := http.NewRequest(method, httpServer.URL+"/api/v1/clusters/register", bytes.NewBufferString(`{"name":"must-not-exist"}`))
+		if err != nil {
+			t.Fatalf("http.NewRequest(%s) error = %v", method, err)
+		}
+		response, err := httpServer.Client().Do(req)
+		if err != nil {
+			t.Fatalf("%s request error = %v", method, err)
+		}
+		_ = response.Body.Close()
+		if response.StatusCode != http.StatusMethodNotAllowed {
+			t.Errorf("%s status = %d, want %d", method, response.StatusCode, http.StatusMethodNotAllowed)
+		}
+		if got := response.Header.Get("Allow"); got != "GET, HEAD, OPTIONS" {
+			t.Errorf("%s Allow = %q", method, got)
+		}
+	}
+
+	response, err := http.Get(httpServer.URL + "/api/v1/meta")
+	if err != nil {
+		t.Fatalf("GET /api/v1/meta error = %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/v1/meta status = %d", response.StatusCode)
+	}
+	var metadata struct {
+		DemoMode      bool `json:"demoMode"`
+		ReadOnly      bool `json:"readOnly"`
+		SyntheticData bool `json:"syntheticData"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&metadata); err != nil {
+		t.Fatalf("decode metadata: %v", err)
+	}
+	if !metadata.DemoMode || !metadata.ReadOnly || !metadata.SyntheticData {
+		t.Fatalf("metadata = %#v, want all safety flags true", metadata)
+	}
+
+	clusterResponse, err := http.Get(httpServer.URL + "/api/v1/clusters")
+	if err != nil {
+		t.Fatalf("GET /api/v1/clusters error = %v", err)
+	}
+	var clusters struct {
+		Clusters []types.Cluster `json:"clusters"`
+	}
+	if err := json.NewDecoder(clusterResponse.Body).Decode(&clusters); err != nil {
+		t.Fatalf("decode clusters: %v", err)
+	}
+	clusterResponse.Body.Close()
+	if clusterResponse.StatusCode != http.StatusOK || len(clusters.Clusters) != 3 {
+		t.Fatalf("public demo clusters status=%d count=%d, want 200 and 3", clusterResponse.StatusCode, len(clusters.Clusters))
+	}
+	for _, cluster := range clusters.Clusters {
+		if cluster.Labels["data"] != "synthetic" || cluster.Labels["environment"] != "demo" {
+			t.Fatalf("public demo leaked a non-synthetic cluster: %#v", cluster)
+		}
+	}
+
+	meResponse, err := http.Get(httpServer.URL + "/api/v1/auth/me")
+	if err != nil {
+		t.Fatalf("GET /api/v1/auth/me error = %v", err)
+	}
+	var me struct {
+		Username string     `json:"username"`
+		Role     types.Role `json:"role"`
+	}
+	if err := json.NewDecoder(meResponse.Body).Decode(&me); err != nil {
+		t.Fatalf("decode demo user: %v", err)
+	}
+	meResponse.Body.Close()
+	if meResponse.StatusCode != http.StatusOK || me.Username != "public-demo" || me.Role != types.RoleReadOnly {
+		t.Fatalf("public demo user status=%d user=%#v", meResponse.StatusCode, me)
+	}
+
+	usersResponse, err := http.Get(httpServer.URL + "/api/v1/users")
+	if err != nil {
+		t.Fatalf("GET /api/v1/users error = %v", err)
+	}
+	usersResponse.Body.Close()
+	if usersResponse.StatusCode != http.StatusForbidden {
+		t.Fatalf("public demo users status = %d, want %d", usersResponse.StatusCode, http.StatusForbidden)
+	}
+	for _, header := range []string{
+		"Content-Security-Policy",
+		"Permissions-Policy",
+		"Referrer-Policy",
+		"Strict-Transport-Security",
+		"X-Content-Type-Options",
+		"X-Frame-Options",
+	} {
+		if response.Header.Get(header) == "" {
+			t.Errorf("%s header is missing", header)
+		}
+	}
+}
 
 func TestBroadcastHubDeliversClusterUpdate(t *testing.T) {
 	st, err := store.Open(filepath.Join(t.TempDir(), "kfleet.db"))

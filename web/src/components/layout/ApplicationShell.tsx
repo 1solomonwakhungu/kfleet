@@ -1,17 +1,35 @@
-import { useEffect, useRef, useState } from 'react'
-import { Activity, Boxes, LogOut, Menu, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Activity, Boxes, Eye, LogOut, Menu, ShieldCheck, X } from 'lucide-react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 
 import { useAuth } from '../../auth/AuthContext'
 import { Button } from '../ui/button'
 import { cn } from '../../lib/utils'
-import { PrimaryNavigation } from '../navigation/PrimaryNavigation'
+import { api, type RuntimeInfo } from '../../lib/api'
+import {
+  PrimaryNavigation,
+  primaryNavigationItems,
+  readOnlyNavigationItems,
+} from '../navigation/PrimaryNavigation'
 
 export function ApplicationShell() {
   const { user, logout } = useAuth()
   const location = useLocation()
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
+  const [runtime, setRuntime] = useState<RuntimeInfo | null>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const navigationItems = useMemo(
+    () => (runtime?.readOnly ? readOnlyNavigationItems : primaryNavigationItems),
+    [runtime?.readOnly],
+  )
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void api.getRuntimeInfo(controller.signal).then(setRuntime).catch(() => {
+      // Older hubs do not expose runtime metadata. Preserve the normal UI.
+    })
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     setMobileNavigationOpen(false)
@@ -47,14 +65,16 @@ export function ApplicationShell() {
 
         <div className="flex min-h-0 flex-1 flex-col px-3 py-5">
           <p className="px-3 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-muted">Workspace</p>
-          <PrimaryNavigation className="mt-2" />
+          <PrimaryNavigation className="mt-2" items={navigationItems} />
           <div className="mt-auto space-y-3">
-            <AccountSummary
-              username={user?.username ?? ''}
-              role={user?.role ?? 'read_only'}
-              onLogout={() => void logout()}
-            />
-            <EnvironmentStatus />
+            {!runtime?.readOnly && (
+              <AccountSummary
+                username={user?.username ?? ''}
+                role={user?.role ?? 'read_only'}
+                onLogout={() => void logout()}
+              />
+            )}
+            <EnvironmentStatus runtime={runtime} />
           </div>
         </div>
       </aside>
@@ -82,17 +102,21 @@ export function ApplicationShell() {
 
           {mobileNavigationOpen && (
             <div id="mobile-navigation" className="border-t border-border px-4 pb-4 pt-3 sm:px-6">
-              <PrimaryNavigation onNavigate={() => setMobileNavigationOpen(false)} />
-              <AccountSummary
-                className="mt-3"
-                username={user?.username ?? ''}
-                role={user?.role ?? 'read_only'}
-                onLogout={() => void logout()}
-              />
-              <EnvironmentStatus className="mt-3" compact />
+              <PrimaryNavigation items={navigationItems} onNavigate={() => setMobileNavigationOpen(false)} />
+              {!runtime?.readOnly && (
+                <AccountSummary
+                  className="mt-3"
+                  username={user?.username ?? ''}
+                  role={user?.role ?? 'read_only'}
+                  onLogout={() => void logout()}
+                />
+              )}
+              <EnvironmentStatus className="mt-3" compact runtime={runtime} />
             </div>
           )}
         </header>
+
+        {runtime?.demoMode && <DemoNotice policy={runtime.dataPolicy} />}
 
         <div id="main-content" className="min-w-0 flex-1" tabIndex={-1}>
           <Outlet />
@@ -144,9 +168,10 @@ function BrandLink() {
 interface EnvironmentStatusProps {
   className?: string
   compact?: boolean
+  runtime: RuntimeInfo | null
 }
 
-function EnvironmentStatus({ className, compact = false }: EnvironmentStatusProps) {
+function EnvironmentStatus({ className, compact = false, runtime }: EnvironmentStatusProps) {
   return (
     <section
       className={cn(
@@ -158,15 +183,38 @@ function EnvironmentStatus({ className, compact = false }: EnvironmentStatusProp
     >
       <div className="min-w-0">
         <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-muted">Environment</p>
-        <p className="mt-1 truncate whitespace-nowrap text-sm font-semibold">Fleet</p>
+        <p className="mt-1 truncate whitespace-nowrap text-sm font-semibold">
+          {runtime?.demoMode ? 'Public demo' : 'Fleet'}
+        </p>
       </div>
       <div className={cn('mt-3 border-t border-border pt-3', compact && 'mt-0 border-l border-t-0 pl-3 pt-0')}>
         <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-muted">Hub status</p>
         <p className="mt-1 flex items-center gap-2 whitespace-nowrap text-sm text-muted">
-          <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          Not reported
+          {runtime?.readOnly ? (
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-healthy" aria-hidden="true" />
+          ) : (
+            <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          )}
+          {runtime?.readOnly ? 'Read-only' : 'Not reported'}
         </p>
       </div>
     </section>
+  )
+}
+
+function DemoNotice({ policy }: { policy: string }) {
+  return (
+    <aside
+      className="border-b border-blue-800/70 bg-blue-950/80 px-4 py-3 text-blue-100 sm:px-6 lg:px-8"
+      aria-label="Public demo safety notice"
+    >
+      <div className="mx-auto flex max-w-[100rem] items-start gap-3">
+        <Eye className="mt-0.5 h-4 w-4 shrink-0 text-blue-300" aria-hidden="true" />
+        <p className="text-sm leading-5">
+          <strong className="font-semibold">Read-only synthetic demo.</strong>{' '}
+          <span className="text-blue-200">{policy} Mutating API requests are disabled.</span>
+        </p>
+      </div>
+    </aside>
   )
 }
