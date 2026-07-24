@@ -1,3 +1,5 @@
+import { notifyAuthenticationRequired } from './authApi'
+
 const API_BASE = '/api/v1'
 
 export interface PendingAgent {
@@ -53,6 +55,7 @@ async function request(path: string, init: RequestInit): Promise<unknown> {
       ...init.headers,
     },
   })
+  notifyAuthenticationRequired(response)
   const body = await readBody(response)
 
   if (!response.ok) {
@@ -116,6 +119,7 @@ export async function getPendingAgents(signal?: AbortSignal): Promise<PendingAge
 export async function approvePendingAgent(id: string, signal?: AbortSignal): Promise<PendingAgent> {
   const body = await request(`/agents/${encodeURIComponent(id)}/approve`, {
     method: 'POST',
+    headers: { 'X-Kfleet-CSRF': '1' },
     signal,
   })
   const approved = parsePendingAgent(body)

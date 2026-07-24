@@ -54,6 +54,13 @@ func main() {
 		}
 	}()
 
+	if !cfg.DemoMode {
+		if err := server.BootstrapAdmin(ctx, cfg, logger, st); err != nil {
+			logger.Error("failed to bootstrap admin user", "error", err)
+			os.Exit(1)
+		}
+	}
+
 	srv := server.New(cfg, logger, st)
 	logger.Info("starting hub server", "address", cfg.ListenAddr, "demo_mode", cfg.DemoMode)
 	if err := srv.Start(ctx); err != nil {

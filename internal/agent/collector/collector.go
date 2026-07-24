@@ -3,6 +3,8 @@ package collector
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -68,6 +70,10 @@ func (c *Collector) Collect(ctx context.Context) (*ClusterState, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list deployments: %w", err)
 	}
+	namespaces, err := c.clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list namespaces: %w", err)
+	}
 	events, err := c.clientset.CoreV1().Events(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("list events: %w", err)
@@ -78,6 +84,7 @@ func (c *Collector) Collect(ctx context.Context) (*ClusterState, error) {
 		Pods:         make([]PodInfo, 0, len(pods.Items)),
 		Services:     make([]ServiceInfo, 0, len(services.Items)),
 		Deployments:  make([]DeploymentInfo, 0, len(deployments.Items)),
+		Namespaces:   make([]NamespaceInfo, 0, len(namespaces.Items)),
 		Events:       make([]EventInfo, 0, min(len(events.Items), maxEvents)),
 		NodeCount:    len(nodes.Items),
 		PodCount:     len(pods.Items),
@@ -99,6 +106,12 @@ func (c *Collector) Collect(ctx context.Context) (*ClusterState, error) {
 	}
 	for _, deployment := range deployments.Items {
 		state.Deployments = append(state.Deployments, deploymentInfo(deployment, collectedAt))
+	}
+	for _, namespace := range namespaces.Items {
+		state.Namespaces = append(state.Namespaces, NamespaceInfo{
+			Name:   namespace.Name,
+			Labels: cloneMap(namespace.Labels),
+		})
 	}
 	sort.Slice(events.Items, func(i, j int) bool {
 		return eventTimestamp(events.Items[i]).After(eventTimestamp(events.Items[j]))
@@ -158,15 +171,54 @@ func podInfo(pod corev1.Pod) PodInfo {
 	for _, status := range pod.Status.InitContainerStatuses {
 		restarts += status.RestartCount
 	}
-	return PodInfo{
-		Namespace: pod.Namespace,
-		Name:      pod.Name,
-		Phase:     string(pod.Status.Phase),
-		Restarts:  restarts,
-		Node:      pod.Spec.NodeName,
-		Ready:     ready,
-		StartTime: timestampValue(pod.Status.StartTime),
+	info := PodInfo{
+		Namespace:   pod.Namespace,
+		Name:        pod.Name,
+		Phase:       string(pod.Status.Phase),
+		Restarts:    restarts,
+		Node:        pod.Spec.NodeName,
+		Ready:       ready,
+		StartTime:   timestampValue(pod.Status.StartTime),
+		HostNetwork: pod.Spec.HostNetwork,
+		HostPID:     pod.Spec.HostPID,
+		HostIPC:     pod.Spec.HostIPC,
 	}
+	containers := make([]corev1.Container, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers)+len(pod.Spec.EphemeralContainers))
+	containers = append(containers, pod.Spec.InitContainers...)
+	containers = append(containers, pod.Spec.Containers...)
+	for _, container := range pod.Spec.EphemeralContainers {
+		containers = append(containers, corev1.Container{
+			Name:            container.Name,
+			SecurityContext: container.SecurityContext,
+		})
+	}
+	if len(containers) == 0 {
+		return info
+	}
+
+	info.SecurityContextKnown = true
+	info.RunAsNonRoot = true
+	info.ReadOnlyRootFilesystem = true
+	info.CapabilitiesDroppedAll = true
+	for _, container := range containers {
+		security := container.SecurityContext
+		if security != nil && security.Privileged != nil && *security.Privileged {
+			info.Privileged = true
+		}
+		if !effectiveRunAsNonRoot(pod.Spec.SecurityContext, security) {
+			info.RunAsNonRoot = false
+		}
+		if security == nil || security.ReadOnlyRootFilesystem == nil || !*security.ReadOnlyRootFilesystem {
+			info.ReadOnlyRootFilesystem = false
+		}
+		if security == nil || security.AllowPrivilegeEscalation == nil || *security.AllowPrivilegeEscalation {
+			info.AllowsPrivilegeEscalation = true
+		}
+		if !dropsAllCapabilities(security) {
+			info.CapabilitiesDroppedAll = false
+		}
+	}
+	return info
 }
 
 func serviceInfo(service corev1.Service, collectedAt time.Time) ServiceInfo {
@@ -194,6 +246,16 @@ func deploymentInfo(deployment appsv1.Deployment, collectedAt time.Time) Deploym
 	if deployment.Spec.Replicas != nil {
 		desired = *deployment.Spec.Replicas
 	}
+	images := make([]string, 0, len(deployment.Spec.Template.Spec.InitContainers)+len(deployment.Spec.Template.Spec.Containers))
+	for _, container := range deployment.Spec.Template.Spec.InitContainers {
+		images = append(images, container.Image)
+	}
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		images = append(images, container.Image)
+	}
+	sort.Strings(images)
+	config, _ := json.Marshal(deployment.Spec)
+	hash := sha256.Sum256(config)
 	return DeploymentInfo{
 		Namespace:         deployment.Namespace,
 		Name:              deployment.Name,
@@ -202,7 +264,36 @@ func deploymentInfo(deployment appsv1.Deployment, collectedAt time.Time) Deploym
 		AvailableReplicas: deployment.Status.AvailableReplicas,
 		UpdatedReplicas:   deployment.Status.UpdatedReplicas,
 		Age:               formatAge(deployment.CreationTimestamp.Time, collectedAt),
+		ConfigHash:        fmt.Sprintf("%x", hash[:12]),
+		Images:            images,
 	}
+}
+
+func effectiveRunAsNonRoot(pod *corev1.PodSecurityContext, container *corev1.SecurityContext) bool {
+	if container != nil && container.RunAsNonRoot != nil {
+		return *container.RunAsNonRoot
+	}
+	return pod != nil && pod.RunAsNonRoot != nil && *pod.RunAsNonRoot
+}
+
+func dropsAllCapabilities(security *corev1.SecurityContext) bool {
+	if security == nil || security.Capabilities == nil {
+		return false
+	}
+	for _, capability := range security.Capabilities.Drop {
+		if strings.EqualFold(string(capability), "ALL") {
+			return true
+		}
+	}
+	return false
+}
+
+func cloneMap(source map[string]string) map[string]string {
+	result := make(map[string]string, len(source))
+	for key, value := range source {
+		result[key] = value
+	}
+	return result
 }
 
 func timestampValue(value *metav1.Time) time.Time {

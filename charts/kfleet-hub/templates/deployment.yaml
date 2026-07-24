@@ -16,7 +16,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/registration-secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/hub-secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -60,11 +60,49 @@ spec:
           env:
             - name: KFLEET_DB_PATH
               value: {{ printf "%s/kfleet.db" .Values.persistence.mountPath | quote }}
+            - name: KFLEET_EVENT_RETENTION
+              value: {{ .Values.timeline.retention | quote }}
             - name: KFLEET_REGISTRATION_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ include "kfleet-hub.fullname" . }}
                   key: registration-token
+            {{- if .Values.alerts.webhook.url }}
+            - name: KFLEET_ALERT_WEBHOOK_URL
+              value: {{ .Values.alerts.webhook.url | quote }}
+            - name: KFLEET_ALERT_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kfleet-hub.fullname" . }}
+                  key: alert-webhook-secret
+            {{- end }}
+            - name: KFLEET_ALERT_MAX_ATTEMPTS
+              value: {{ .Values.alerts.maxAttempts | quote }}
+            - name: KFLEET_ALERT_RETRY_BASE
+              value: {{ .Values.alerts.retryBase | quote }}
+            - name: KFLEET_ALERT_POLL_INTERVAL
+              value: {{ .Values.alerts.pollInterval | quote }}
+            - name: KFLEET_SESSION_DURATION
+              value: {{ .Values.auth.sessionDuration | quote }}
+            {{- if .Values.auth.sessionCookieInsecure }}
+            - name: KFLEET_SESSION_COOKIE_INSECURE
+              value: "true"
+            {{- end }}
+            - name: KFLEET_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kfleet-hub.fullname" . }}
+                  key: bootstrap-admin-username
+            - name: KFLEET_BOOTSTRAP_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kfleet-hub.fullname" . }}
+                  key: bootstrap-admin-email
+            - name: KFLEET_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kfleet-hub.fullname" . }}
+                  key: bootstrap-admin-password
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}

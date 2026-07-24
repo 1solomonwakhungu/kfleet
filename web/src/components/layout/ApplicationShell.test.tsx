@@ -5,6 +5,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../lib/api'
 import { ApplicationShell } from './ApplicationShell'
 
+vi.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({
+    user: { username: 'public-demo', role: 'read_only' },
+    logout: vi.fn(),
+  }),
+}))
+
 afterEach(() => {
   vi.restoreAllMocks()
 })
@@ -33,6 +40,7 @@ describe('ApplicationShell public demo state', () => {
     })
     expect(screen.getByText(/Mutating API requests are disabled/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: /Agents/ })).toBeNull()
-    expect(screen.getByRole('link', { name: /Fleet/ })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Fleet Cluster overview' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
   })
 })

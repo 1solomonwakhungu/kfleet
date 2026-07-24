@@ -16,6 +16,9 @@ func TestRegisterKeepsBootstrapTokenAfterRuntimeTokenRotation(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer bootstrap-token" {
 			t.Errorf("registration %d Authorization = %q, want bootstrap token", requests, got)
 		}
+		if got := r.Header.Get("X-Kfleet-Tenant-ID"); got != "tenant-a" {
+			t.Errorf("registration %d tenant = %q, want tenant-a", requests, got)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"clusterId":"cluster-a","token":"runtime-token"}`))
@@ -26,6 +29,7 @@ func TestRegisterKeepsBootstrapTokenAfterRuntimeTokenRotation(t *testing.T) {
 		HubURL:      server.URL,
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
+		TenantID:    "tenant-a",
 	}, nil)
 	if _, err := registrar.Register(context.Background(), "v1.32.3"); err != nil {
 		t.Fatalf("first Register() error = %v", err)

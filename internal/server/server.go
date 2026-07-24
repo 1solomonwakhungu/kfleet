@@ -9,8 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/1solomonwakhungu/kfleet/internal/alerts"
 	"github.com/1solomonwakhungu/kfleet/internal/config"
 	hubweb "github.com/1solomonwakhungu/kfleet/internal/hub/web"
+	"github.com/1solomonwakhungu/kfleet/internal/policy"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
 	"github.com/1solomonwakhungu/kfleet/pkg/api"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
@@ -18,11 +20,18 @@ import (
 
 const shutdownTimeout = 5 * time.Second
 
+// eventPruneInterval controls how often the retention sweep runs. Hourly is
+// frequent enough to keep the table bounded without adding meaningful load.
+const eventPruneInterval = time.Hour
+const defaultEventRetention = 90 * 24 * time.Hour
+
 // Server is the kfleet hub HTTP server.
 type Server struct {
 	cfg        *config.Config
 	logger     *slog.Logger
 	store      store.Store
+	alerts     *alerts.Manager
+	policies   *policy.Engine
 	broadcast  *BroadcastHub
 	httpServer *http.Server
 }
@@ -30,11 +39,19 @@ type Server struct {
 // New constructs a hub server with its routes configured.
 func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	server := &Server{
-		cfg:       cfg,
-		logger:    logger,
-		store:     st,
+		cfg:    cfg,
+		logger: logger,
+		store:  st,
+		alerts: alerts.New(st, logger, alerts.Config{
+			WebhookURL:   cfg.AlertWebhookURL,
+			Secret:       cfg.AlertWebhookSecret,
+			MaxAttempts:  cfg.AlertMaxAttempts,
+			RetryBase:    cfg.AlertRetryBase,
+			PollInterval: cfg.AlertPollInterval,
+		}),
 		broadcast: NewBroadcastHub(logger),
 	}
+	server.policies = policy.NewEngine(st, 3*server.heartbeatInterval())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -55,9 +72,16 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 			server.logger.Error("failed to write runtime metadata", "error", err)
 		}
 	})
+	server.registerAuthRoutes(mux)
+	server.registerUserRoutes(mux)
+	server.registerAuditRoutes(mux)
+	server.registerAdminRoutes(mux)
 	server.registerAgentRoutes(mux)
 	server.registerClusterRoutes(mux)
-	mux.HandleFunc("GET /ws/clusters", server.handleWSClusters)
+	server.registerAlertRoutes(mux)
+	server.registerEventRoutes(mux)
+	server.registerPolicyRoutes(mux)
+	mux.HandleFunc("GET /ws/clusters", server.requireAuth(server.handleWSClusters))
 	mux.Handle("/", hubweb.Handler())
 
 	handler := http.Handler(mux)
@@ -82,6 +106,9 @@ func (s *Server) Start(ctx context.Context) error {
 	go s.broadcast.Run(hubCtx)
 	if !s.cfg.DemoMode {
 		go s.monitorStaleClusters(hubCtx)
+		go s.alerts.Run(hubCtx)
+		go s.monitorEventRetention(hubCtx)
+		go s.pruneExpiredSessions(hubCtx)
 	}
 
 	errCh := make(chan error, 1)
@@ -152,6 +179,24 @@ func (s *Server) withSecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) pruneExpiredSessions(ctx context.Context) {
+	if err := s.store.DeleteExpiredSessions(ctx, time.Now().UTC()); err != nil {
+		s.logger.Error("failed to prune expired sessions", "error", err)
+	}
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			if err := s.store.DeleteExpiredSessions(ctx, now.UTC()); err != nil {
+				s.logger.Error("failed to prune expired sessions", "error", err)
+			}
+		}
+	}
+}
+
 func (s *Server) heartbeatInterval() time.Duration {
 	if s.cfg.HeartbeatInterval > 0 {
 		return s.cfg.HeartbeatInterval
@@ -183,12 +228,49 @@ func (s *Server) markStaleClusters(ctx context.Context, now time.Time) {
 		if cluster.LastHeartbeat.IsZero() || !cluster.LastHeartbeat.Before(cutoff) || cluster.Health == types.HealthUnreachable {
 			continue
 		}
+		oldHealth := cluster.Health
 		if err := s.store.UpdateHealth(ctx, cluster.ID, types.HealthUnreachable, cluster.LastHeartbeat); err != nil {
 			s.logger.Error("failed to mark cluster unreachable", "cluster_id", cluster.ID, "error", err)
 			continue
 		}
 		cluster.Health = types.HealthUnreachable
+		s.alerts.Evaluate(ctx, cluster)
 		s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
+		s.recordAgentDisconnected(ctx, cluster, "heartbeat_timeout", now)
+		s.recordHeartbeatTransition(ctx, cluster, oldHealth, types.HealthUnreachable, now)
+	}
+}
+
+func (s *Server) monitorEventRetention(ctx context.Context) {
+	s.pruneExpiredEvents(ctx, time.Now().UTC())
+	ticker := time.NewTicker(eventPruneInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			s.pruneExpiredEvents(ctx, now.UTC())
+		}
+	}
+}
+
+func (s *Server) eventRetention() time.Duration {
+	if s.cfg.EventRetention > 0 {
+		return s.cfg.EventRetention
+	}
+	return defaultEventRetention
+}
+
+func (s *Server) pruneExpiredEvents(ctx context.Context, now time.Time) {
+	cutoff := now.UTC().Add(-s.eventRetention())
+	removed, err := s.store.PruneEventsBefore(ctx, cutoff)
+	if err != nil {
+		s.logger.Error("failed to prune operational events", "error", err)
+		return
+	}
+	if removed > 0 {
+		s.logger.Info("pruned expired operational events", "removed", removed, "cutoff", cutoff)
 	}
 }
 

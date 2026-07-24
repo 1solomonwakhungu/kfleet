@@ -17,7 +17,11 @@ const (
 )
 
 func (s *Server) handleWSClusters(w http.ResponseWriter, r *http.Request) {
-	clusters, err := s.store.ListClusters(r.Context())
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	clusters, err := s.store.ListClustersForTenant(r.Context(), tenantID)
 	if err != nil {
 		s.logger.Error("failed to create WebSocket cluster snapshot", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "failed to list clusters")
@@ -39,6 +43,7 @@ func (s *Server) handleWSClusters(w http.ResponseWriter, r *http.Request) {
 	}
 	client := &wsClient{
 		conn:       conn,
+		tenantID:   tenantID,
 		send:       make(chan ClusterUpdate, queueSize),
 		registered: make(chan struct{}),
 		closed:     make(chan struct{}),
