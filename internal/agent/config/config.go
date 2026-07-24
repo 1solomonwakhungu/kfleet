@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var tenantIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
 
 const (
 	defaultReportInterval = 30 * time.Second
@@ -19,6 +22,7 @@ type Config struct {
 	HubURL         string
 	ClusterName    string
 	HubToken       string
+	TenantID       string
 	ReportInterval time.Duration
 	Kubeconfig     string
 	HealthAddress  string
@@ -47,10 +51,16 @@ func Load() (*Config, error) {
 		interval = parsed
 	}
 
+	tenantID := envOrDefault("KFLEET_TENANT_ID", "default")
+	if !tenantIDPattern.MatchString(tenantID) {
+		return nil, errors.New("KFLEET_TENANT_ID must be a lowercase tenant identifier")
+	}
+
 	return &Config{
 		HubURL:         hubURL,
 		ClusterName:    clusterName,
 		HubToken:       os.Getenv("KFLEET_HUB_TOKEN"),
+		TenantID:       tenantID,
 		ReportInterval: interval,
 		Kubeconfig:     os.Getenv("KUBECONFIG"),
 		HealthAddress:  envOrDefault("KFLEET_HEALTH_ADDR", defaultHealthAddress),

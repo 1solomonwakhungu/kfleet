@@ -1,11 +1,62 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
 )
+
+func TestAlertHistoryAndAcknowledgementAreTenantScoped(t *testing.T) {
+	server := newTestHTTPServer(t)
+	st := serverStoreForTest(t, server)
+	now := time.Now().UTC()
+	for _, alert := range []types.Alert{
+		{
+			ID: "alert-a", TenantID: "tenant-a", RuleID: "fleet-health-degraded",
+			RuleName: "Cluster health degraded", ClusterID: "cluster-a", ClusterName: "alpha",
+			DedupeKey: "degraded:cluster-a", Health: types.HealthDegraded,
+			Severity: types.AlertSeverityWarning, Summary: "alpha is degraded",
+			Status: types.AlertStatusFiring, TriggeredAt: now, UpdatedAt: now,
+			DeliveryStatus: types.AlertDeliveryDisabled,
+		},
+		{
+			ID: "alert-b", TenantID: "tenant-b", RuleID: "fleet-health-degraded",
+			RuleName: "Cluster health degraded", ClusterID: "cluster-b", ClusterName: "bravo",
+			DedupeKey: "degraded:cluster-b", Health: types.HealthDegraded,
+			Severity: types.AlertSeverityWarning, Summary: "bravo is degraded",
+			Status: types.AlertStatusFiring, TriggeredAt: now, UpdatedAt: now,
+			DeliveryStatus: types.AlertDeliveryDisabled,
+		},
+	} {
+		created, err := st.CreateAlertIfDue(context.Background(), alert, 0)
+		if err != nil || !created {
+			t.Fatalf("CreateAlertIfDue(%s) = %v, %v, want true, nil", alert.ID, created, err)
+		}
+	}
+
+	list := tenantRequest(t, server, http.MethodGet, "/api/v1/alerts", "tenant-a", "")
+	var history alertListResponse
+	decodeResponse(t, list, &history)
+	if len(history.Alerts) != 1 || history.Alerts[0].ID != "alert-a" {
+		t.Fatalf("tenant-a alert history = %#v, want only alert-a", history.Alerts)
+	}
+
+	crossTenant := tenantRequest(
+		t,
+		server,
+		http.MethodPost,
+		"/api/v1/alerts/alert-b/acknowledge",
+		"tenant-a",
+		`{"acknowledgedBy":"spoofed"}`,
+	)
+	crossTenant.Body.Close()
+	if crossTenant.StatusCode != http.StatusNotFound {
+		t.Fatalf("cross-tenant acknowledge status = %d, want %d", crossTenant.StatusCode, http.StatusNotFound)
+	}
+}
 
 func TestAlertHistoryAndAcknowledgementLifecycle(t *testing.T) {
 	server, registration := registeredAgent(t)
@@ -53,7 +104,8 @@ func TestAlertHistoryAndAcknowledgementLifecycle(t *testing.T) {
 	var updated types.Alert
 	decodeResponse(t, acknowledged, &updated)
 	if updated.Status != types.AlertStatusAcknowledged ||
-		updated.AcknowledgedBy != "on-call" ||
+		updated.AcknowledgedBy == "" ||
+		updated.AcknowledgedBy == "on-call" ||
 		updated.AcknowledgedAt == nil {
 		t.Fatalf("acknowledged alert = %#v", updated)
 	}

@@ -28,13 +28,17 @@ type acknowledgeAlertRequest struct {
 }
 
 func (s *Server) registerAlertRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/alerts", s.handleListAlerts)
-	mux.HandleFunc("POST /api/v1/alerts/{id}/acknowledge", s.handleAcknowledgeAlert)
-	mux.HandleFunc("GET /api/v1/alert-rules", s.handleListAlertRules)
-	mux.HandleFunc("PUT /api/v1/alert-rules/{id}", s.handlePutAlertRule)
+	mux.HandleFunc("GET /api/v1/alerts", s.requireAuth(s.handleListAlerts))
+	mux.HandleFunc("POST /api/v1/alerts/{id}/acknowledge", s.requireRole(types.RoleOperator, s.handleAcknowledgeAlert))
+	mux.HandleFunc("GET /api/v1/alert-rules", s.requireAuth(s.handleListAlertRules))
+	mux.HandleFunc("PUT /api/v1/alert-rules/{id}", s.requireRole(types.RoleAdmin, s.handlePutAlertRule))
 }
 
 func (s *Server) handleListAlerts(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
 	status := types.AlertStatus(strings.TrimSpace(r.URL.Query().Get("status")))
 	if status != "" && !validAlertStatus(status) {
 		api.WriteError(w, http.StatusBadRequest, "status must be firing, acknowledged, or resolved")
@@ -49,7 +53,7 @@ func (s *Server) handleListAlerts(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = parsed
 	}
-	alerts, err := s.store.ListAlerts(r.Context(), status, limit)
+	alerts, err := s.store.ListAlertsForTenant(r.Context(), tenantID, status, limit)
 	if err != nil {
 		s.logger.Error("failed to list alerts", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "failed to list alerts")
@@ -61,6 +65,10 @@ func (s *Server) handleListAlerts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAcknowledgeAlert(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxAlertRequestBodyBytes)
 	request := acknowledgeAlertRequest{AcknowledgedBy: "operator"}
 	decoder := json.NewDecoder(r.Body)
@@ -68,17 +76,10 @@ func (s *Server) handleAcknowledgeAlert(w http.ResponseWriter, r *http.Request) 
 		api.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	request.AcknowledgedBy = strings.TrimSpace(request.AcknowledgedBy)
-	if request.AcknowledgedBy == "" {
-		request.AcknowledgedBy = "operator"
-	}
-	if len(request.AcknowledgedBy) > 128 {
-		api.WriteError(w, http.StatusBadRequest, "acknowledgedBy must not exceed 128 characters")
-		return
-	}
+	actor, _ := authenticatedUser(r.Context())
 
 	alertID := r.PathValue("id")
-	if err := s.store.AcknowledgeAlert(r.Context(), alertID, request.AcknowledgedBy, time.Now().UTC()); err != nil {
+	if err := s.store.AcknowledgeAlertForTenant(r.Context(), tenantID, alertID, actor.Username, time.Now().UTC()); err != nil {
 		switch {
 		case errors.Is(err, store.ErrNotFound):
 			api.WriteError(w, http.StatusNotFound, "alert not found")
@@ -90,7 +91,17 @@ func (s *Server) handleAcknowledgeAlert(w http.ResponseWriter, r *http.Request) 
 		}
 		return
 	}
-	alert, err := s.store.GetAlert(r.Context(), alertID)
+	s.recordAudit(
+		r.Context(),
+		r,
+		auditActorFromUser(actor),
+		"alert.acknowledge",
+		"alert",
+		alertID,
+		types.AuditSuccess,
+		"tenant_id="+tenantID,
+	)
+	alert, err := s.store.GetAlertForTenant(r.Context(), tenantID, alertID)
 	if err != nil {
 		s.logger.Error("failed to read acknowledged alert", "alert_id", alertID, "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "failed to acknowledge alert")
@@ -148,6 +159,17 @@ func (s *Server) handlePutAlertRule(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, http.StatusInternalServerError, "failed to save alert rule")
 		return
 	}
+	actor, _ := authenticatedUser(r.Context())
+	s.recordAudit(
+		r.Context(),
+		r,
+		auditActorFromUser(actor),
+		"alert_rule.update",
+		"alert_rule",
+		rule.ID,
+		types.AuditSuccess,
+		"",
+	)
 	rules, err := s.store.ListAlertRules(r.Context())
 	if err != nil {
 		s.logger.Error("failed to read saved alert rule", "rule_id", rule.ID, "error", err)

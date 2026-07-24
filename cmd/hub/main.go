@@ -48,6 +48,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	if err := server.BootstrapAdmin(ctx, cfg, logger, st); err != nil {
+		logger.Error("failed to bootstrap admin user", "error", err)
+		os.Exit(1)
+	}
+
 	srv := server.New(cfg, logger, st)
 	logger.Info("starting hub server", "address", cfg.ListenAddr)
 	if err := srv.Start(ctx); err != nil {

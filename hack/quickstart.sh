@@ -6,7 +6,11 @@ USE_GHCR=${USE_GHCR:-0}
 IMAGE_TAG=${IMAGE_TAG:-dev}
 HUB_PORT=${KFLEET_HUB_PORT:-8080}
 TOKEN=$(openssl rand -hex 16)
+ADMIN_USERNAME=${KFLEET_ADMIN_USERNAME:-admin}
+ADMIN_EMAIL=${KFLEET_ADMIN_EMAIL:-admin@kfleet.local}
+ADMIN_PASSWORD=${KFLEET_ADMIN_PASSWORD:-$(openssl rand -hex 16)}
 PF_PID_FILE="/tmp/kfleet-pf.pid"
+COOKIE_FILE="/tmp/kfleet-quickstart-cookie.txt"
 
 echo "Checking prerequisites..."
 for cmd in kind kubectl helm docker; do
@@ -52,6 +56,10 @@ helm upgrade --install kfleet-hub charts/kfleet-hub \
     --set service.type=ClusterIP \
     --set persistence.enabled=true \
     --set registration.token="$TOKEN" \
+    --set auth.sessionCookieInsecure=true \
+    --set-string auth.bootstrapAdmin.username="$ADMIN_USERNAME" \
+    --set-string auth.bootstrapAdmin.email="$ADMIN_EMAIL" \
+    --set-string auth.bootstrapAdmin.password="$ADMIN_PASSWORD" \
     --wait --timeout 120s
 
 kubectl rollout status deployment/kfleet-hub --timeout=120s
@@ -65,6 +73,12 @@ echo $! > "$PF_PID_FILE"
 sleep 3
 
 HUB_URL="http://host.docker.internal:${HUB_PORT}"
+
+curl --fail --silent --show-error \
+    --cookie-jar "$COOKIE_FILE" \
+    --header "Content-Type: application/json" \
+    --data "{\"username\":\"${ADMIN_USERNAME}\",\"password\":\"${ADMIN_PASSWORD}\"}" \
+    "http://localhost:${HUB_PORT}/api/v1/auth/login" >/dev/null
 
 for i in $(seq 1 "$CLUSTERS"); do
     echo "Installing agent on kfleet-$i..."
@@ -81,7 +95,7 @@ done
 echo "Waiting for agents to register..."
 for attempt in $(seq 1 24); do
     sleep 5
-    REGISTERED=$(curl -s "http://localhost:${HUB_PORT}/api/v1/clusters" 2>/dev/null | grep -o '"id"' | wc -l)
+    REGISTERED=$(curl -s --cookie "$COOKIE_FILE" "http://localhost:${HUB_PORT}/api/v1/clusters" 2>/dev/null | grep -o '"id"' | wc -l)
     echo "  Attempt $attempt: $REGISTERED/$CLUSTERS clusters registered"
     if [ "$REGISTERED" -ge "$CLUSTERS" ]; then
         break
@@ -92,5 +106,7 @@ echo ""
 echo "=============================================="
 echo " kfleet is ready!"
 echo " Open http://localhost:${HUB_PORT}"
+echo " Username: ${ADMIN_USERNAME}"
+echo " Password: ${ADMIN_PASSWORD}"
 echo "=============================================="
 echo "Cleanup: ./hack/cleanup.sh"

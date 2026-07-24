@@ -47,6 +47,7 @@ type ClusterSnapshotRequest struct {
 	Pods         []SnapshotPod        `json:"pods"`
 	Services     []SnapshotService    `json:"services"`
 	Deployments  []SnapshotDeployment `json:"deployments"`
+	Namespaces   []SnapshotNamespace  `json:"namespaces"`
 	Events       []SnapshotEvent      `json:"events"`
 	NodeCount    int                  `json:"nodeCount"`
 	PodCount     int                  `json:"podCount"`
@@ -67,13 +68,22 @@ type SnapshotNode struct {
 
 // SnapshotPod is the pod shape emitted by the agent collector.
 type SnapshotPod struct {
-	Namespace string    `json:"namespace"`
-	Name      string    `json:"name"`
-	Phase     string    `json:"phase"`
-	Restarts  int32     `json:"restarts"`
-	Node      string    `json:"node"`
-	Ready     bool      `json:"ready"`
-	StartTime time.Time `json:"startTime"`
+	Namespace                 string    `json:"namespace"`
+	Name                      string    `json:"name"`
+	Phase                     string    `json:"phase"`
+	Restarts                  int32     `json:"restarts"`
+	Node                      string    `json:"node"`
+	Ready                     bool      `json:"ready"`
+	StartTime                 time.Time `json:"startTime"`
+	SecurityContextKnown      bool      `json:"securityContextKnown"`
+	Privileged                bool      `json:"privileged"`
+	RunAsNonRoot              bool      `json:"runAsNonRoot"`
+	ReadOnlyRootFilesystem    bool      `json:"readOnlyRootFilesystem"`
+	AllowsPrivilegeEscalation bool      `json:"allowsPrivilegeEscalation"`
+	CapabilitiesDroppedAll    bool      `json:"capabilitiesDroppedAll"`
+	HostNetwork               bool      `json:"hostNetwork"`
+	HostPID                   bool      `json:"hostPID"`
+	HostIPC                   bool      `json:"hostIPC"`
 }
 
 // SnapshotService is the service shape emitted by the agent collector.
@@ -89,13 +99,32 @@ type SnapshotService struct {
 
 // SnapshotDeployment is the deployment shape emitted by the agent collector.
 type SnapshotDeployment struct {
-	Namespace         string `json:"namespace"`
-	Name              string `json:"name"`
-	DesiredReplicas   int32  `json:"desiredReplicas"`
-	ReadyReplicas     int32  `json:"readyReplicas"`
-	AvailableReplicas int32  `json:"availableReplicas"`
-	UpdatedReplicas   int32  `json:"updatedReplicas"`
-	Age               string `json:"age"`
+	Namespace         string   `json:"namespace"`
+	Name              string   `json:"name"`
+	DesiredReplicas   int32    `json:"desiredReplicas"`
+	ReadyReplicas     int32    `json:"readyReplicas"`
+	AvailableReplicas int32    `json:"availableReplicas"`
+	UpdatedReplicas   int32    `json:"updatedReplicas"`
+	Age               string   `json:"age"`
+	ConfigHash        string   `json:"configHash"`
+	Images            []string `json:"images"`
+}
+
+// SnapshotNamespace is namespace configuration emitted by the agent.
+type SnapshotNamespace struct {
+	Name   string            `json:"name"`
+	Labels map[string]string `json:"labels"`
+}
+
+// PolicyListResponse contains the immutable policy catalog.
+type PolicyListResponse struct {
+	Policies []types.Policy `json:"policies"`
+}
+
+// PolicyResultsResponse contains a tenant-scoped evaluation.
+type PolicyResultsResponse struct {
+	Results []types.PolicyResult `json:"results"`
+	Summary types.PolicySummary  `json:"summary"`
 }
 
 // SnapshotEvent is the event shape emitted by the agent collector.
@@ -128,6 +157,71 @@ type HeartbeatRequest struct {
 type ErrorResponse struct {
 	Error string `json:"error"`
 	Code  int    `json:"code"`
+}
+
+// ListTimelineEventsResponse is a paginated page of operational events.
+type ListTimelineEventsResponse struct {
+	Events     []types.OperationalEvent `json:"events"`
+	NextCursor int64                    `json:"nextCursor,omitempty"`
+}
+
+// RecordPolicyFindingRequest reports a policy or compliance finding to be
+// appended to a cluster's operational timeline.
+type RecordPolicyFindingRequest struct {
+	RuleID     string            `json:"ruleId"`
+	Resource   string            `json:"resource"`
+	Severity   string            `json:"severity"`
+	Message    string            `json:"message"`
+	Details    map[string]string `json:"details,omitempty"`
+	OccurredAt time.Time         `json:"occurredAt,omitempty"`
+}
+
+// LoginRequest authenticates a user and starts a session.
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// UserResponse is the public representation of a user account. It never
+// includes the password hash.
+type UserResponse struct {
+	ID        string     `json:"id"`
+	Username  string     `json:"username"`
+	Email     string     `json:"email"`
+	Role      types.Role `json:"role"`
+	Disabled  bool       `json:"disabled"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
+}
+
+// ListUsersResponse contains every user account.
+type ListUsersResponse struct {
+	Users []UserResponse `json:"users"`
+}
+
+// CreateUserRequest creates a new user account.
+type CreateUserRequest struct {
+	Username string     `json:"username"`
+	Email    string     `json:"email"`
+	Password string     `json:"password"`
+	Role     types.Role `json:"role"`
+}
+
+// UpdateUserRequest changes a user's role or enabled status.
+type UpdateUserRequest struct {
+	Role     types.Role `json:"role"`
+	Disabled bool       `json:"disabled"`
+}
+
+// ListAuditEventsResponse contains recent audit log entries, newest first.
+type ListAuditEventsResponse struct {
+	Events []types.AuditEvent `json:"events"`
+}
+
+// RotateRegistrationTokenResponse contains the new agent registration token.
+// The raw token is returned exactly once; only its hash is persisted.
+type RotateRegistrationTokenResponse struct {
+	Token string `json:"token"`
 }
 
 // WriteJSON writes v as a JSON response with the supplied HTTP status.
