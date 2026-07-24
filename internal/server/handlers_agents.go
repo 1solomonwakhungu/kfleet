@@ -64,6 +64,7 @@ func (s *Server) handleAgentDeregister(w http.ResponseWriter, r *http.Request) {
 	previousHealth := cluster.Health
 	cluster.Health = types.HealthUnreachable
 	cluster.LastHeartbeat = now
+	s.alerts.Evaluate(r.Context(), cluster)
 	s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
 	if previousHealth != types.HealthUnreachable {
 		s.recordAgentDisconnected(r.Context(), cluster, "deregistered", now)
@@ -352,6 +353,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		handleHeartbeatStoreError(w, err)
 		return
 	}
+	s.alerts.Evaluate(r.Context(), cluster)
 	s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
 	s.broadcast.Broadcast(ClusterUpdate{Type: "snapshot", Cluster: cluster})
 	s.recordHeartbeatTransition(r.Context(), cluster, previous.Health, cluster.Health, now)

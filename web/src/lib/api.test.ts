@@ -198,4 +198,40 @@ describe('api', () => {
       }],
     });
   });
+
+  it('lists and acknowledges alerts through encoded API paths', async () => {
+    const alert = {
+      id: 'alert/a?#',
+      ruleId: 'fleet-health-degraded',
+      ruleName: 'Cluster health degraded',
+      clusterId: 'cluster-a',
+      clusterName: 'production',
+      dedupeKey: 'rule:cluster:degraded',
+      health: 'degraded',
+      severity: 'warning',
+      summary: 'production is degraded',
+      status: 'firing',
+      triggeredAt: '2026-07-23T12:00:00Z',
+      updatedAt: '2026-07-23T12:00:00Z',
+      deliveryStatus: 'disabled',
+      deliveryAttempts: 0,
+    };
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ alerts: [alert] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...alert, status: 'acknowledged' })));
+
+    await expect(api.listAlerts('firing')).resolves.toEqual([alert]);
+    await expect(api.acknowledgeAlert(alert.id, 'on-call')).resolves.toMatchObject({
+      id: alert.id,
+      status: 'acknowledged',
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/alerts?status=firing');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/alerts/alert%2Fa%3F%23/acknowledge');
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({ 'X-Kfleet-CSRF': '1' }),
+      body: JSON.stringify({ acknowledgedBy: 'on-call' }),
+    });
+  });
 });

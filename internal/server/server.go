@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/1solomonwakhungu/kfleet/internal/alerts"
 	"github.com/1solomonwakhungu/kfleet/internal/config"
 	hubweb "github.com/1solomonwakhungu/kfleet/internal/hub/web"
 	"github.com/1solomonwakhungu/kfleet/internal/policy"
@@ -27,6 +28,7 @@ type Server struct {
 	cfg        *config.Config
 	logger     *slog.Logger
 	store      store.Store
+	alerts     *alerts.Manager
 	policies   *policy.Engine
 	broadcast  *BroadcastHub
 	httpServer *http.Server
@@ -35,9 +37,16 @@ type Server struct {
 // New constructs a hub server with its routes configured.
 func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	server := &Server{
-		cfg:       cfg,
-		logger:    logger,
-		store:     st,
+		cfg:    cfg,
+		logger: logger,
+		store:  st,
+		alerts: alerts.New(st, logger, alerts.Config{
+			WebhookURL:   cfg.AlertWebhookURL,
+			Secret:       cfg.AlertWebhookSecret,
+			MaxAttempts:  cfg.AlertMaxAttempts,
+			RetryBase:    cfg.AlertRetryBase,
+			PollInterval: cfg.AlertPollInterval,
+		}),
 		broadcast: NewBroadcastHub(logger),
 	}
 	server.policies = policy.NewEngine(st, 3*server.heartbeatInterval())
@@ -57,6 +66,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	server.registerAdminRoutes(mux)
 	server.registerAgentRoutes(mux)
 	server.registerClusterRoutes(mux)
+	server.registerAlertRoutes(mux)
 	server.registerEventRoutes(mux)
 	server.registerPolicyRoutes(mux)
 	mux.HandleFunc("GET /ws/clusters", server.requireAuth(server.handleWSClusters))
@@ -87,6 +97,7 @@ func (s *Server) Start(ctx context.Context) error {
 	defer stopHub()
 	go s.broadcast.Run(hubCtx)
 	go s.monitorStaleClusters(hubCtx)
+	go s.alerts.Run(hubCtx)
 	go s.monitorEventRetention(hubCtx)
 	go s.pruneExpiredSessions(hubCtx)
 
@@ -172,6 +183,7 @@ func (s *Server) markStaleClusters(ctx context.Context, now time.Time) {
 			continue
 		}
 		cluster.Health = types.HealthUnreachable
+		s.alerts.Evaluate(ctx, cluster)
 		s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
 		s.recordAgentDisconnected(ctx, cluster, "heartbeat_timeout", now)
 		s.recordHeartbeatTransition(ctx, cluster, oldHealth, types.HealthUnreachable, now)

@@ -6,6 +6,7 @@ import ClusterDetail from './pages/ClusterDetail'
 import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import PendingAgents from './pages/PendingAgents'
+import Alerts from './pages/Alerts'
 import PolicyDashboard from './pages/PolicyDashboard'
 
 export function App() {
@@ -17,6 +18,7 @@ export function App() {
           <Route index element={<Dashboard />} />
           <Route path="clusters/:id" element={<ClusterDetail />} />
           <Route path="agents" element={<PendingAgents />} />
+          <Route path="alerts" element={<Alerts />} />
           <Route path="policies" element={<PolicyDashboard />} />
         </Route>
       </Route>

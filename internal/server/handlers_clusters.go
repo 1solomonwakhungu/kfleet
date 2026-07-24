@@ -209,6 +209,7 @@ func (s *Server) handleClusterSnapshot(w http.ResponseWriter, r *http.Request) {
 	if cluster.Health != updated.Health {
 		s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: updated})
 	}
+	s.alerts.Evaluate(r.Context(), updated)
 	s.broadcast.Broadcast(ClusterUpdate{Type: "snapshot", Cluster: updated})
 	s.recordHeartbeatTransition(r.Context(), updated, cluster.Health, updated.Health, now)
 	s.recordVersionChanged(r.Context(), updated, cluster.Version, updated.Version, now)
