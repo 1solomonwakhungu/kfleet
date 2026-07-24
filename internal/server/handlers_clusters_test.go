@@ -289,10 +289,22 @@ func newTestHTTPServer(t *testing.T) *httptest.Server {
 			t.Errorf("store.Close() error = %v", err)
 		}
 	})
+	registerDefaultSession(httpServer, st, sessionCookieFor(t, st, types.RoleAdmin))
 	return httpServer
 }
 
+// request issues an HTTP request against server using its default admin
+// session cookie (see registerDefaultSession). Tests exercising a specific
+// role's allowed/denied actions should use requestWithSession instead.
 func request(t *testing.T, server *httptest.Server, method, path, body string) *http.Response {
+	t.Helper()
+	return requestWithSession(t, server, method, path, defaultSessionFor(server), body)
+}
+
+// requestWithSession issues an HTTP request against server, attaching
+// sessionCookie as the kfleet_session cookie when non-empty. Pass an empty
+// sessionCookie to exercise unauthenticated requests.
+func requestWithSession(t *testing.T, server *httptest.Server, method, path, sessionCookie, body string) *http.Response {
 	t.Helper()
 	req, err := http.NewRequest(method, server.URL+path, bytes.NewBufferString(body))
 	if err != nil {
@@ -300,6 +312,12 @@ func request(t *testing.T, server *httptest.Server, method, path, body string) *
 	}
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if sessionCookie != "" {
+		req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessionCookie})
+		if mutationRequest(req) {
+			req.Header.Set(csrfHeaderName, "1")
+		}
 	}
 	response, err := server.Client().Do(req)
 	if err != nil {
