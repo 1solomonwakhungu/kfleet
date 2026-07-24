@@ -56,6 +56,7 @@ func (s *Server) handleAgentDeregister(w http.ResponseWriter, r *http.Request) {
 	}
 	cluster.Health = types.HealthUnreachable
 	cluster.LastHeartbeat = now
+	s.alerts.Evaluate(r.Context(), cluster)
 	s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
 	w.WriteHeader(http.StatusOK)
 }
@@ -280,6 +281,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		handleHeartbeatStoreError(w, err)
 		return
 	}
+	s.alerts.Evaluate(r.Context(), cluster)
 	s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
 	s.broadcast.Broadcast(ClusterUpdate{Type: "snapshot", Cluster: cluster})
 	if err := api.WriteJSON(w, http.StatusOK, cluster); err != nil {

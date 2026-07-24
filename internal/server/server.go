@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/1solomonwakhungu/kfleet/internal/alerts"
 	"github.com/1solomonwakhungu/kfleet/internal/config"
 	hubweb "github.com/1solomonwakhungu/kfleet/internal/hub/web"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
@@ -21,6 +22,7 @@ type Server struct {
 	cfg        *config.Config
 	logger     *slog.Logger
 	store      store.Store
+	alerts     *alerts.Manager
 	broadcast  *BroadcastHub
 	httpServer *http.Server
 }
@@ -28,9 +30,16 @@ type Server struct {
 // New constructs a hub server with its routes configured.
 func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	server := &Server{
-		cfg:       cfg,
-		logger:    logger,
-		store:     st,
+		cfg:    cfg,
+		logger: logger,
+		store:  st,
+		alerts: alerts.New(st, logger, alerts.Config{
+			WebhookURL:   cfg.AlertWebhookURL,
+			Secret:       cfg.AlertWebhookSecret,
+			MaxAttempts:  cfg.AlertMaxAttempts,
+			RetryBase:    cfg.AlertRetryBase,
+			PollInterval: cfg.AlertPollInterval,
+		}),
 		broadcast: NewBroadcastHub(logger),
 	}
 
@@ -45,6 +54,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	})
 	server.registerAgentRoutes(mux)
 	server.registerClusterRoutes(mux)
+	server.registerAlertRoutes(mux)
 	mux.HandleFunc("GET /ws/clusters", server.handleWSClusters)
 	mux.Handle("/", hubweb.Handler())
 
@@ -63,6 +73,7 @@ func (s *Server) Start(ctx context.Context) error {
 	defer stopHub()
 	go s.broadcast.Run(hubCtx)
 	go s.monitorStaleClusters(hubCtx)
+	go s.alerts.Run(hubCtx)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -127,6 +138,7 @@ func (s *Server) markStaleClusters(ctx context.Context, now time.Time) {
 			continue
 		}
 		cluster.Health = types.HealthUnreachable
+		s.alerts.Evaluate(ctx, cluster)
 		s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
 	}
 }

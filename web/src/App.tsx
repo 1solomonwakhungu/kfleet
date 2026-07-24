@@ -4,6 +4,7 @@ import { ApplicationShell } from './components/layout/ApplicationShell'
 import ClusterDetail from './pages/ClusterDetail'
 import { Dashboard } from './pages/Dashboard'
 import PendingAgents from './pages/PendingAgents'
+import Alerts from './pages/Alerts'
 
 export function App() {
   return (
@@ -12,6 +13,7 @@ export function App() {
         <Route index element={<Dashboard />} />
         <Route path="clusters/:id" element={<ClusterDetail />} />
         <Route path="agents" element={<PendingAgents />} />
+        <Route path="alerts" element={<Alerts />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

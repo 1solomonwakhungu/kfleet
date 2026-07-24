@@ -140,6 +140,10 @@ func Open(dbPath string) (Store, error) {
 		{name: "snapshot services", sql: createSnapshotServicesTable},
 		{name: "snapshot deployments", sql: createSnapshotDeploymentsTable},
 		{name: "snapshot events", sql: createSnapshotEventsTable},
+		{name: "alert rules", sql: createAlertRulesTable},
+		{name: "alerts", sql: createAlertsTable},
+		{name: "alert history index", sql: createAlertHistoryIndex},
+		{name: "alert delivery index", sql: createAlertDeliveryIndex},
 	} {
 		if _, err := db.Exec(migration.sql); err != nil {
 			_ = db.Close()
@@ -149,6 +153,10 @@ func Open(dbPath string) (Store, error) {
 	if err := ensureColumn(db, "clusters", "agent_version", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate clusters agent_version column: %w", err)
+	}
+	if err := seedDefaultAlertRules(db, time.Now().UTC()); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("seed default alert rules: %w", err)
 	}
 
 	return &sqliteStore{db: db}, nil

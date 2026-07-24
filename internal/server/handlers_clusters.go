@@ -177,6 +177,7 @@ func (s *Server) handleClusterSnapshot(w http.ResponseWriter, r *http.Request) {
 	if cluster.Health != updated.Health {
 		s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: updated})
 	}
+	s.alerts.Evaluate(r.Context(), updated)
 	s.broadcast.Broadcast(ClusterUpdate{Type: "snapshot", Cluster: updated})
 	if err := api.WriteJSON(w, http.StatusOK, updated); err != nil {
 		s.logger.Error("failed to write snapshot response", "error", err)

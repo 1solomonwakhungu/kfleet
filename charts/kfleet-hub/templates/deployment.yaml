@@ -65,6 +65,21 @@ spec:
                 secretKeyRef:
                   name: {{ include "kfleet-hub.fullname" . }}
                   key: registration-token
+            {{- if .Values.alerts.webhook.url }}
+            - name: KFLEET_ALERT_WEBHOOK_URL
+              value: {{ .Values.alerts.webhook.url | quote }}
+            - name: KFLEET_ALERT_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kfleet-hub.fullname" . }}
+                  key: alert-webhook-secret
+            {{- end }}
+            - name: KFLEET_ALERT_MAX_ATTEMPTS
+              value: {{ .Values.alerts.maxAttempts | quote }}
+            - name: KFLEET_ALERT_RETRY_BASE
+              value: {{ .Values.alerts.retryBase | quote }}
+            - name: KFLEET_ALERT_POLL_INTERVAL
+              value: {{ .Values.alerts.pollInterval | quote }}
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}

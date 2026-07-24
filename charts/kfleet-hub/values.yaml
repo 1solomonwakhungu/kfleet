@@ -41,6 +41,15 @@ ingress:
 registration:
   token: ""
 
+alerts:
+  webhook:
+    # Leave empty to retain alert history without sending notifications.
+    url: ""
+    secret: ""
+  maxAttempts: 5
+  retryBase: 5s
+  pollInterval: 1s
+
 resources:
   requests:
     cpu: 100m
