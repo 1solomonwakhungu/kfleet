@@ -28,6 +28,7 @@ type Registrar struct {
 	token             string
 	clusterName       string
 	agentVersion      string
+	tenantID          string
 	labels            map[string]string
 	client            *http.Client
 }
@@ -54,6 +55,7 @@ func New(cfg *config.Config, labels map[string]string) *Registrar {
 		token:             cfg.HubToken,
 		clusterName:       cfg.ClusterName,
 		agentVersion:      agentVersion,
+		tenantID:          cfg.TenantID,
 		labels:            labels,
 		client:            &http.Client{Timeout: requestTimeout},
 	}
@@ -146,4 +148,7 @@ func (r *Registrar) setHeaders(request *http.Request, jsonBody bool, token strin
 		request.Header.Set("Content-Type", "application/json")
 	}
 	request.Header.Set("Authorization", "Bearer "+token)
+	if r.tenantID != "" {
+		request.Header.Set("X-Kfleet-Tenant-ID", r.tenantID)
+	}
 }

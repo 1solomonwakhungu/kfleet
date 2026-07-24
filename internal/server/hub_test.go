@@ -130,3 +130,46 @@ func TestBroadcastHubDropsSlowClientWithoutBlocking(t *testing.T) {
 		t.Fatal("Broadcast blocked after dropping a slow client")
 	}
 }
+
+func TestBroadcastHubScopesUpdatesToTenant(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := NewBroadcastHub(logger)
+	ctx, cancel := context.WithCancel(context.Background())
+	go hub.Run(ctx)
+	defer cancel()
+
+	clientA := &wsClient{
+		tenantID: "tenant-a", send: make(chan ClusterUpdate, 1),
+		registered: make(chan struct{}), closed: make(chan struct{}),
+	}
+	clientB := &wsClient{
+		tenantID: "tenant-b", send: make(chan ClusterUpdate, 1),
+		registered: make(chan struct{}), closed: make(chan struct{}),
+	}
+	if !hub.registerClient(clientA) || !hub.registerClient(clientB) {
+		t.Fatal("failed to register tenant clients")
+	}
+	defer hub.unregisterClient(clientA)
+	defer hub.unregisterClient(clientB)
+
+	hub.Broadcast(ClusterUpdate{
+		Type: "snapshot",
+		Cluster: types.Cluster{
+			ID: "a", TenantID: "tenant-a", Name: "alpha",
+		},
+	})
+
+	select {
+	case update := <-clientA.send:
+		if update.Cluster.ID != "a" {
+			t.Fatalf("tenant-a update = %#v, want cluster a", update)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("tenant-a did not receive its update")
+	}
+	select {
+	case update := <-clientB.send:
+		t.Fatalf("tenant-b received tenant-a update: %#v", update)
+	case <-time.After(50 * time.Millisecond):
+	}
+}

@@ -40,7 +40,11 @@ func (s *Server) registerClusterRoutes(mux *http.ServeMux) {
 }
 
 func (s *Server) handleListClusters(w http.ResponseWriter, r *http.Request) {
-	clusters, err := s.store.ListClusters(r.Context())
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	clusters, err := s.store.ListClustersForTenant(r.Context(), tenantID)
 	if err != nil {
 		s.logger.Error("failed to list clusters", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "failed to list clusters")
@@ -52,7 +56,11 @@ func (s *Server) handleListClusters(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetCluster(w http.ResponseWriter, r *http.Request) {
-	cluster, err := s.store.GetCluster(r.Context(), r.PathValue("id"))
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	cluster, err := s.store.GetClusterForTenant(r.Context(), tenantID, r.PathValue("id"))
 	if handleStoreError(w, err) {
 		return
 	}
@@ -75,8 +83,13 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
 	cluster := types.Cluster{
 		ID:           uuid.NewString(),
+		TenantID:     tenantID,
 		Name:         request.Name,
 		Health:       types.HealthUnknown,
 		RegisteredAt: time.Now().UTC(),
@@ -101,7 +114,11 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
 	actor, _ := authenticatedUser(r.Context())
-	cluster, err := s.store.GetCluster(r.Context(), r.PathValue("id"))
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	cluster, err := s.store.GetClusterForTenant(r.Context(), tenantID, r.PathValue("id"))
 	if handleStoreError(w, err) {
 		return
 	}
@@ -115,7 +132,11 @@ func (s *Server) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleClusterStatus(w http.ResponseWriter, r *http.Request) {
-	cluster, err := s.store.GetCluster(r.Context(), r.PathValue("id"))
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	cluster, err := s.store.GetClusterForTenant(r.Context(), tenantID, r.PathValue("id"))
 	if handleStoreError(w, err) {
 		return
 	}
@@ -264,7 +285,11 @@ func (s *Server) handleClusterEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) resourceCluster(w http.ResponseWriter, r *http.Request) (types.Cluster, bool) {
-	cluster, err := s.store.GetCluster(r.Context(), r.PathValue("id"))
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return types.Cluster{}, false
+	}
+	cluster, err := s.store.GetClusterForTenant(r.Context(), tenantID, r.PathValue("id"))
 	if handleStoreError(w, err) {
 		return types.Cluster{}, false
 	}
@@ -286,6 +311,7 @@ func normalizeSnapshot(clusterID string, request api.ClusterSnapshotRequest) typ
 		Pods:        make([]types.Pod, 0, len(request.Pods)),
 		Services:    make([]types.Service, 0, len(request.Services)),
 		Deployments: make([]types.Deployment, 0, len(request.Deployments)),
+		Namespaces:  make([]types.Namespace, 0, len(request.Namespaces)),
 		Events:      make([]types.Event, 0, len(request.Events)),
 	}
 	for _, node := range request.Nodes {
@@ -301,13 +327,22 @@ func normalizeSnapshot(clusterID string, request api.ClusterSnapshotRequest) typ
 	}
 	for _, pod := range request.Pods {
 		snapshot.Pods = append(snapshot.Pods, types.Pod{
-			Name:         pod.Name,
-			Namespace:    pod.Namespace,
-			Phase:        pod.Phase,
-			NodeName:     pod.Node,
-			RestartCount: pod.Restarts,
-			Ready:        pod.Ready,
-			StartTime:    pod.StartTime,
+			Name:                      pod.Name,
+			Namespace:                 pod.Namespace,
+			Phase:                     pod.Phase,
+			NodeName:                  pod.Node,
+			RestartCount:              pod.Restarts,
+			Ready:                     pod.Ready,
+			StartTime:                 pod.StartTime,
+			SecurityContextKnown:      pod.SecurityContextKnown,
+			Privileged:                pod.Privileged,
+			RunAsNonRoot:              pod.RunAsNonRoot,
+			ReadOnlyRootFilesystem:    pod.ReadOnlyRootFilesystem,
+			AllowsPrivilegeEscalation: pod.AllowsPrivilegeEscalation,
+			CapabilitiesDroppedAll:    pod.CapabilitiesDroppedAll,
+			HostNetwork:               pod.HostNetwork,
+			HostPID:                   pod.HostPID,
+			HostIPC:                   pod.HostIPC,
 		})
 	}
 	for _, service := range request.Services {
@@ -334,6 +369,14 @@ func normalizeSnapshot(clusterID string, request api.ClusterSnapshotRequest) typ
 			AvailableReplicas: deployment.AvailableReplicas,
 			UpdatedReplicas:   deployment.UpdatedReplicas,
 			Age:               deployment.Age,
+			ConfigHash:        deployment.ConfigHash,
+			Images:            nonNilSlice(deployment.Images),
+		})
+	}
+	for _, namespace := range request.Namespaces {
+		snapshot.Namespaces = append(snapshot.Namespaces, types.Namespace{
+			Name:   namespace.Name,
+			Labels: nonNilMap(namespace.Labels),
 		})
 	}
 	for _, event := range request.Events {
@@ -386,6 +429,13 @@ func parseServicePort(value string) types.ServicePort {
 func nonNilSlice[T any](values []T) []T {
 	if values == nil {
 		return make([]T, 0)
+	}
+	return values
+}
+
+func nonNilMap(values map[string]string) map[string]string {
+	if values == nil {
+		return make(map[string]string)
 	}
 	return values
 }

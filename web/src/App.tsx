@@ -6,6 +6,7 @@ import ClusterDetail from './pages/ClusterDetail'
 import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import PendingAgents from './pages/PendingAgents'
+import PolicyDashboard from './pages/PolicyDashboard'
 
 export function App() {
   return (
@@ -16,6 +17,7 @@ export function App() {
           <Route index element={<Dashboard />} />
           <Route path="clusters/:id" element={<ClusterDetail />} />
           <Route path="agents" element={<PendingAgents />} />
+          <Route path="policies" element={<PolicyDashboard />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

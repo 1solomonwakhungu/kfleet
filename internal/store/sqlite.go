@@ -16,7 +16,8 @@ import (
 const createClustersTable = `
 CREATE TABLE IF NOT EXISTS clusters (
 	id TEXT PRIMARY KEY,
-	name TEXT UNIQUE NOT NULL,
+	tenant_id TEXT NOT NULL DEFAULT 'default',
+	name TEXT NOT NULL,
 	health TEXT NOT NULL,
 	version TEXT,
 	agent_version TEXT NOT NULL DEFAULT '',
@@ -24,7 +25,8 @@ CREATE TABLE IF NOT EXISTS clusters (
 	pod_count INTEGER,
 	registered_at TIMESTAMP,
 	last_heartbeat TIMESTAMP,
-	labels TEXT
+	labels TEXT,
+	UNIQUE (tenant_id, name)
 )`
 
 const createAgentsTable = `
@@ -61,6 +63,15 @@ CREATE TABLE IF NOT EXISTS snapshot_pods (
 	restart_count INTEGER NOT NULL,
 	ready INTEGER NOT NULL CHECK (ready IN (0, 1)),
 	start_time TIMESTAMP NOT NULL,
+	security_context_known INTEGER NOT NULL DEFAULT 0 CHECK (security_context_known IN (0, 1)),
+	privileged INTEGER NOT NULL DEFAULT 0 CHECK (privileged IN (0, 1)),
+	run_as_non_root INTEGER NOT NULL DEFAULT 0 CHECK (run_as_non_root IN (0, 1)),
+	read_only_root_filesystem INTEGER NOT NULL DEFAULT 0 CHECK (read_only_root_filesystem IN (0, 1)),
+	allows_privilege_escalation INTEGER NOT NULL DEFAULT 0 CHECK (allows_privilege_escalation IN (0, 1)),
+	capabilities_dropped_all INTEGER NOT NULL DEFAULT 0 CHECK (capabilities_dropped_all IN (0, 1)),
+	host_network INTEGER NOT NULL DEFAULT 0 CHECK (host_network IN (0, 1)),
+	host_pid INTEGER NOT NULL DEFAULT 0 CHECK (host_pid IN (0, 1)),
+	host_ipc INTEGER NOT NULL DEFAULT 0 CHECK (host_ipc IN (0, 1)),
 	PRIMARY KEY (cluster_id, namespace, name),
 	FOREIGN KEY (cluster_id) REFERENCES clusters(id) ON DELETE CASCADE
 )`
@@ -89,7 +100,18 @@ CREATE TABLE IF NOT EXISTS snapshot_deployments (
 	updated_replicas INTEGER NOT NULL,
 	available_replicas INTEGER NOT NULL,
 	age TEXT NOT NULL,
+	config_hash TEXT NOT NULL DEFAULT '',
+	images TEXT NOT NULL DEFAULT '[]',
 	PRIMARY KEY (cluster_id, namespace, name),
+	FOREIGN KEY (cluster_id) REFERENCES clusters(id) ON DELETE CASCADE
+)`
+
+const createSnapshotNamespacesTable = `
+CREATE TABLE IF NOT EXISTS snapshot_namespaces (
+	cluster_id TEXT NOT NULL,
+	name TEXT NOT NULL,
+	labels TEXT NOT NULL,
+	PRIMARY KEY (cluster_id, name),
 	FOREIGN KEY (cluster_id) REFERENCES clusters(id) ON DELETE CASCADE
 )`
 
@@ -211,6 +233,7 @@ func Open(dbPath string) (Store, error) {
 		{name: "snapshot pods", sql: createSnapshotPodsTable},
 		{name: "snapshot services", sql: createSnapshotServicesTable},
 		{name: "snapshot deployments", sql: createSnapshotDeploymentsTable},
+		{name: "snapshot namespaces", sql: createSnapshotNamespacesTable},
 		{name: "snapshot events", sql: createSnapshotEventsTable},
 		{name: "users", sql: createUsersTable},
 		{name: "sessions", sql: createSessionsTable},
@@ -231,6 +254,27 @@ func Open(dbPath string) (Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate clusters agent_version column: %w", err)
 	}
+	for _, column := range []struct {
+		table, name, definition string
+	}{
+		{table: "clusters", name: "tenant_id", definition: "TEXT NOT NULL DEFAULT 'default'"},
+		{table: "snapshot_pods", name: "security_context_known", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "snapshot_pods", name: "privileged", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "snapshot_pods", name: "run_as_non_root", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "snapshot_pods", name: "read_only_root_filesystem", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "snapshot_pods", name: "allows_privilege_escalation", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "snapshot_pods", name: "capabilities_dropped_all", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "snapshot_pods", name: "host_network", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "snapshot_pods", name: "host_pid", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "snapshot_pods", name: "host_ipc", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "snapshot_deployments", name: "config_hash", definition: "TEXT NOT NULL DEFAULT ''"},
+		{table: "snapshot_deployments", name: "images", definition: "TEXT NOT NULL DEFAULT '[]'"},
+	} {
+		if err := ensureColumn(db, column.table, column.name, column.definition); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("migrate %s %s column: %w", column.table, column.name, err)
+		}
+	}
 
 	return &sqliteStore{db: db}, nil
 }
@@ -243,10 +287,11 @@ func (s *sqliteStore) CreateCluster(ctx context.Context, cluster types.Cluster) 
 
 	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO clusters (
-			id, name, health, version, agent_version, node_count, pod_count,
+			id, tenant_id, name, health, version, agent_version, node_count, pod_count,
 			registered_at, last_heartbeat, labels
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		cluster.ID,
+		normalizeTenantID(cluster.TenantID),
 		cluster.Name,
 		cluster.Health,
 		cluster.Version,
@@ -265,7 +310,7 @@ func (s *sqliteStore) CreateCluster(ctx context.Context, cluster types.Cluster) 
 
 func (s *sqliteStore) GetCluster(ctx context.Context, id string) (types.Cluster, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, name, health, version, agent_version, node_count, pod_count,
+		SELECT id, tenant_id, name, health, version, agent_version, node_count, pod_count,
 		       registered_at, last_heartbeat, labels
 		FROM clusters
 		WHERE id = ?`, id)
@@ -280,9 +325,25 @@ func (s *sqliteStore) GetCluster(ctx context.Context, id string) (types.Cluster,
 	return cluster, nil
 }
 
+func (s *sqliteStore) GetClusterForTenant(ctx context.Context, tenantID, id string) (types.Cluster, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, tenant_id, name, health, version, agent_version, node_count, pod_count,
+		       registered_at, last_heartbeat, labels
+		FROM clusters
+		WHERE id = ? AND tenant_id = ?`, id, normalizeTenantID(tenantID))
+	cluster, err := scanCluster(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return types.Cluster{}, ErrNotFound
+	}
+	if err != nil {
+		return types.Cluster{}, fmt.Errorf("get cluster for tenant: %w", err)
+	}
+	return cluster, nil
+}
+
 func (s *sqliteStore) ListClusters(ctx context.Context) ([]types.Cluster, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, name, health, version, agent_version, node_count, pod_count,
+		SELECT id, tenant_id, name, health, version, agent_version, node_count, pod_count,
 		       registered_at, last_heartbeat, labels
 		FROM clusters
 		ORDER BY registered_at, name`)
@@ -301,6 +362,32 @@ func (s *sqliteStore) ListClusters(ctx context.Context) ([]types.Cluster, error)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("list clusters: %w", err)
+	}
+	return clusters, nil
+}
+
+func (s *sqliteStore) ListClustersForTenant(ctx context.Context, tenantID string) ([]types.Cluster, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, tenant_id, name, health, version, agent_version, node_count, pod_count,
+		       registered_at, last_heartbeat, labels
+		FROM clusters
+		WHERE tenant_id = ?
+		ORDER BY registered_at, name`, normalizeTenantID(tenantID))
+	if err != nil {
+		return nil, fmt.Errorf("list clusters for tenant: %w", err)
+	}
+	defer rows.Close()
+
+	clusters := make([]types.Cluster, 0)
+	for rows.Next() {
+		cluster, err := scanCluster(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan tenant cluster: %w", err)
+		}
+		clusters = append(clusters, cluster)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list tenant clusters: %w", err)
 	}
 	return clusters, nil
 }
@@ -373,7 +460,7 @@ func (s *sqliteStore) ApproveAgent(ctx context.Context, clusterID string) error 
 
 func (s *sqliteStore) ListPendingAgents(ctx context.Context) ([]types.Cluster, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT c.id, c.name, c.health, c.version, c.agent_version, c.node_count, c.pod_count,
+		SELECT c.id, c.tenant_id, c.name, c.health, c.version, c.agent_version, c.node_count, c.pod_count,
 		       c.registered_at, c.last_heartbeat, c.labels
 		FROM clusters c
 		JOIN agents a ON a.cluster_id = c.id
@@ -394,6 +481,33 @@ func (s *sqliteStore) ListPendingAgents(ctx context.Context) ([]types.Cluster, e
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("list pending agents: %w", err)
+	}
+	return clusters, nil
+}
+
+func (s *sqliteStore) ListPendingAgentsForTenant(ctx context.Context, tenantID string) ([]types.Cluster, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT c.id, c.tenant_id, c.name, c.health, c.version, c.agent_version, c.node_count, c.pod_count,
+		       c.registered_at, c.last_heartbeat, c.labels
+		FROM clusters c
+		JOIN agents a ON a.cluster_id = c.id
+		WHERE a.approved = 0 AND c.tenant_id = ?
+		ORDER BY a.issued_at, c.name`, normalizeTenantID(tenantID))
+	if err != nil {
+		return nil, fmt.Errorf("list pending agents for tenant: %w", err)
+	}
+	defer rows.Close()
+
+	clusters := make([]types.Cluster, 0)
+	for rows.Next() {
+		cluster, err := scanCluster(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan tenant pending agent: %w", err)
+		}
+		clusters = append(clusters, cluster)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list tenant pending agents: %w", err)
 	}
 	return clusters, nil
 }
@@ -451,6 +565,7 @@ func (s *sqliteStore) ReplaceSnapshot(
 		"snapshot_pods",
 		"snapshot_services",
 		"snapshot_deployments",
+		"snapshot_namespaces",
 		"snapshot_events",
 	} {
 		if _, err := tx.ExecContext(ctx, "DELETE FROM "+table+" WHERE cluster_id = ?", id); err != nil {
@@ -475,10 +590,16 @@ func (s *sqliteStore) ReplaceSnapshot(
 	for _, pod := range snapshot.Pods {
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO snapshot_pods (
-				cluster_id, namespace, name, phase, node_name, restart_count, ready, start_time
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				cluster_id, namespace, name, phase, node_name, restart_count, ready, start_time,
+				security_context_known, privileged, run_as_non_root, read_only_root_filesystem,
+				allows_privilege_escalation, capabilities_dropped_all, host_network, host_pid, host_ipc
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			id, pod.Namespace, pod.Name, pod.Phase, pod.NodeName,
-			pod.RestartCount, boolInt(pod.Ready), pod.StartTime); err != nil {
+			pod.RestartCount, boolInt(pod.Ready), pod.StartTime,
+			boolInt(pod.SecurityContextKnown), boolInt(pod.Privileged),
+			boolInt(pod.RunAsNonRoot), boolInt(pod.ReadOnlyRootFilesystem),
+			boolInt(pod.AllowsPrivilegeEscalation), boolInt(pod.CapabilitiesDroppedAll),
+			boolInt(pod.HostNetwork), boolInt(pod.HostPID), boolInt(pod.HostIPC)); err != nil {
 			return fmt.Errorf("insert snapshot pod: %w", err)
 		}
 	}
@@ -501,15 +622,30 @@ func (s *sqliteStore) ReplaceSnapshot(
 		}
 	}
 	for _, deployment := range snapshot.Deployments {
+		images, marshalErr := json.Marshal(nonNil(deployment.Images))
+		if marshalErr != nil {
+			return fmt.Errorf("encode deployment images: %w", marshalErr)
+		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO snapshot_deployments (
 				cluster_id, namespace, name, ready_replicas, desired_replicas,
-				updated_replicas, available_replicas, age
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				updated_replicas, available_replicas, age, config_hash, images
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			id, deployment.Namespace, deployment.Name, deployment.ReadyReplicas,
 			deployment.DesiredReplicas, deployment.UpdatedReplicas,
-			deployment.AvailableReplicas, deployment.Age); err != nil {
+			deployment.AvailableReplicas, deployment.Age, deployment.ConfigHash, string(images)); err != nil {
 			return fmt.Errorf("insert snapshot deployment: %w", err)
+		}
+	}
+	for _, namespace := range snapshot.Namespaces {
+		labels, marshalErr := json.Marshal(namespace.Labels)
+		if marshalErr != nil {
+			return fmt.Errorf("encode namespace labels: %w", marshalErr)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO snapshot_namespaces (cluster_id, name, labels)
+			VALUES (?, ?, ?)`, id, namespace.Name, string(labels)); err != nil {
+			return fmt.Errorf("insert snapshot namespace: %w", err)
 		}
 	}
 	for index, event := range snapshot.Events {
@@ -560,7 +696,9 @@ func (s *sqliteStore) ListNodes(ctx context.Context, clusterID string) ([]types.
 
 func (s *sqliteStore) ListPods(ctx context.Context, clusterID, namespace string) ([]types.Pod, error) {
 	query := `
-		SELECT name, namespace, phase, node_name, restart_count, ready, start_time
+		SELECT name, namespace, phase, node_name, restart_count, ready, start_time,
+		       security_context_known, privileged, run_as_non_root, read_only_root_filesystem,
+		       allows_privilege_escalation, capabilities_dropped_all, host_network, host_pid, host_ipc
 		FROM snapshot_pods WHERE cluster_id = ?`
 	args := []any{clusterID}
 	if namespace != "" {
@@ -577,11 +715,24 @@ func (s *sqliteStore) ListPods(ctx context.Context, clusterID, namespace string)
 	pods := make([]types.Pod, 0)
 	for rows.Next() {
 		var pod types.Pod
-		var ready int
-		if err := rows.Scan(&pod.Name, &pod.Namespace, &pod.Phase, &pod.NodeName, &pod.RestartCount, &ready, &pod.StartTime); err != nil {
+		var ready, known, privileged, nonRoot, readOnly, privilegeEscalation, droppedAll, hostNetwork, hostPID, hostIPC int
+		if err := rows.Scan(
+			&pod.Name, &pod.Namespace, &pod.Phase, &pod.NodeName, &pod.RestartCount, &ready, &pod.StartTime,
+			&known, &privileged, &nonRoot, &readOnly, &privilegeEscalation, &droppedAll,
+			&hostNetwork, &hostPID, &hostIPC,
+		); err != nil {
 			return nil, fmt.Errorf("scan snapshot pod: %w", err)
 		}
 		pod.Ready = ready == 1
+		pod.SecurityContextKnown = known == 1
+		pod.Privileged = privileged == 1
+		pod.RunAsNonRoot = nonRoot == 1
+		pod.ReadOnlyRootFilesystem = readOnly == 1
+		pod.AllowsPrivilegeEscalation = privilegeEscalation == 1
+		pod.CapabilitiesDroppedAll = droppedAll == 1
+		pod.HostNetwork = hostNetwork == 1
+		pod.HostPID = hostPID == 1
+		pod.HostIPC = hostIPC == 1
 		pods = append(pods, pod)
 	}
 	if err := rows.Err(); err != nil {
@@ -630,7 +781,7 @@ func (s *sqliteStore) ListServices(ctx context.Context, clusterID, namespace str
 func (s *sqliteStore) ListDeployments(ctx context.Context, clusterID, namespace string) ([]types.Deployment, error) {
 	query := `
 		SELECT name, namespace, ready_replicas, desired_replicas,
-		       updated_replicas, available_replicas, age
+		       updated_replicas, available_replicas, age, config_hash, images
 		FROM snapshot_deployments WHERE cluster_id = ?`
 	args := []any{clusterID}
 	if namespace != "" {
@@ -647,6 +798,7 @@ func (s *sqliteStore) ListDeployments(ctx context.Context, clusterID, namespace 
 	deployments := make([]types.Deployment, 0)
 	for rows.Next() {
 		var deployment types.Deployment
+		var images string
 		if err := rows.Scan(
 			&deployment.Name,
 			&deployment.Namespace,
@@ -655,8 +807,13 @@ func (s *sqliteStore) ListDeployments(ctx context.Context, clusterID, namespace 
 			&deployment.UpdatedReplicas,
 			&deployment.AvailableReplicas,
 			&deployment.Age,
+			&deployment.ConfigHash,
+			&images,
 		); err != nil {
 			return nil, fmt.Errorf("scan snapshot deployment: %w", err)
+		}
+		if err := json.Unmarshal([]byte(images), &deployment.Images); err != nil {
+			return nil, fmt.Errorf("decode deployment images: %w", err)
 		}
 		deployments = append(deployments, deployment)
 	}
@@ -699,11 +856,13 @@ func (s *sqliteStore) ListEvents(ctx context.Context, clusterID, namespace strin
 func (s *sqliteStore) ListNamespaces(ctx context.Context, clusterID string) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT namespace FROM (
+			SELECT name AS namespace FROM snapshot_namespaces WHERE cluster_id = ?
+			UNION
 			SELECT namespace FROM snapshot_pods WHERE cluster_id = ?
 			UNION SELECT namespace FROM snapshot_services WHERE cluster_id = ?
 			UNION SELECT namespace FROM snapshot_deployments WHERE cluster_id = ?
 			UNION SELECT namespace FROM snapshot_events WHERE cluster_id = ?
-		) WHERE namespace != '' ORDER BY namespace`, clusterID, clusterID, clusterID, clusterID)
+		) WHERE namespace != '' ORDER BY namespace`, clusterID, clusterID, clusterID, clusterID, clusterID)
 	if err != nil {
 		return nil, fmt.Errorf("list snapshot namespaces: %w", err)
 	}
@@ -719,6 +878,32 @@ func (s *sqliteStore) ListNamespaces(ctx context.Context, clusterID string) ([]s
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("list snapshot namespaces: %w", err)
+	}
+	return namespaces, nil
+}
+
+func (s *sqliteStore) ListNamespaceConfigs(ctx context.Context, clusterID string) ([]types.Namespace, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT name, labels FROM snapshot_namespaces WHERE cluster_id = ? ORDER BY name`, clusterID)
+	if err != nil {
+		return nil, fmt.Errorf("list snapshot namespace configs: %w", err)
+	}
+	defer rows.Close()
+
+	namespaces := make([]types.Namespace, 0)
+	for rows.Next() {
+		var namespace types.Namespace
+		var labels string
+		if err := rows.Scan(&namespace.Name, &labels); err != nil {
+			return nil, fmt.Errorf("scan snapshot namespace config: %w", err)
+		}
+		if err := json.Unmarshal([]byte(labels), &namespace.Labels); err != nil {
+			return nil, fmt.Errorf("decode snapshot namespace labels: %w", err)
+		}
+		namespaces = append(namespaces, namespace)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list snapshot namespace configs: %w", err)
 	}
 	return namespaces, nil
 }
@@ -1019,6 +1204,7 @@ func scanCluster(scanner clusterScanner) (types.Cluster, error) {
 	var labels string
 	if err := scanner.Scan(
 		&cluster.ID,
+		&cluster.TenantID,
 		&cluster.Name,
 		&cluster.Health,
 		&cluster.Version,
@@ -1031,10 +1217,20 @@ func scanCluster(scanner clusterScanner) (types.Cluster, error) {
 	); err != nil {
 		return types.Cluster{}, err
 	}
+	if cluster.TenantID == DefaultTenantID {
+		cluster.TenantID = ""
+	}
 	if err := json.Unmarshal([]byte(labels), &cluster.Labels); err != nil {
 		return types.Cluster{}, fmt.Errorf("decode cluster labels: %w", err)
 	}
 	return cluster, nil
+}
+
+func normalizeTenantID(tenantID string) string {
+	if tenantID == "" {
+		return DefaultTenantID
+	}
+	return tenantID
 }
 
 func ensureColumn(db *sql.DB, table, column, definition string) error {

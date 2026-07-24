@@ -20,6 +20,9 @@ func TestReport(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer agent-token" {
 			t.Errorf("Authorization = %q", got)
 		}
+		if got := r.Header.Get("X-Kfleet-Tenant-ID"); got != "tenant-a" {
+			t.Errorf("X-Kfleet-Tenant-ID = %q, want tenant-a", got)
+		}
 		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
 			t.Errorf("decode body: %v", err)
 		}
@@ -27,7 +30,7 @@ func TestReport(t *testing.T) {
 	}))
 	defer server.Close()
 
-	r := New(&config.Config{HubURL: server.URL, ClusterName: "production", HubToken: "agent-token"})
+	r := New(&config.Config{HubURL: server.URL, ClusterName: "production", HubToken: "agent-token", TenantID: "tenant-a"})
 	want := &collector.ClusterState{NodeCount: 2, PodCount: 10, K8sVersion: "v1.32.0"}
 	if err := r.Report(context.Background(), want); err != nil {
 		t.Fatalf("Report() error = %v", err)

@@ -1,5 +1,6 @@
 import type { Cluster, ClusterStatus } from '@/types/cluster';
 import type { PodInfo, EventInfo, ServiceInfo, DeploymentInfo } from '@/types/resources';
+import type { PolicyResultsResponse } from '@/types/policy';
 import { notifyAuthenticationRequired } from './authApi';
 
 const BASE = '/api/v1';
@@ -104,4 +105,8 @@ export const api = {
   getDeployments: (id: string, ns?: string, signal?: AbortSignal) =>
     get<DeploymentInfo[]>(`${clusterPath(id, '/deployments')}${qs({ namespace: ns })}`, signal),
   getNamespaces: (id: string, signal?: AbortSignal) => get<string[]>(clusterPath(id, '/namespaces'), signal),
+  // Built-in policies are evaluated read-only against the latest tenant snapshot.
+  getPolicyResults: (signal?: AbortSignal) => get<PolicyResultsResponse>('/policies/results', signal),
+  getClusterPolicyResults: (id: string, signal?: AbortSignal) =>
+    get<PolicyResultsResponse>(clusterPath(id, '/policy-results'), signal),
 };

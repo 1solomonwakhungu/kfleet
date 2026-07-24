@@ -47,6 +47,7 @@ type ClusterSnapshotRequest struct {
 	Pods         []SnapshotPod        `json:"pods"`
 	Services     []SnapshotService    `json:"services"`
 	Deployments  []SnapshotDeployment `json:"deployments"`
+	Namespaces   []SnapshotNamespace  `json:"namespaces"`
 	Events       []SnapshotEvent      `json:"events"`
 	NodeCount    int                  `json:"nodeCount"`
 	PodCount     int                  `json:"podCount"`
@@ -67,13 +68,22 @@ type SnapshotNode struct {
 
 // SnapshotPod is the pod shape emitted by the agent collector.
 type SnapshotPod struct {
-	Namespace string    `json:"namespace"`
-	Name      string    `json:"name"`
-	Phase     string    `json:"phase"`
-	Restarts  int32     `json:"restarts"`
-	Node      string    `json:"node"`
-	Ready     bool      `json:"ready"`
-	StartTime time.Time `json:"startTime"`
+	Namespace                 string    `json:"namespace"`
+	Name                      string    `json:"name"`
+	Phase                     string    `json:"phase"`
+	Restarts                  int32     `json:"restarts"`
+	Node                      string    `json:"node"`
+	Ready                     bool      `json:"ready"`
+	StartTime                 time.Time `json:"startTime"`
+	SecurityContextKnown      bool      `json:"securityContextKnown"`
+	Privileged                bool      `json:"privileged"`
+	RunAsNonRoot              bool      `json:"runAsNonRoot"`
+	ReadOnlyRootFilesystem    bool      `json:"readOnlyRootFilesystem"`
+	AllowsPrivilegeEscalation bool      `json:"allowsPrivilegeEscalation"`
+	CapabilitiesDroppedAll    bool      `json:"capabilitiesDroppedAll"`
+	HostNetwork               bool      `json:"hostNetwork"`
+	HostPID                   bool      `json:"hostPID"`
+	HostIPC                   bool      `json:"hostIPC"`
 }
 
 // SnapshotService is the service shape emitted by the agent collector.
@@ -89,13 +99,32 @@ type SnapshotService struct {
 
 // SnapshotDeployment is the deployment shape emitted by the agent collector.
 type SnapshotDeployment struct {
-	Namespace         string `json:"namespace"`
-	Name              string `json:"name"`
-	DesiredReplicas   int32  `json:"desiredReplicas"`
-	ReadyReplicas     int32  `json:"readyReplicas"`
-	AvailableReplicas int32  `json:"availableReplicas"`
-	UpdatedReplicas   int32  `json:"updatedReplicas"`
-	Age               string `json:"age"`
+	Namespace         string   `json:"namespace"`
+	Name              string   `json:"name"`
+	DesiredReplicas   int32    `json:"desiredReplicas"`
+	ReadyReplicas     int32    `json:"readyReplicas"`
+	AvailableReplicas int32    `json:"availableReplicas"`
+	UpdatedReplicas   int32    `json:"updatedReplicas"`
+	Age               string   `json:"age"`
+	ConfigHash        string   `json:"configHash"`
+	Images            []string `json:"images"`
+}
+
+// SnapshotNamespace is namespace configuration emitted by the agent.
+type SnapshotNamespace struct {
+	Name   string            `json:"name"`
+	Labels map[string]string `json:"labels"`
+}
+
+// PolicyListResponse contains the immutable policy catalog.
+type PolicyListResponse struct {
+	Policies []types.Policy `json:"policies"`
+}
+
+// PolicyResultsResponse contains a tenant-scoped evaluation.
+type PolicyResultsResponse struct {
+	Results []types.PolicyResult `json:"results"`
+	Summary types.PolicySummary  `json:"summary"`
 }
 
 // SnapshotEvent is the event shape emitted by the agent collector.

@@ -10,6 +10,7 @@ import (
 
 	"github.com/1solomonwakhungu/kfleet/internal/config"
 	hubweb "github.com/1solomonwakhungu/kfleet/internal/hub/web"
+	"github.com/1solomonwakhungu/kfleet/internal/policy"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
 )
@@ -21,6 +22,7 @@ type Server struct {
 	cfg        *config.Config
 	logger     *slog.Logger
 	store      store.Store
+	policies   *policy.Engine
 	broadcast  *BroadcastHub
 	httpServer *http.Server
 }
@@ -33,6 +35,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 		store:     st,
 		broadcast: NewBroadcastHub(logger),
 	}
+	server.policies = policy.NewEngine(st, 3*server.heartbeatInterval())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -49,6 +52,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	server.registerAdminRoutes(mux)
 	server.registerAgentRoutes(mux)
 	server.registerClusterRoutes(mux)
+	server.registerPolicyRoutes(mux)
 	mux.HandleFunc("GET /ws/clusters", server.requireAuth(server.handleWSClusters))
 	mux.Handle("/", hubweb.Handler())
 

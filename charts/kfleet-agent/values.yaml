@@ -9,6 +9,9 @@ hub:
   url: ""
   token: ""
 
+tenant:
+  id: default
+
 cluster:
   name: ""
   labels: {}

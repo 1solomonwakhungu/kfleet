@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 
 import { cn } from '../../lib/utils'
@@ -13,6 +13,13 @@ export interface NavigationItem {
 }
 
 export const primaryNavigationItems: readonly NavigationItem[] = [
+  {
+    label: 'Policy',
+    description: 'Drift and compliance',
+    to: '/policies',
+    icon: ShieldCheck,
+    end: true,
+  },
   {
     label: 'Fleet',
     description: 'Cluster overview',

@@ -157,6 +157,19 @@ Example prompts:
 - “Diagnose the production cluster and explain its recent Warning events.”
 - “Show pods in the payments namespace on staging.”
 
+## Detect policy and configuration drift
+
+The Policy dashboard evaluates seven built-in, read-only checks across the latest cluster snapshots. It reports Kubernetes version, cluster label, namespace, deployment configuration, workload availability, namespace Pod Security, and pod security posture results as `pass`, `fail`, `unknown`, or `stale`.
+
+Open `/policies` in the hub UI or query the REST API:
+
+```bash
+curl http://localhost:8080/api/v1/policies
+curl 'http://localhost:8080/api/v1/policies/results?status=fail'
+```
+
+The hub never remediates policy findings. Multi-tenant installations scope agent and API traffic with `KFLEET_TENANT_ID` and `X-Kfleet-Tenant-ID`. See [Policy and configuration drift](docs/policy-drift.md) for policy definitions, API filters, freshness behavior, tenant isolation, and compatibility details.
+
 ## Development
 
 Prerequisites:
