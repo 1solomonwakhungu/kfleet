@@ -23,6 +23,8 @@ describe('api', () => {
       };
       const body = url.endsWith('/status')
         ? { cluster, nodes: [] }
+        : url.includes('/timeline')
+          ? { events: [] }
         : /\/clusters\/[^/]+$/.test(url)
           ? cluster
           : [];
@@ -37,6 +39,8 @@ describe('api', () => {
     await api.getServices(id);
     await api.getDeployments(id);
     await api.getNamespaces(id);
+    await api.getTimeline(id);
+    await api.getClusterPolicyResults(id);
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25',
@@ -46,6 +50,8 @@ describe('api', () => {
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/services',
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/deployments',
       '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/namespaces',
+      '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/timeline',
+      '/api/v1/clusters/fleet%2Fus%20central%3F%23%25/policy-results',
     ]);
   });
 
@@ -63,6 +69,26 @@ describe('api', () => {
       '/api/v1/clusters/cluster/events',
       '/api/v1/clusters/cluster/services',
     ]);
+  });
+
+  it('constructs paginated and time-filtered timeline queries', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ events: [], nextCursor: 40 }), {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await expect(api.getTimeline('cluster/a', {
+      since: '2026-07-20T00:00:00Z',
+      until: '2026-07-21T00:00:00Z',
+      before: 81,
+      limit: 40,
+    })).resolves.toEqual({ events: [], nextCursor: 40 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/clusters/cluster%2Fa/timeline?since=2026-07-20T00%3A00%3A00Z&until=2026-07-21T00%3A00%3A00Z&before=81&limit=40',
+      expect.objectContaining({ method: 'GET' }),
+    );
   });
 
   it('returns undefined for an empty successful response', async () => {
@@ -170,6 +196,42 @@ describe('api', () => {
         memoryCapacity: '16Gi',
         ready: true,
       }],
+    });
+  });
+
+  it('lists and acknowledges alerts through encoded API paths', async () => {
+    const alert = {
+      id: 'alert/a?#',
+      ruleId: 'fleet-health-degraded',
+      ruleName: 'Cluster health degraded',
+      clusterId: 'cluster-a',
+      clusterName: 'production',
+      dedupeKey: 'rule:cluster:degraded',
+      health: 'degraded',
+      severity: 'warning',
+      summary: 'production is degraded',
+      status: 'firing',
+      triggeredAt: '2026-07-23T12:00:00Z',
+      updatedAt: '2026-07-23T12:00:00Z',
+      deliveryStatus: 'disabled',
+      deliveryAttempts: 0,
+    };
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ alerts: [alert] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...alert, status: 'acknowledged' })));
+
+    await expect(api.listAlerts('firing')).resolves.toEqual([alert]);
+    await expect(api.acknowledgeAlert(alert.id, 'on-call')).resolves.toMatchObject({
+      id: alert.id,
+      status: 'acknowledged',
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/alerts?status=firing');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/alerts/alert%2Fa%3F%23/acknowledge');
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({ 'X-Kfleet-CSRF': '1' }),
+      body: JSON.stringify({ acknowledgedBy: 'on-call' }),
     });
   });
 });

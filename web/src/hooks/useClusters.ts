@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Cluster, ClusterHealth } from '../types/cluster'
+import { notifyAuthenticationRequired } from '../lib/authApi'
 
 interface APICluster {
   id: string
@@ -54,6 +55,7 @@ export function useClusters() {
 
     try {
       const response = await fetch('/api/v1/clusters', { signal: controller.signal })
+      notifyAuthenticationRequired(response)
       if (!response.ok) throw new Error(`Cluster request failed with status ${response.status}`)
       const body = (await response.json()) as ListClustersResponse | APICluster[]
       const items = Array.isArray(body) ? body : body.clusters

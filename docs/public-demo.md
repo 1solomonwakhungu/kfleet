@@ -14,8 +14,15 @@ a connection to a live Kubernetes environment.
   certificates, real hostnames, or live cluster identifiers are loaded.
 - `POST`, `PUT`, `PATCH`, and `DELETE` are rejected with HTTP 405 before they
   reach an application handler. `GET`, `HEAD`, and `OPTIONS` remain available.
-- The stale-cluster monitor is disabled so the demo process does not perform
+- The stale-cluster monitor, alert delivery worker, timeline retention worker,
+  and session-pruning worker are disabled so the demo process does not perform
   background mutations.
+- Read routes run as a synthetic `read_only` viewer without creating a user or
+  session. Admin-only reads remain forbidden, and every mutation is still
+  rejected before routing.
+- Synthetic alert history and timeline entries are seeded alongside the
+  cluster snapshots so the demo covers the operational features without
+  connecting to a live system.
 - The UI identifies the environment as a read-only synthetic demo and removes
   the agent approval navigation.
 - The server applies CSP, HSTS, anti-framing, MIME sniffing, referrer, browser

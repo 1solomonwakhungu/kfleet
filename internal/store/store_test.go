@@ -273,3 +273,67 @@ func TestSQLiteStoreReplaceSnapshot(t *testing.T) {
 		t.Fatalf("ListEvents() = (%#v, %v), want empty", events, err)
 	}
 }
+
+func TestSQLiteStoreTenantIsolationAndPolicyEvidence(t *testing.T) {
+	t.Parallel()
+
+	st, err := Open(filepath.Join(t.TempDir(), "kfleet.db"))
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := st.Close(); err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	})
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	for _, cluster := range []types.Cluster{
+		{ID: "a", TenantID: "tenant-a", Name: "alpha", Health: types.HealthHealthy, RegisteredAt: now, Labels: map[string]string{}},
+		{ID: "b", TenantID: "tenant-b", Name: "alpha", Health: types.HealthHealthy, RegisteredAt: now, Labels: map[string]string{}},
+	} {
+		if err := st.CreateCluster(ctx, cluster); err != nil {
+			t.Fatalf("CreateCluster(%s) error = %v", cluster.ID, err)
+		}
+	}
+
+	clusters, err := st.ListClustersForTenant(ctx, "tenant-a")
+	if err != nil || len(clusters) != 1 || clusters[0].ID != "a" {
+		t.Fatalf("ListClustersForTenant(tenant-a) = (%#v, %v), want only a", clusters, err)
+	}
+	if _, err := st.GetClusterForTenant(ctx, "tenant-a", "b"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("GetClusterForTenant(tenant-a, b) error = %v, want ErrNotFound", err)
+	}
+
+	snapshot := types.ClusterSnapshot{
+		Pods: []types.Pod{{
+			Name: "api", Namespace: "apps", SecurityContextKnown: true,
+			RunAsNonRoot: true, ReadOnlyRootFilesystem: true, CapabilitiesDroppedAll: true,
+		}},
+		Deployments: []types.Deployment{{
+			Name: "api", Namespace: "apps", ConfigHash: "abc123", Images: []string{"example/api:v1"},
+		}},
+		Namespaces: []types.Namespace{{
+			Name: "apps", Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"},
+		}},
+	}
+	if err := st.ReplaceSnapshot(ctx, "a", snapshot, "v1.31.1", "0.2.0", types.HealthHealthy, now); err != nil {
+		t.Fatalf("ReplaceSnapshot() error = %v", err)
+	}
+	pods, err := st.ListPods(ctx, "a", "")
+	if err != nil || len(pods) != 1 || !pods[0].SecurityContextKnown || !pods[0].RunAsNonRoot ||
+		!pods[0].ReadOnlyRootFilesystem || !pods[0].CapabilitiesDroppedAll {
+		t.Fatalf("ListPods() policy evidence = (%#v, %v)", pods, err)
+	}
+	deployments, err := st.ListDeployments(ctx, "a", "")
+	if err != nil || len(deployments) != 1 || deployments[0].ConfigHash != "abc123" ||
+		!reflect.DeepEqual(deployments[0].Images, []string{"example/api:v1"}) {
+		t.Fatalf("ListDeployments() policy evidence = (%#v, %v)", deployments, err)
+	}
+	namespaces, err := st.ListNamespaceConfigs(ctx, "a")
+	if err != nil || len(namespaces) != 1 ||
+		namespaces[0].Labels["pod-security.kubernetes.io/enforce"] != "restricted" {
+		t.Fatalf("ListNamespaceConfigs() = (%#v, %v)", namespaces, err)
+	}
+}

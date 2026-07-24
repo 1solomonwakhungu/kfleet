@@ -28,6 +28,7 @@ type Registrar struct {
 	token             string
 	clusterName       string
 	agentVersion      string
+	tenantID          string
 	labels            map[string]string
 	client            *http.Client
 }
@@ -54,6 +55,7 @@ func New(cfg *config.Config, labels map[string]string) *Registrar {
 		token:             cfg.HubToken,
 		clusterName:       cfg.ClusterName,
 		agentVersion:      agentVersion,
+		tenantID:          cfg.TenantID,
 		labels:            labels,
 		client:            &http.Client{Timeout: requestTimeout},
 	}
@@ -80,7 +82,7 @@ func (r *Registrar) Register(ctx context.Context, k8sVersion string) (*RegisterR
 	if err != nil {
 		return nil, fmt.Errorf("register agent: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode == http.StatusUnauthorized {
 		_, _ = io.Copy(io.Discard, response.Body)
 		return nil, errors.New("hub rejected agent token")
@@ -133,7 +135,7 @@ func (r *Registrar) postLifecycle(ctx context.Context, action string) error {
 	if err != nil {
 		return fmt.Errorf("send agent %s: %w", action, err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	_, _ = io.Copy(io.Discard, response.Body)
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("hub returned %s status %s", action, response.Status)
@@ -146,4 +148,7 @@ func (r *Registrar) setHeaders(request *http.Request, jsonBody bool, token strin
 		request.Header.Set("Content-Type", "application/json")
 	}
 	request.Header.Set("Authorization", "Bearer "+token)
+	if r.tenantID != "" {
+		request.Header.Set("X-Kfleet-Tenant-ID", r.tenantID)
+	}
 }

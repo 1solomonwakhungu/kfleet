@@ -17,6 +17,7 @@ const (
 // Cluster describes a Kubernetes cluster registered with kfleet.
 type Cluster struct {
 	ID            string            `json:"id"`
+	TenantID      string            `json:"-"`
 	Name          string            `json:"name"`
 	Health        ClusterHealth     `json:"health"`
 	Version       string            `json:"version"`
@@ -41,13 +42,22 @@ type Node struct {
 
 // Pod describes the runtime state of a Kubernetes pod.
 type Pod struct {
-	Name         string    `json:"name"`
-	Namespace    string    `json:"namespace"`
-	Phase        string    `json:"phase"`
-	NodeName     string    `json:"nodeName"`
-	RestartCount int32     `json:"restartCount"`
-	Ready        bool      `json:"ready"`
-	StartTime    time.Time `json:"startTime"`
+	Name                      string    `json:"name"`
+	Namespace                 string    `json:"namespace"`
+	Phase                     string    `json:"phase"`
+	NodeName                  string    `json:"nodeName"`
+	RestartCount              int32     `json:"restartCount"`
+	Ready                     bool      `json:"ready"`
+	StartTime                 time.Time `json:"startTime"`
+	SecurityContextKnown      bool      `json:"securityContextKnown"`
+	Privileged                bool      `json:"privileged"`
+	RunAsNonRoot              bool      `json:"runAsNonRoot"`
+	ReadOnlyRootFilesystem    bool      `json:"readOnlyRootFilesystem"`
+	AllowsPrivilegeEscalation bool      `json:"allowsPrivilegeEscalation"`
+	CapabilitiesDroppedAll    bool      `json:"capabilitiesDroppedAll"`
+	HostNetwork               bool      `json:"hostNetwork"`
+	HostPID                   bool      `json:"hostPID"`
+	HostIPC                   bool      `json:"hostIPC"`
 }
 
 // Event describes an event observed in a managed cluster.
@@ -82,13 +92,21 @@ type Service struct {
 
 // Deployment describes the replica state of a Kubernetes deployment.
 type Deployment struct {
-	Name              string `json:"name"`
-	Namespace         string `json:"namespace"`
-	ReadyReplicas     int32  `json:"readyReplicas"`
-	DesiredReplicas   int32  `json:"desiredReplicas"`
-	UpdatedReplicas   int32  `json:"updatedReplicas"`
-	AvailableReplicas int32  `json:"availableReplicas"`
-	Age               string `json:"age"`
+	Name              string   `json:"name"`
+	Namespace         string   `json:"namespace"`
+	ReadyReplicas     int32    `json:"readyReplicas"`
+	DesiredReplicas   int32    `json:"desiredReplicas"`
+	UpdatedReplicas   int32    `json:"updatedReplicas"`
+	AvailableReplicas int32    `json:"availableReplicas"`
+	Age               string   `json:"age"`
+	ConfigHash        string   `json:"configHash"`
+	Images            []string `json:"images"`
+}
+
+// Namespace describes configuration attached to a Kubernetes namespace.
+type Namespace struct {
+	Name   string            `json:"name"`
+	Labels map[string]string `json:"labels"`
 }
 
 // ClusterSnapshot is the normalized, durable resource state for one cluster.
@@ -97,5 +115,159 @@ type ClusterSnapshot struct {
 	Pods        []Pod
 	Services    []Service
 	Deployments []Deployment
+	Namespaces  []Namespace
 	Events      []Event
+}
+
+// AlertSeverity describes the operational impact of a fleet health alert.
+type AlertSeverity string
+
+const (
+	AlertSeverityWarning  AlertSeverity = "warning"
+	AlertSeverityCritical AlertSeverity = "critical"
+)
+
+// AlertStatus describes the operator lifecycle of an alert.
+type AlertStatus string
+
+const (
+	AlertStatusFiring       AlertStatus = "firing"
+	AlertStatusAcknowledged AlertStatus = "acknowledged"
+	AlertStatusResolved     AlertStatus = "resolved"
+)
+
+// AlertDeliveryStatus describes webhook delivery state independently from the
+// operator lifecycle.
+type AlertDeliveryStatus string
+
+const (
+	AlertDeliveryPending    AlertDeliveryStatus = "pending"
+	AlertDeliveryRetrying   AlertDeliveryStatus = "retrying"
+	AlertDeliveryDelivered  AlertDeliveryStatus = "delivered"
+	AlertDeliveryDeadLetter AlertDeliveryStatus = "dead_letter"
+	AlertDeliveryDisabled   AlertDeliveryStatus = "disabled"
+)
+
+// AlertRule maps a cluster health state to an alert severity and cooldown.
+type AlertRule struct {
+	ID              string        `json:"id"`
+	Name            string        `json:"name"`
+	Health          ClusterHealth `json:"health"`
+	Severity        AlertSeverity `json:"severity"`
+	CooldownSeconds int64         `json:"cooldownSeconds"`
+	Enabled         bool          `json:"enabled"`
+	CreatedAt       time.Time     `json:"createdAt"`
+	UpdatedAt       time.Time     `json:"updatedAt"`
+}
+
+// Alert is a durable fleet health alert and its webhook delivery record.
+type Alert struct {
+	ID                string              `json:"id"`
+	TenantID          string              `json:"-"`
+	RuleID            string              `json:"ruleId"`
+	RuleName          string              `json:"ruleName"`
+	ClusterID         string              `json:"clusterId"`
+	ClusterName       string              `json:"clusterName"`
+	DedupeKey         string              `json:"dedupeKey"`
+	Health            ClusterHealth       `json:"health"`
+	Severity          AlertSeverity       `json:"severity"`
+	Summary           string              `json:"summary"`
+	Status            AlertStatus         `json:"status"`
+	TriggeredAt       time.Time           `json:"triggeredAt"`
+	UpdatedAt         time.Time           `json:"updatedAt"`
+	AcknowledgedAt    *time.Time          `json:"acknowledgedAt,omitempty"`
+	AcknowledgedBy    string              `json:"acknowledgedBy,omitempty"`
+	ResolvedAt        *time.Time          `json:"resolvedAt,omitempty"`
+	DeliveryStatus    AlertDeliveryStatus `json:"deliveryStatus"`
+	DeliveryAttempts  int                 `json:"deliveryAttempts"`
+	NextDeliveryAt    *time.Time          `json:"nextDeliveryAt,omitempty"`
+	LastDeliveryError string              `json:"lastDeliveryError,omitempty"`
+	DeliveredAt       *time.Time          `json:"deliveredAt,omitempty"`
+	DeadLetteredAt    *time.Time          `json:"deadLetteredAt,omitempty"`
+}
+
+// OperationalEventKind categorizes an entry in the fleet timeline.
+type OperationalEventKind string
+
+const (
+	EventClusterRegistered    OperationalEventKind = "cluster_registered"
+	EventAgentApproved        OperationalEventKind = "agent_approved"
+	EventHeartbeatStateChange OperationalEventKind = "heartbeat_state_change"
+	EventVersionChanged       OperationalEventKind = "version_changed"
+	EventAgentReconnected     OperationalEventKind = "agent_reconnected"
+	EventAgentDisconnected    OperationalEventKind = "agent_disconnected"
+	EventPolicyFinding        OperationalEventKind = "policy_finding"
+)
+
+// OperationalEvent is a durable, append-only fleet lifecycle record.
+type OperationalEvent struct {
+	ID         int64                `json:"id"`
+	TenantID   string               `json:"-"`
+	ClusterID  string               `json:"clusterId"`
+	Kind       OperationalEventKind `json:"kind"`
+	Message    string               `json:"message"`
+	Details    map[string]string    `json:"details,omitempty"`
+	OccurredAt time.Time            `json:"occurredAt"`
+	DedupeKey  string               `json:"-"`
+}
+
+// Role identifies a user's permission level in the hub.
+type Role string
+
+// Supported user roles, ordered from least to most privileged.
+const (
+	// RoleReadOnly can view fleet state but cannot perform mutations.
+	RoleReadOnly Role = "read_only"
+	// RoleOperator can perform day-to-day fleet operations such as
+	// approving agents and registering or removing clusters.
+	RoleOperator Role = "operator"
+	// RoleAdmin can perform every operator action plus user management
+	// and hub configuration changes.
+	RoleAdmin Role = "admin"
+)
+
+// ValidRole reports whether role is one of the known roles.
+func ValidRole(role Role) bool {
+	switch role {
+	case RoleReadOnly, RoleOperator, RoleAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
+// User is a hub operator account used to authenticate to the REST API and web UI.
+type User struct {
+	ID           string    `json:"id"`
+	Username     string    `json:"username"`
+	Email        string    `json:"email"`
+	Role         Role      `json:"role"`
+	Disabled     bool      `json:"disabled"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	PasswordHash string    `json:"-"`
+}
+
+// AuditOutcome describes whether an audited action succeeded or failed.
+type AuditOutcome string
+
+// Supported audit outcomes.
+const (
+	AuditSuccess AuditOutcome = "success"
+	AuditFailure AuditOutcome = "failure"
+)
+
+// AuditEvent is an immutable record of a security-relevant action.
+type AuditEvent struct {
+	ID            string       `json:"id"`
+	OccurredAt    time.Time    `json:"occurredAt"`
+	ActorUserID   string       `json:"actorUserId,omitempty"`
+	ActorUsername string       `json:"actorUsername"`
+	ActorRole     Role         `json:"actorRole,omitempty"`
+	Action        string       `json:"action"`
+	TargetType    string       `json:"targetType"`
+	TargetID      string       `json:"targetId"`
+	Outcome       AuditOutcome `json:"outcome"`
+	Details       string       `json:"details,omitempty"`
+	SourceIP      string       `json:"sourceIp,omitempty"`
 }

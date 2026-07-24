@@ -19,22 +19,32 @@ const placeholderClusterToken = "placeholder-token"
 
 const maxSnapshotBodyBytes = 4 << 20
 
+// registerClusterRoutes wires the human-facing cluster inventory endpoints.
+// Every route requires an authenticated hub session; the mutating routes
+// (register, delete) additionally require the operator role or higher.
+// POST /api/v1/clusters/{id}/status is the agent snapshot ingestion route
+// and keeps authenticating with the per-agent bearer token, matching the
+// existing agent flow.
 func (s *Server) registerClusterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/clusters", s.handleListClusters)
-	mux.HandleFunc("GET /api/v1/clusters/{id}", s.handleGetCluster)
-	mux.HandleFunc("POST /api/v1/clusters/register", s.handleRegisterCluster)
-	mux.HandleFunc("DELETE /api/v1/clusters/{id}", s.handleDeleteCluster)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/status", s.handleClusterStatus)
+	mux.HandleFunc("GET /api/v1/clusters", s.requireAuth(s.handleListClusters))
+	mux.HandleFunc("GET /api/v1/clusters/{id}", s.requireAuth(s.handleGetCluster))
+	mux.HandleFunc("POST /api/v1/clusters/register", s.requireRole(types.RoleOperator, s.handleRegisterCluster))
+	mux.HandleFunc("DELETE /api/v1/clusters/{id}", s.requireRole(types.RoleOperator, s.handleDeleteCluster))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/status", s.requireAuth(s.handleClusterStatus))
 	mux.HandleFunc("POST /api/v1/clusters/{id}/status", s.handleClusterSnapshot)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/pods", s.handleClusterPods)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/services", s.handleClusterServices)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/deployments", s.handleClusterDeployments)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/namespaces", s.handleClusterNamespaces)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/events", s.handleClusterEvents)
+	mux.HandleFunc("GET /api/v1/clusters/{id}/pods", s.requireAuth(s.handleClusterPods))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/services", s.requireAuth(s.handleClusterServices))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/deployments", s.requireAuth(s.handleClusterDeployments))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/namespaces", s.requireAuth(s.handleClusterNamespaces))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/events", s.requireAuth(s.handleClusterEvents))
 }
 
 func (s *Server) handleListClusters(w http.ResponseWriter, r *http.Request) {
-	clusters, err := s.store.ListClusters(r.Context())
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	clusters, err := s.store.ListClustersForTenant(r.Context(), tenantID)
 	if err != nil {
 		s.logger.Error("failed to list clusters", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "failed to list clusters")
@@ -46,7 +56,11 @@ func (s *Server) handleListClusters(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetCluster(w http.ResponseWriter, r *http.Request) {
-	cluster, err := s.store.GetCluster(r.Context(), r.PathValue("id"))
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	cluster, err := s.store.GetClusterForTenant(r.Context(), tenantID, r.PathValue("id"))
 	if handleStoreError(w, err) {
 		return
 	}
@@ -56,6 +70,7 @@ func (s *Server) handleGetCluster(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
+	actor, _ := authenticatedUser(r.Context())
 	var request api.RegisterClusterRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
@@ -68,8 +83,13 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
 	cluster := types.Cluster{
 		ID:           uuid.NewString(),
+		TenantID:     tenantID,
 		Name:         request.Name,
 		Health:       types.HealthUnknown,
 		RegisteredAt: time.Now().UTC(),
@@ -81,6 +101,8 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.broadcast.Broadcast(ClusterUpdate{Type: "registered", Cluster: cluster})
+	s.recordClusterRegistered(r.Context(), cluster)
+	s.recordAudit(r.Context(), r, auditActorFromUser(actor), "cluster.register", "cluster", cluster.ID, types.AuditSuccess, "name="+cluster.Name)
 
 	response := api.RegisterClusterResponse{
 		ClusterID: cluster.ID,
@@ -92,7 +114,12 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
-	cluster, err := s.store.GetCluster(r.Context(), r.PathValue("id"))
+	actor, _ := authenticatedUser(r.Context())
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	cluster, err := s.store.GetClusterForTenant(r.Context(), tenantID, r.PathValue("id"))
 	if handleStoreError(w, err) {
 		return
 	}
@@ -101,11 +128,16 @@ func (s *Server) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.broadcast.Broadcast(ClusterUpdate{Type: "deleted", Cluster: cluster})
+	s.recordAudit(r.Context(), r, auditActorFromUser(actor), "cluster.delete", "cluster", cluster.ID, types.AuditSuccess, "name="+cluster.Name)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleClusterStatus(w http.ResponseWriter, r *http.Request) {
-	cluster, err := s.store.GetCluster(r.Context(), r.PathValue("id"))
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	cluster, err := s.store.GetClusterForTenant(r.Context(), tenantID, r.PathValue("id"))
 	if handleStoreError(w, err) {
 		return
 	}
@@ -177,7 +209,10 @@ func (s *Server) handleClusterSnapshot(w http.ResponseWriter, r *http.Request) {
 	if cluster.Health != updated.Health {
 		s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: updated})
 	}
+	s.alerts.Evaluate(r.Context(), updated)
 	s.broadcast.Broadcast(ClusterUpdate{Type: "snapshot", Cluster: updated})
+	s.recordHeartbeatTransition(r.Context(), updated, cluster.Health, updated.Health, now)
+	s.recordVersionChanged(r.Context(), updated, cluster.Version, updated.Version, now)
 	if err := api.WriteJSON(w, http.StatusOK, updated); err != nil {
 		s.logger.Error("failed to write snapshot response", "error", err)
 	}
@@ -254,7 +289,11 @@ func (s *Server) handleClusterEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) resourceCluster(w http.ResponseWriter, r *http.Request) (types.Cluster, bool) {
-	cluster, err := s.store.GetCluster(r.Context(), r.PathValue("id"))
+	tenantID, ok := tenantIDFromRequest(w, r)
+	if !ok {
+		return types.Cluster{}, false
+	}
+	cluster, err := s.store.GetClusterForTenant(r.Context(), tenantID, r.PathValue("id"))
 	if handleStoreError(w, err) {
 		return types.Cluster{}, false
 	}
@@ -276,6 +315,7 @@ func normalizeSnapshot(clusterID string, request api.ClusterSnapshotRequest) typ
 		Pods:        make([]types.Pod, 0, len(request.Pods)),
 		Services:    make([]types.Service, 0, len(request.Services)),
 		Deployments: make([]types.Deployment, 0, len(request.Deployments)),
+		Namespaces:  make([]types.Namespace, 0, len(request.Namespaces)),
 		Events:      make([]types.Event, 0, len(request.Events)),
 	}
 	for _, node := range request.Nodes {
@@ -291,13 +331,22 @@ func normalizeSnapshot(clusterID string, request api.ClusterSnapshotRequest) typ
 	}
 	for _, pod := range request.Pods {
 		snapshot.Pods = append(snapshot.Pods, types.Pod{
-			Name:         pod.Name,
-			Namespace:    pod.Namespace,
-			Phase:        pod.Phase,
-			NodeName:     pod.Node,
-			RestartCount: pod.Restarts,
-			Ready:        pod.Ready,
-			StartTime:    pod.StartTime,
+			Name:                      pod.Name,
+			Namespace:                 pod.Namespace,
+			Phase:                     pod.Phase,
+			NodeName:                  pod.Node,
+			RestartCount:              pod.Restarts,
+			Ready:                     pod.Ready,
+			StartTime:                 pod.StartTime,
+			SecurityContextKnown:      pod.SecurityContextKnown,
+			Privileged:                pod.Privileged,
+			RunAsNonRoot:              pod.RunAsNonRoot,
+			ReadOnlyRootFilesystem:    pod.ReadOnlyRootFilesystem,
+			AllowsPrivilegeEscalation: pod.AllowsPrivilegeEscalation,
+			CapabilitiesDroppedAll:    pod.CapabilitiesDroppedAll,
+			HostNetwork:               pod.HostNetwork,
+			HostPID:                   pod.HostPID,
+			HostIPC:                   pod.HostIPC,
 		})
 	}
 	for _, service := range request.Services {
@@ -324,6 +373,14 @@ func normalizeSnapshot(clusterID string, request api.ClusterSnapshotRequest) typ
 			AvailableReplicas: deployment.AvailableReplicas,
 			UpdatedReplicas:   deployment.UpdatedReplicas,
 			Age:               deployment.Age,
+			ConfigHash:        deployment.ConfigHash,
+			Images:            nonNilSlice(deployment.Images),
+		})
+	}
+	for _, namespace := range request.Namespaces {
+		snapshot.Namespaces = append(snapshot.Namespaces, types.Namespace{
+			Name:   namespace.Name,
+			Labels: nonNilMap(namespace.Labels),
 		})
 	}
 	for _, event := range request.Events {
@@ -376,6 +433,13 @@ func parseServicePort(value string) types.ServicePort {
 func nonNilSlice[T any](values []T) []T {
 	if values == nil {
 		return make([]T, 0)
+	}
+	return values
+}
+
+func nonNilMap(values map[string]string) map[string]string {
+	if values == nil {
+		return make(map[string]string)
 	}
 	return values
 }

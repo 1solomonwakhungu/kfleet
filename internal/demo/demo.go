@@ -32,7 +32,8 @@ func Open(ctx context.Context) (store.Store, error) {
 
 // Seed writes a deterministic set of clearly synthetic clusters and snapshots.
 func Seed(ctx context.Context, st store.Store, now time.Time) error {
-	for _, item := range fixtures(now) {
+	items := fixtures(now)
+	for _, item := range items {
 		if err := st.CreateCluster(ctx, item.cluster); err != nil {
 			return fmt.Errorf("create synthetic cluster %q: %w", item.cluster.ID, err)
 		}
@@ -46,6 +47,68 @@ func Seed(ctx context.Context, st store.Store, now time.Time) error {
 			item.cluster.LastHeartbeat,
 		); err != nil {
 			return fmt.Errorf("seed synthetic snapshot %q: %w", item.cluster.ID, err)
+		}
+	}
+	if err := seedOperationalFeatures(ctx, st, items, now.UTC()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func seedOperationalFeatures(ctx context.Context, st store.Store, items []fixture, now time.Time) error {
+	for _, item := range items {
+		inserted, err := st.AppendEvent(ctx, types.OperationalEvent{
+			TenantID:   store.DefaultTenantID,
+			ClusterID:  item.cluster.ID,
+			Kind:       types.EventClusterRegistered,
+			Message:    "Synthetic demo cluster registered",
+			Details:    map[string]string{"data": "synthetic", "environment": "demo"},
+			OccurredAt: item.cluster.RegisteredAt,
+			DedupeKey:  "demo-registration",
+		})
+		if err != nil {
+			return fmt.Errorf("seed synthetic timeline %q: %w", item.cluster.ID, err)
+		}
+		if !inserted {
+			return fmt.Errorf("seed synthetic timeline %q: event was not inserted", item.cluster.ID)
+		}
+
+		var ruleID, ruleName string
+		var severity types.AlertSeverity
+		switch item.cluster.Health {
+		case types.HealthDegraded:
+			ruleID = "fleet-health-degraded"
+			ruleName = "Cluster health degraded"
+			severity = types.AlertSeverityWarning
+		case types.HealthUnreachable:
+			ruleID = "fleet-health-unreachable"
+			ruleName = "Cluster unreachable"
+			severity = types.AlertSeverityCritical
+		default:
+			continue
+		}
+		alert := types.Alert{
+			ID:             "demo-alert-" + item.cluster.ID,
+			TenantID:       store.DefaultTenantID,
+			RuleID:         ruleID,
+			RuleName:       ruleName,
+			ClusterID:      item.cluster.ID,
+			ClusterName:    item.cluster.Name,
+			DedupeKey:      ruleID + ":" + item.cluster.ID + ":" + string(item.cluster.Health),
+			Health:         item.cluster.Health,
+			Severity:       severity,
+			Summary:        item.cluster.Name + " is " + string(item.cluster.Health) + " (synthetic demo)",
+			Status:         types.AlertStatusFiring,
+			TriggeredAt:    now.Add(-30 * time.Minute),
+			UpdatedAt:      now.Add(-30 * time.Minute),
+			DeliveryStatus: types.AlertDeliveryDisabled,
+		}
+		created, err := st.CreateAlertIfDue(ctx, alert, 0)
+		if err != nil {
+			return fmt.Errorf("seed synthetic alert %q: %w", item.cluster.ID, err)
+		}
+		if !created {
+			return fmt.Errorf("seed synthetic alert %q: alert was not created", item.cluster.ID)
 		}
 	}
 	return nil
@@ -153,7 +216,12 @@ func demoPod(namespace, name, node string, started time.Time, ready bool, restar
 	if !ready {
 		phase = "Pending"
 	}
-	return types.Pod{Name: name, Namespace: namespace, Phase: phase, NodeName: node, RestartCount: restarts, Ready: ready, StartTime: started}
+	return types.Pod{
+		Name: name, Namespace: namespace, Phase: phase, NodeName: node,
+		RestartCount: restarts, Ready: ready, StartTime: started,
+		SecurityContextKnown: true, RunAsNonRoot: true, ReadOnlyRootFilesystem: true,
+		CapabilitiesDroppedAll: true,
+	}
 }
 
 func demoService(name, namespace, clusterIP string, port int32) types.Service {
@@ -167,6 +235,7 @@ func demoDeployment(name, namespace string, desired, ready int32, age string) ty
 	return types.Deployment{
 		Name: name, Namespace: namespace, DesiredReplicas: desired, ReadyReplicas: ready,
 		UpdatedReplicas: ready, AvailableReplicas: ready, Age: age,
+		ConfigHash: "synthetic-demo-config", Images: []string{"registry.invalid/demo/" + name + ":v1"},
 	}
 }
 

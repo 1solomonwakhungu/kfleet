@@ -1,5 +1,9 @@
 import type { Cluster, ClusterStatus } from '@/types/cluster';
+import type { Alert, AlertStatus } from '@/types/alert';
 import type { PodInfo, EventInfo, ServiceInfo, DeploymentInfo } from '@/types/resources';
+import type { TimelinePage } from '@/types/timeline';
+import type { PolicyResultsResponse } from '@/types/policy';
+import { notifyAuthenticationRequired } from './authApi';
 
 const BASE = '/api/v1';
 
@@ -27,11 +31,21 @@ function isErrorBody(body: unknown): body is { error: string } {
 }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return request<T>('GET', path, undefined, signal);
+}
+
+async function request<T>(method: string, path: string, payload?: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
+    method,
+    headers: {
+      Accept: 'application/json',
+      ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }),
+      ...(method === 'GET' ? {} : { 'X-Kfleet-CSRF': '1' }),
+    },
+    body: payload === undefined ? undefined : JSON.stringify(payload),
     signal,
   });
+  notifyAuthenticationRequired(res);
 
   const text = await res.text();
   let body: unknown;
@@ -90,6 +104,22 @@ export function normalizeCluster(cluster: WireCluster): Cluster {
   };
 }
 
+export interface TimelineQuery {
+  since?: string;
+  until?: string;
+  before?: number;
+  limit?: number;
+}
+
+function timelineQuery(query: TimelineQuery): string {
+  return qs({
+    since: query.since,
+    until: query.until,
+    before: query.before ? String(query.before) : undefined,
+    limit: query.limit ? String(query.limit) : undefined,
+  });
+}
+
 export const api = {
   getRuntimeInfo: (signal?: AbortSignal) => get<RuntimeInfo>('/meta', signal),
   // Backed by GET /api/v1/clusters (internal/server/handlers_clusters.go).
@@ -110,4 +140,22 @@ export const api = {
   getDeployments: (id: string, ns?: string, signal?: AbortSignal) =>
     get<DeploymentInfo[]>(`${clusterPath(id, '/deployments')}${qs({ namespace: ns })}`, signal),
   getNamespaces: (id: string, signal?: AbortSignal) => get<string[]>(clusterPath(id, '/namespaces'), signal),
+  listAlerts: (status?: AlertStatus, signal?: AbortSignal) =>
+    get<{ alerts: Alert[] }>(`/alerts${qs({ status })}`, signal).then((response) => response.alerts),
+  acknowledgeAlert: (id: string, acknowledgedBy = 'operator', signal?: AbortSignal) =>
+    request<Alert>(
+      'POST',
+      `/alerts/${encodeURIComponent(id)}/acknowledge`,
+      { acknowledgedBy },
+      signal,
+    ),
+  // Backed by the durable operational timeline, not Kubernetes snapshot events.
+  getTimeline: (id: string, query: TimelineQuery = {}, signal?: AbortSignal) =>
+    get<TimelinePage>(`${clusterPath(id, '/timeline')}${timelineQuery(query)}`, signal),
+  getFleetTimeline: (query: TimelineQuery = {}, signal?: AbortSignal) =>
+    get<TimelinePage>(`/timeline${timelineQuery(query)}`, signal),
+  // Built-in policies are evaluated read-only against the latest tenant snapshot.
+  getPolicyResults: (signal?: AbortSignal) => get<PolicyResultsResponse>('/policies/results', signal),
+  getClusterPolicyResults: (id: string, signal?: AbortSignal) =>
+    get<PolicyResultsResponse>(clusterPath(id, '/policy-results'), signal),
 };

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/1solomonwakhungu/kfleet/internal/store"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
 	"github.com/coder/websocket"
 )
@@ -21,6 +22,7 @@ type ClusterUpdate struct {
 
 type wsClient struct {
 	conn       *websocket.Conn
+	tenantID   string
 	send       chan ClusterUpdate
 	registered chan struct{}
 	closed     chan struct{}
@@ -65,6 +67,9 @@ func (h *BroadcastHub) Run(ctx context.Context) {
 			h.removeClient(client, false)
 		case update := <-h.broadcast:
 			for client := range h.clients {
+				if normalizeBroadcastTenant(update.Cluster.TenantID) != normalizeBroadcastTenant(client.tenantID) {
+					continue
+				}
 				select {
 				case client.send <- update:
 				default:
@@ -74,6 +79,13 @@ func (h *BroadcastHub) Run(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func normalizeBroadcastTenant(tenantID string) string {
+	if tenantID == "" {
+		return store.DefaultTenantID
+	}
+	return tenantID
 }
 
 // Broadcast queues an update without waiting for clients to consume it.

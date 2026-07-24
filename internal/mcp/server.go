@@ -41,14 +41,19 @@ func (s *Server) Serve(ctx context.Context) error {
 	return mcpserver.NewStdioServer(s.server).Listen(ctx, os.Stdin, os.Stdout)
 }
 
-// RunStdio configures and runs the MCP server using KFLEET_HUB_URL and
-// KFLEET_HUB_TOKEN.
+// RunStdio configures and runs the MCP server using KFLEET_HUB_URL,
+// KFLEET_HUB_USERNAME, and KFLEET_HUB_PASSWORD.
 func RunStdio() error {
 	hubURL := strings.TrimSpace(os.Getenv("KFLEET_HUB_URL"))
 	if hubURL == "" {
 		return errors.New("KFLEET_HUB_URL is required")
 	}
-	hub, err := hubclient.New(hubURL, os.Getenv("KFLEET_HUB_TOKEN"))
+	username := strings.TrimSpace(os.Getenv("KFLEET_HUB_USERNAME"))
+	password := os.Getenv("KFLEET_HUB_PASSWORD")
+	if username == "" || password == "" {
+		return errors.New("KFLEET_HUB_USERNAME and KFLEET_HUB_PASSWORD are required")
+	}
+	hub, err := hubclient.NewWithCredentials(hubURL, username, password)
 	if err != nil {
 		return fmt.Errorf("configure hub client: %w", err)
 	}
