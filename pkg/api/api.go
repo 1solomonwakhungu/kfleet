@@ -159,6 +159,23 @@ type ErrorResponse struct {
 	Code  int    `json:"code"`
 }
 
+// ListTimelineEventsResponse is a paginated page of operational events.
+type ListTimelineEventsResponse struct {
+	Events     []types.OperationalEvent `json:"events"`
+	NextCursor int64                    `json:"nextCursor,omitempty"`
+}
+
+// RecordPolicyFindingRequest reports a policy or compliance finding to be
+// appended to a cluster's operational timeline.
+type RecordPolicyFindingRequest struct {
+	RuleID     string            `json:"ruleId"`
+	Resource   string            `json:"resource"`
+	Severity   string            `json:"severity"`
+	Message    string            `json:"message"`
+	Details    map[string]string `json:"details,omitempty"`
+	OccurredAt time.Time         `json:"occurredAt,omitempty"`
+}
+
 // LoginRequest authenticates a user and starts a session.
 type LoginRequest struct {
 	Username string `json:"username"`

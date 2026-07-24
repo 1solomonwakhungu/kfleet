@@ -50,6 +50,58 @@ kfleet is a lightweight control plane for viewing and operating multiple Kuberne
 
 The hub is the only service users connect to. Agents use Kubernetes RBAC to collect a normalized cluster snapshot, register with the hub, and send heartbeats and state updates.
 
+## Operational event timeline
+
+The hub keeps an append-only operational history in SQLite. This history is separate from the Kubernetes Events included in the latest cluster snapshot. It records:
+
+- cluster registration and agent approval
+- heartbeat health transitions
+- agent disconnects caused by deregistration or stale heartbeat timeout
+- reconnects after an unreachable agent reports again
+- Kubernetes version changes
+- policy and compliance findings reported by an approved agent
+
+The schema migration runs automatically when the hub opens its database. Events survive hub restarts and cluster deletion, and remain available until retention removes them. The default retention period is 90 days. Set `KFLEET_EVENT_RETENTION` to a positive Go duration such as `720h`, or set Helm value `timeline.retention`.
+
+The hub marks a cluster stale after three missed heartbeat intervals. That transition records both the agent disconnect reason and the health change. A later heartbeat records a reconnect rather than another generic health change.
+
+### REST API
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /api/v1/timeline` | Fleet-wide operational events |
+| `GET /api/v1/clusters/{id}/timeline` | Operational events for one cluster ID or name |
+| `POST /api/v1/clusters/{id}/policy-findings` | Ingest an idempotent policy finding using an approved agent bearer token |
+
+Timeline reads require a human user session. They are scoped by the validated
+`X-Kfleet-Tenant-ID` context, including retained events for deleted clusters.
+Policy-finding ingestion continues to use the approved agent bearer token.
+
+Timeline list endpoints return newest events first in `{ "events": [...], "nextCursor": 123 }`. Supported query parameters are:
+
+- `limit`: page size from 1 through 500, default 50
+- `before`: the positive `nextCursor` from the previous response
+- `since`: inclusive RFC3339 timestamp
+- `until`: exclusive RFC3339 timestamp
+
+Policy finding ingestion requires `ruleId`, `resource`, and `message`. `severity`, `details`, and `occurredAt` are optional. Retried findings with the same identity and timestamp are deduplicated.
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $KFLEET_AGENT_TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:8080/api/v1/clusters/production/policy-findings \
+  -d '{
+    "ruleId": "no-privilege-escalation",
+    "resource": "pod/default/api",
+    "severity": "high",
+    "message": "Container allows privilege escalation",
+    "occurredAt": "2026-07-23T18:30:00Z"
+  }'
+```
+
+The cluster detail page exposes the same retained history in its Timeline tab with 24-hour, 7-day, 30-day, 90-day, and all-retained filters plus cursor pagination.
+
 ## How it compares
 
 This table compares native, bundled capabilities; integrations and third-party extensions may add more.
@@ -117,7 +169,7 @@ helm upgrade --install kfleet-agent ./charts/kfleet-agent \
   --set cluster.name=my-cluster
 ```
 
-Important values include `hub.url`, `hub.token`, `cluster.name`, `cluster.labels`, `reportInterval`, and the image repository/tag settings in each chart's `values.yaml`.
+Important values include `hub.url`, `hub.token`, `cluster.name`, `cluster.labels`, `reportInterval`, `timeline.retention`, and the image repository/tag settings in each chart's `values.yaml`.
 
 The hub requires a human user session for its web UI and fleet APIs. It
 supports admin, operator, and read-only roles, and records security-relevant
@@ -148,7 +200,7 @@ configuration:
 }
 ```
 
-You can also build and use the standalone server at `./cmd/mcp`. Available tools list clusters, retrieve status, pods, and events, locate crashlooping pods, and produce a composite cluster diagnosis.
+You can also build and use the standalone server at `./cmd/mcp`. Available tools list clusters, retrieve status, pods, Kubernetes events, and recent operational events, locate crashlooping pods, and produce a composite cluster diagnosis. The `get_recent_events` tool accepts an optional cluster, RFC3339 `since` and `until` filters, a page `limit`, and a `before` cursor.
 
 Example prompts:
 
@@ -156,6 +208,7 @@ Example prompts:
 - “Find crashlooping or frequently restarting pods across the fleet.”
 - “Diagnose the production cluster and explain its recent Warning events.”
 - “Show pods in the payments namespace on staging.”
+- “Show recent reconnects and policy findings across the fleet.”
 
 ## Detect policy and configuration drift
 

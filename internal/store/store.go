@@ -47,6 +47,12 @@ type Store interface {
 	ListPendingAgents(ctx context.Context) ([]types.Cluster, error)
 	ListPendingAgentsForTenant(ctx context.Context, tenantID string) ([]types.Cluster, error)
 
+	// AppendEvent durably records an operational timeline event and suppresses
+	// retries with the same cluster, kind, and dedupe key.
+	AppendEvent(ctx context.Context, event types.OperationalEvent) (inserted bool, err error)
+	ListTimelineEvents(ctx context.Context, filter EventFilter) (EventPage, error)
+	PruneEventsBefore(ctx context.Context, cutoff time.Time) (int64, error)
+
 	// User accounts and RBAC.
 	CreateUser(ctx context.Context, user types.User) error
 	GetUserByID(ctx context.Context, id string) (types.User, error)
@@ -72,4 +78,24 @@ type Store interface {
 	SetSetting(ctx context.Context, key, value string) error
 
 	Close() error
+}
+
+// EventFilter narrows ListTimelineEvents results.
+type EventFilter struct {
+	// TenantID restricts results to one tenant; empty is reserved for internal
+	// unscoped operations and tests.
+	TenantID string
+	// ClusterID restricts results to one cluster; empty means fleet-wide.
+	ClusterID string
+	Since     *time.Time
+	Until     *time.Time
+	// Before is the ID of the last event from the previous page.
+	Before int64
+	Limit  int
+}
+
+// EventPage is one page of operational events.
+type EventPage struct {
+	Events     []types.OperationalEvent
+	NextCursor int64
 }

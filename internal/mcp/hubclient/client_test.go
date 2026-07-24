@@ -33,6 +33,14 @@ func TestClientRequests(t *testing.T) {
 				t.Errorf("event namespace = %q, want apps", got)
 			}
 			_ = json.NewEncoder(w).Encode([]types.Event{{Reason: "Started"}})
+		case "/api/v1/clusters/cluster-1/timeline":
+			if got := r.URL.Query().Get("limit"); got != "10" {
+				t.Errorf("timeline limit = %q, want 10", got)
+			}
+			_ = json.NewEncoder(w).Encode(api.ListTimelineEventsResponse{
+				Events:     []types.OperationalEvent{{ID: 2, ClusterID: "cluster-1", Kind: types.EventAgentApproved}},
+				NextCursor: 1,
+			})
 		default:
 			http.NotFound(w, r)
 		}
@@ -59,6 +67,10 @@ func TestClientRequests(t *testing.T) {
 	events, err := client.GetEvents(ctx, "cluster-1", "apps")
 	if err != nil || len(events) != 1 {
 		t.Fatalf("GetEvents() = %#v, %v", events, err)
+	}
+	timeline, err := client.GetTimeline(ctx, TimelineQuery{ClusterID: "cluster-1", Limit: 10})
+	if err != nil || len(timeline.Events) != 1 || timeline.Events[0].Kind != types.EventAgentApproved || timeline.NextCursor != 1 {
+		t.Fatalf("GetTimeline() = %#v, %v", timeline, err)
 	}
 }
 
