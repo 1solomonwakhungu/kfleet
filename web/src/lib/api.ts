@@ -1,5 +1,6 @@
 import type { Cluster, ClusterStatus } from '@/types/cluster';
 import type { PodInfo, EventInfo, ServiceInfo, DeploymentInfo } from '@/types/resources';
+import { notifyAuthenticationRequired } from './authApi';
 
 const BASE = '/api/v1';
 
@@ -25,6 +26,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     headers: { Accept: 'application/json' },
     signal,
   });
+  notifyAuthenticationRequired(res);
 
   const text = await res.text();
   let body: unknown;

@@ -147,10 +147,21 @@ func newAgentTestServerWithConfig(t *testing.T, cfg *config.Config) (*httptest.S
 			t.Errorf("store.Close() error = %v", err)
 		}
 	})
+	registerDefaultSession(httpServer, st, sessionCookieFor(t, st, types.RoleAdmin))
 	return httpServer, srv, st
 }
 
+// agentRequest issues a request carrying an agent bearer token (when token
+// is non-empty) and the server's default admin session cookie, so tests
+// exercising the operator-facing pending/approve endpoints alongside the
+// agent-facing register/heartbeat endpoints keep working from one helper.
+// Tests exercising a specific human role should use agentRequestWithSession.
 func agentRequest(t *testing.T, server *httptest.Server, method, path, token, body string) *http.Response {
+	t.Helper()
+	return agentRequestWithSession(t, server, method, path, token, defaultSessionFor(server), body)
+}
+
+func agentRequestWithSession(t *testing.T, server *httptest.Server, method, path, token, sessionCookie, body string) *http.Response {
 	t.Helper()
 	req, err := http.NewRequest(method, server.URL+path, bytes.NewBufferString(body))
 	if err != nil {
@@ -161,6 +172,12 @@ func agentRequest(t *testing.T, server *httptest.Server, method, path, token, bo
 	}
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	if sessionCookie != "" {
+		req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessionCookie})
+		if mutationRequest(req) {
+			req.Header.Set(csrfHeaderName, "1")
+		}
 	}
 	response, err := server.Client().Do(req)
 	if err != nil {

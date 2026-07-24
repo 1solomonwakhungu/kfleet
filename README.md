@@ -92,11 +92,15 @@ Create a shared registration token and install the hub:
 
 ```bash
 export KFLEET_REGISTRATION_TOKEN="$(openssl rand -hex 32)"
+export KFLEET_ADMIN_PASSWORD="$(openssl rand -base64 24)"
 
 helm upgrade --install kfleet-hub ./charts/kfleet-hub \
   --namespace kfleet-system \
   --create-namespace \
   --set registration.token="$KFLEET_REGISTRATION_TOKEN" \
+  --set-string auth.bootstrapAdmin.username=admin \
+  --set-string auth.bootstrapAdmin.email=admin@example.com \
+  --set-string auth.bootstrapAdmin.password="$KFLEET_ADMIN_PASSWORD" \
   --set persistence.enabled=true \
   --set persistence.size=1Gi
 ```
@@ -115,9 +119,18 @@ helm upgrade --install kfleet-agent ./charts/kfleet-agent \
 
 Important values include `hub.url`, `hub.token`, `cluster.name`, `cluster.labels`, `reportInterval`, and the image repository/tag settings in each chart's `values.yaml`.
 
+The hub requires a human user session for its web UI and fleet APIs. It
+supports admin, operator, and read-only roles, and records security-relevant
+actions in an append-only audit log. See
+[Hub authentication and authorization](docs/authentication.md) for bootstrap,
+RBAC, cookie security, migrations, audit retention, and agent token rotation.
+
 ## Use the MCP server
 
-The MCP server communicates over stdio and calls the hub REST API. Set `KFLEET_HUB_URL` and, when the hub requires it, `KFLEET_HUB_TOKEN`. For Claude Desktop, add an entry like this to its MCP configuration:
+The MCP server communicates over stdio and calls the hub REST API. Create a
+dedicated read-only user, then set `KFLEET_HUB_URL`, `KFLEET_HUB_USERNAME`, and
+`KFLEET_HUB_PASSWORD`. For Claude Desktop, add an entry like this to its MCP
+configuration:
 
 ```json
 {
@@ -127,7 +140,8 @@ The MCP server communicates over stdio and calls the hub REST API. Set `KFLEET_H
       "args": ["mcp"],
       "env": {
         "KFLEET_HUB_URL": "http://localhost:8080",
-        "KFLEET_HUB_TOKEN": "replace-with-your-token"
+        "KFLEET_HUB_USERNAME": "mcp-reader",
+        "KFLEET_HUB_PASSWORD": "replace-with-the-read-only-user-password"
       }
     }
   }
@@ -166,7 +180,12 @@ make web-build
 make test
 
 # Run the hub locally with a disposable database.
-KFLEET_DB_PATH=/tmp/kfleet.db go run ./cmd/hub
+KFLEET_DB_PATH=/tmp/kfleet.db \
+KFLEET_SESSION_COOKIE_INSECURE=true \
+KFLEET_BOOTSTRAP_ADMIN_USERNAME=admin \
+KFLEET_BOOTSTRAP_ADMIN_EMAIL=admin@localhost \
+KFLEET_BOOTSTRAP_ADMIN_PASSWORD='local-development-password' \
+go run ./cmd/hub
 ```
 
 The hub listens on `:8080` by default. Run the MCP subcommand during development with:
