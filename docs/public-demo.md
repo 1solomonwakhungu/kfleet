@@ -66,7 +66,7 @@ are maintained in `VentureForgre/homelab`.
 
 Deployment order:
 
-1. Merge the kfleet PR so CI publishes `ghcr.io/1solomonwakhungu/kfleet-hub:main`.
+1. Merge the kfleet PR so CI publishes `ghcr.io/1solomonwakhungu/kfleet-public-demo:main`.
 2. Merge the homelab PR so Flux registers `deploy/homelab`.
 3. Provision the cluster-managed `ghcr-pull` secret in `kfleet-demo` using the
    homelab registry-secret runbook. Do not commit or mount registry credentials.
