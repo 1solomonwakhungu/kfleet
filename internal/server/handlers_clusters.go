@@ -19,18 +19,24 @@ const placeholderClusterToken = "placeholder-token"
 
 const maxSnapshotBodyBytes = 4 << 20
 
+// registerClusterRoutes wires the human-facing cluster inventory endpoints.
+// Every route requires an authenticated hub session; the mutating routes
+// (register, delete) additionally require the operator role or higher.
+// POST /api/v1/clusters/{id}/status is the agent snapshot ingestion route
+// and keeps authenticating with the per-agent bearer token, matching the
+// existing agent flow.
 func (s *Server) registerClusterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/clusters", s.handleListClusters)
-	mux.HandleFunc("GET /api/v1/clusters/{id}", s.handleGetCluster)
-	mux.HandleFunc("POST /api/v1/clusters/register", s.handleRegisterCluster)
-	mux.HandleFunc("DELETE /api/v1/clusters/{id}", s.handleDeleteCluster)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/status", s.handleClusterStatus)
+	mux.HandleFunc("GET /api/v1/clusters", s.requireAuth(s.handleListClusters))
+	mux.HandleFunc("GET /api/v1/clusters/{id}", s.requireAuth(s.handleGetCluster))
+	mux.HandleFunc("POST /api/v1/clusters/register", s.requireRole(types.RoleOperator, s.handleRegisterCluster))
+	mux.HandleFunc("DELETE /api/v1/clusters/{id}", s.requireRole(types.RoleOperator, s.handleDeleteCluster))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/status", s.requireAuth(s.handleClusterStatus))
 	mux.HandleFunc("POST /api/v1/clusters/{id}/status", s.handleClusterSnapshot)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/pods", s.handleClusterPods)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/services", s.handleClusterServices)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/deployments", s.handleClusterDeployments)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/namespaces", s.handleClusterNamespaces)
-	mux.HandleFunc("GET /api/v1/clusters/{id}/events", s.handleClusterEvents)
+	mux.HandleFunc("GET /api/v1/clusters/{id}/pods", s.requireAuth(s.handleClusterPods))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/services", s.requireAuth(s.handleClusterServices))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/deployments", s.requireAuth(s.handleClusterDeployments))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/namespaces", s.requireAuth(s.handleClusterNamespaces))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/events", s.requireAuth(s.handleClusterEvents))
 }
 
 func (s *Server) handleListClusters(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +70,7 @@ func (s *Server) handleGetCluster(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
+	actor, _ := authenticatedUser(r.Context())
 	var request api.RegisterClusterRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
@@ -94,6 +101,7 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.broadcast.Broadcast(ClusterUpdate{Type: "registered", Cluster: cluster})
+	s.recordAudit(r.Context(), r, auditActorFromUser(actor), "cluster.register", "cluster", cluster.ID, types.AuditSuccess, "name="+cluster.Name)
 
 	response := api.RegisterClusterResponse{
 		ClusterID: cluster.ID,
@@ -105,6 +113,7 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
+	actor, _ := authenticatedUser(r.Context())
 	tenantID, ok := tenantIDFromRequest(w, r)
 	if !ok {
 		return
@@ -118,6 +127,7 @@ func (s *Server) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.broadcast.Broadcast(ClusterUpdate{Type: "deleted", Cluster: cluster})
+	s.recordAudit(r.Context(), r, auditActorFromUser(actor), "cluster.delete", "cluster", cluster.ID, types.AuditSuccess, "name="+cluster.Name)
 	w.WriteHeader(http.StatusNoContent)
 }
 

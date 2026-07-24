@@ -125,6 +125,7 @@ func newPolicyTestServer(t *testing.T) (*httptest.Server, store.Store) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	srv := New(&config.Config{ListenAddr: ":0", HeartbeatInterval: time.Minute}, logger, st)
 	httpServer := httptest.NewServer(srv.httpServer.Handler)
+	registerDefaultSession(httpServer, st, sessionCookieFor(t, st, types.RoleReadOnly))
 	t.Cleanup(httpServer.Close)
 	return httpServer, st
 }
@@ -136,6 +137,7 @@ func tenantRequest(t *testing.T, server *httptest.Server, method, path, tenantID
 		t.Fatalf("http.NewRequest() error = %v", err)
 	}
 	req.Header.Set(tenantHeader, tenantID)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: defaultSessionFor(server)})
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}

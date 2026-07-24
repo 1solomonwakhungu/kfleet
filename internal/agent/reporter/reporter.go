@@ -59,7 +59,7 @@ func (r *Reporter) Report(ctx context.Context, state *collector.ClusterState) er
 	if err != nil {
 		return fmt.Errorf("report cluster state: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		_, _ = io.Copy(io.Discard, response.Body)
 		return fmt.Errorf("hub returned status %s", response.Status)

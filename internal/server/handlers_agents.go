@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -18,10 +19,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// registerAgentRoutes wires the agent-facing endpoints. These continue to
+// authenticate with the shared registration token and per-agent bearer
+// tokens established during registration; they intentionally do not use
+// user session cookies, since agents are not hub users. Endpoints that
+// expose or approve pending agents to a human operator require an
+// authenticated hub session with sufficient role.
 func (s *Server) registerAgentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/agents/register", s.handleAgentRegister)
-	mux.HandleFunc("POST /api/v1/agents/{id}/approve", s.handleAgentApprove)
-	mux.HandleFunc("GET /api/v1/agents/pending", s.handleListPendingAgents)
+	mux.HandleFunc("POST /api/v1/agents/{id}/approve", s.requireRole(types.RoleOperator, s.handleAgentApprove))
+	mux.HandleFunc("GET /api/v1/agents/pending", s.requireAuth(s.handleListPendingAgents))
 	mux.HandleFunc("POST /api/v1/agents/heartbeat", s.handleHeartbeat)
 	mux.HandleFunc("POST /api/v1/agents/{id}/heartbeat", s.handleAgentLiveness)
 	mux.HandleFunc("POST /api/v1/agents/{id}/deregister", s.handleAgentDeregister)
@@ -106,7 +113,7 @@ func hashToken(raw string) string {
 }
 
 func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
-	if !s.validRegistrationToken(r.Header.Get("Authorization")) {
+	if !s.validRegistrationToken(r.Context(), r.Header.Get("Authorization")) {
 		api.WriteError(w, http.StatusUnauthorized, "invalid registration token")
 		return
 	}
@@ -180,7 +187,26 @@ func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) validRegistrationToken(authorization string) bool {
+// validRegistrationToken checks the bearer token against a rotated
+// registration token stored in the settings table, if one has ever been
+// issued via handleRotateRegistrationToken; otherwise it falls back to the
+// static KFLEET_REGISTRATION_TOKEN configured at startup. This preserves
+// the original env-var-based registration flow for installations that
+// never rotate the token.
+func (s *Server) validRegistrationToken(ctx context.Context, authorization string) bool {
+	rotatedHash, ok, err := s.store.GetSetting(ctx, settingRegistrationTokenHash)
+	if err != nil {
+		s.logger.Error("failed to read rotated registration token setting", "error", err)
+		return false
+	}
+	if ok {
+		token, tokenOK := bearerToken(authorization)
+		if !tokenOK {
+			return false
+		}
+		return subtle.ConstantTimeCompare([]byte(hashToken(token)), []byte(rotatedHash)) == 1
+	}
+
 	if s.cfg.RegistrationToken == "" {
 		return true
 	}
@@ -209,6 +235,7 @@ func (s *Server) findClusterByName(r *http.Request, name string) (types.Cluster,
 }
 
 func (s *Server) handleAgentApprove(w http.ResponseWriter, r *http.Request) {
+	actor, _ := authenticatedUser(r.Context())
 	clusterID := r.PathValue("id")
 	tenantID, ok := tenantIDFromRequest(w, r)
 	if !ok {
@@ -238,6 +265,7 @@ func (s *Server) handleAgentApprove(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, http.StatusInternalServerError, "failed to approve agent")
 		return
 	}
+	s.recordAudit(r.Context(), r, auditActorFromUser(actor), "agent.approve", "cluster", cluster.ID, types.AuditSuccess, "name="+cluster.Name)
 	if err := api.WriteJSON(w, http.StatusOK, cluster); err != nil {
 		s.logger.Error("failed to write approved agent", "error", err)
 	}

@@ -5,6 +5,7 @@ describe('api', () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
+    fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
   });
 

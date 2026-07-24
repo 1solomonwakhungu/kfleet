@@ -42,6 +42,7 @@ func TestBroadcastHubDeliversClusterUpdate(t *testing.T) {
 
 	httpServer := httptest.NewServer(srv.httpServer.Handler)
 	t.Cleanup(httpServer.Close)
+	sessionCookie := sessionCookieFor(t, st, types.RoleReadOnly)
 	readyResponse, err := http.Get(httpServer.URL + "/readyz")
 	if err != nil {
 		t.Fatalf("GET /readyz error = %v", err)
@@ -51,7 +52,9 @@ func TestBroadcastHubDeliversClusterUpdate(t *testing.T) {
 		t.Fatalf("GET /readyz status = %d, want %d", readyResponse.StatusCode, http.StatusOK)
 	}
 	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/clusters"
-	conn, _, err := websocket.Dial(context.Background(), wsURL, nil)
+	conn, _, err := websocket.Dial(context.Background(), wsURL, &websocket.DialOptions{
+		HTTPHeader: http.Header{"Cookie": []string{sessionCookieName + "=" + sessionCookie}},
+	})
 	if err != nil {
 		t.Fatalf("websocket.Dial() error = %v", err)
 	}
