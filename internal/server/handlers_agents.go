@@ -214,7 +214,7 @@ func (s *Server) handleAgentApprove(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	cluster, err := s.store.GetClusterForTenant(r.Context(), tenantID, clusterID)
+	_, err := s.store.GetClusterForTenant(r.Context(), tenantID, clusterID)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			api.WriteError(w, http.StatusNotFound, "agent not found")
@@ -232,7 +232,7 @@ func (s *Server) handleAgentApprove(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, http.StatusInternalServerError, "failed to approve agent")
 		return
 	}
-	cluster, err = s.store.GetCluster(r.Context(), clusterID)
+	cluster, err := s.store.GetCluster(r.Context(), clusterID)
 	if err != nil {
 		s.logger.Error("failed to get approved agent", "cluster_id", clusterID, "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "failed to approve agent")
