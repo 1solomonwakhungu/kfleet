@@ -46,18 +46,32 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ready"))
 	})
+	server.registerAuthRoutes(mux)
+	server.registerUserRoutes(mux)
+	server.registerAuditRoutes(mux)
+	server.registerAdminRoutes(mux)
 	server.registerAgentRoutes(mux)
 	server.registerClusterRoutes(mux)
 	server.registerPolicyRoutes(mux)
-	mux.HandleFunc("GET /ws/clusters", server.handleWSClusters)
+	mux.HandleFunc("GET /ws/clusters", server.requireAuth(server.handleWSClusters))
 	mux.Handle("/", hubweb.Handler())
 
 	server.httpServer = &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           server.withLogging(mux),
+		Handler:           server.withLogging(server.withSecurityHeaders(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	return server
+}
+
+func (s *Server) withSecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Start serves HTTP requests until the context is cancelled or the server
@@ -67,6 +81,7 @@ func (s *Server) Start(ctx context.Context) error {
 	defer stopHub()
 	go s.broadcast.Run(hubCtx)
 	go s.monitorStaleClusters(hubCtx)
+	go s.pruneExpiredSessions(hubCtx)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -92,6 +107,24 @@ func (s *Server) Start(ctx context.Context) error {
 			return nil
 		}
 		return err
+	}
+}
+
+func (s *Server) pruneExpiredSessions(ctx context.Context) {
+	if err := s.store.DeleteExpiredSessions(ctx, time.Now().UTC()); err != nil {
+		s.logger.Error("failed to prune expired sessions", "error", err)
+	}
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			if err := s.store.DeleteExpiredSessions(ctx, now.UTC()); err != nil {
+				s.logger.Error("failed to prune expired sessions", "error", err)
+			}
+		}
 	}
 }
 

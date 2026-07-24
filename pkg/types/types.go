@@ -118,3 +118,64 @@ type ClusterSnapshot struct {
 	Namespaces  []Namespace
 	Events      []Event
 }
+
+// Role identifies a user's permission level in the hub.
+type Role string
+
+// Supported user roles, ordered from least to most privileged.
+const (
+	// RoleReadOnly can view fleet state but cannot perform mutations.
+	RoleReadOnly Role = "read_only"
+	// RoleOperator can perform day-to-day fleet operations such as
+	// approving agents and registering or removing clusters.
+	RoleOperator Role = "operator"
+	// RoleAdmin can perform every operator action plus user management
+	// and hub configuration changes.
+	RoleAdmin Role = "admin"
+)
+
+// ValidRole reports whether role is one of the known roles.
+func ValidRole(role Role) bool {
+	switch role {
+	case RoleReadOnly, RoleOperator, RoleAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
+// User is a hub operator account used to authenticate to the REST API and web UI.
+type User struct {
+	ID           string    `json:"id"`
+	Username     string    `json:"username"`
+	Email        string    `json:"email"`
+	Role         Role      `json:"role"`
+	Disabled     bool      `json:"disabled"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	PasswordHash string    `json:"-"`
+}
+
+// AuditOutcome describes whether an audited action succeeded or failed.
+type AuditOutcome string
+
+// Supported audit outcomes.
+const (
+	AuditSuccess AuditOutcome = "success"
+	AuditFailure AuditOutcome = "failure"
+)
+
+// AuditEvent is an immutable record of a security-relevant action.
+type AuditEvent struct {
+	ID            string       `json:"id"`
+	OccurredAt    time.Time    `json:"occurredAt"`
+	ActorUserID   string       `json:"actorUserId,omitempty"`
+	ActorUsername string       `json:"actorUsername"`
+	ActorRole     Role         `json:"actorRole,omitempty"`
+	Action        string       `json:"action"`
+	TargetType    string       `json:"targetType"`
+	TargetID      string       `json:"targetId"`
+	Outcome       AuditOutcome `json:"outcome"`
+	Details       string       `json:"details,omitempty"`
+	SourceIP      string       `json:"sourceIp,omitempty"`
+}

@@ -17,6 +17,7 @@ interface PendingAgentTableProps {
   agents: PendingAgent[]
   approvingIds: ReadonlySet<string>
   errors: Readonly<Record<string, string>>
+  canApprove: boolean
   onApprove: (agent: PendingAgent) => void
 }
 
@@ -55,7 +56,7 @@ function AgentLabels({ labels }: { labels: Record<string, string> }) {
   )
 }
 
-export function PendingAgentTable({ agents, approvingIds, errors, onApprove }: PendingAgentTableProps) {
+export function PendingAgentTable({ agents, approvingIds, errors, canApprove, onApprove }: PendingAgentTableProps) {
   return (
     <Card className="overflow-hidden ring-1 ring-inset ring-border">
       <Table aria-label="Pending agents">
@@ -115,7 +116,7 @@ export function PendingAgentTable({ agents, approvingIds, errors, onApprove }: P
                 <TableCell className="min-w-48 text-right">
                   <Button
                     size="sm"
-                    disabled={approving}
+                    disabled={approving || !canApprove}
                     aria-label={approving ? `Approving ${agent.name}` : `Approve ${agent.name}`}
                     aria-describedby={itemError ? errorId : undefined}
                     className="bg-blue-600 text-white hover:bg-blue-500 hover:brightness-100"
@@ -126,7 +127,7 @@ export function PendingAgentTable({ agents, approvingIds, errors, onApprove }: P
                     ) : (
                       <Check className="size-4" aria-hidden="true" />
                     )}
-                    {approving ? 'Approving…' : 'Approve'}
+                    {approving ? 'Approving…' : canApprove ? 'Approve' : 'View only'}
                   </Button>
                   {itemError && (
                     <p id={errorId} className="mt-2 max-w-64 text-left text-xs text-danger" role="alert">

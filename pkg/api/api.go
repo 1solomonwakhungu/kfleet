@@ -159,6 +159,54 @@ type ErrorResponse struct {
 	Code  int    `json:"code"`
 }
 
+// LoginRequest authenticates a user and starts a session.
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// UserResponse is the public representation of a user account. It never
+// includes the password hash.
+type UserResponse struct {
+	ID        string     `json:"id"`
+	Username  string     `json:"username"`
+	Email     string     `json:"email"`
+	Role      types.Role `json:"role"`
+	Disabled  bool       `json:"disabled"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
+}
+
+// ListUsersResponse contains every user account.
+type ListUsersResponse struct {
+	Users []UserResponse `json:"users"`
+}
+
+// CreateUserRequest creates a new user account.
+type CreateUserRequest struct {
+	Username string     `json:"username"`
+	Email    string     `json:"email"`
+	Password string     `json:"password"`
+	Role     types.Role `json:"role"`
+}
+
+// UpdateUserRequest changes a user's role or enabled status.
+type UpdateUserRequest struct {
+	Role     types.Role `json:"role"`
+	Disabled bool       `json:"disabled"`
+}
+
+// ListAuditEventsResponse contains recent audit log entries, newest first.
+type ListAuditEventsResponse struct {
+	Events []types.AuditEvent `json:"events"`
+}
+
+// RotateRegistrationTokenResponse contains the new agent registration token.
+// The raw token is returned exactly once; only its hash is persisted.
+type RotateRegistrationTokenResponse struct {
+	Token string `json:"token"`
+}
+
 // WriteJSON writes v as a JSON response with the supplied HTTP status.
 func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	w.Header().Set("Content-Type", "application/json")
