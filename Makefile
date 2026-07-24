@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: build web-build test lint tidy docker-hub docker-agent clean help
+.PHONY: build web-build test lint tidy receiver docker-hub docker-agent clean help
 
 build: web-build
 	@mkdir -p bin
@@ -21,6 +21,9 @@ lint:
 tidy:
 	go mod tidy
 
+receiver:
+	go run ./cmd/webhook-receiver
+
 docker-hub:
 	docker build -f Dockerfile.hub -t kfleet-hub:local .
 
@@ -37,6 +40,7 @@ help:
 	@echo "  test   Run tests with the race detector and coverage"
 	@echo "  lint   Run golangci-lint"
 	@echo "  tidy   Tidy Go module dependencies"
+	@echo "  receiver  Run the loopback alert webhook receiver"
 	@echo "  docker-hub    Build the local hub container image"
 	@echo "  docker-agent  Build the local agent container image"
 	@echo "  clean  Remove build artifacts"

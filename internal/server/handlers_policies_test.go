@@ -141,6 +141,9 @@ func tenantRequest(t *testing.T, server *httptest.Server, method, path, tenantID
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	if mutationRequest(req) {
+		req.Header.Set(csrfHeaderName, "1")
+	}
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("%s %s error = %v", method, path, err)

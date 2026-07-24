@@ -264,6 +264,10 @@ func Open(dbPath string) (Store, error) {
 		{name: "snapshot deployments", sql: createSnapshotDeploymentsTable},
 		{name: "snapshot namespaces", sql: createSnapshotNamespacesTable},
 		{name: "snapshot events", sql: createSnapshotEventsTable},
+		{name: "alert rules", sql: createAlertRulesTable},
+		{name: "alerts", sql: createAlertsTable},
+		{name: "alert history index", sql: createAlertHistoryIndex},
+		{name: "alert delivery index", sql: createAlertDeliveryIndex},
 		{name: "operational events", sql: createOperationalEventsTable},
 		{name: "operational events cluster index", sql: createOperationalEventsClusterIndex},
 		{name: "operational events occurred index", sql: createOperationalEventsOccurredIndex},
@@ -290,6 +294,7 @@ func Open(dbPath string) (Store, error) {
 		table, name, definition string
 	}{
 		{table: "clusters", name: "tenant_id", definition: "TEXT NOT NULL DEFAULT 'default'"},
+		{table: "alerts", name: "tenant_id", definition: "TEXT NOT NULL DEFAULT 'default'"},
 		{table: "snapshot_pods", name: "security_context_known", definition: "INTEGER NOT NULL DEFAULT 0"},
 		{table: "snapshot_pods", name: "privileged", definition: "INTEGER NOT NULL DEFAULT 0"},
 		{table: "snapshot_pods", name: "run_as_non_root", definition: "INTEGER NOT NULL DEFAULT 0"},
@@ -306,6 +311,14 @@ func Open(dbPath string) (Store, error) {
 			_ = db.Close()
 			return nil, fmt.Errorf("migrate %s %s column: %w", column.table, column.name, err)
 		}
+	}
+	if _, err := db.Exec(createAlertTenantHistoryIndex); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrate alert tenant history index: %w", err)
+	}
+	if err := seedDefaultAlertRules(db, time.Now().UTC()); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("seed default alert rules: %w", err)
 	}
 
 	return &sqliteStore{db: db}, nil

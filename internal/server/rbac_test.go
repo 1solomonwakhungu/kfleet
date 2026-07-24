@@ -22,6 +22,10 @@ func TestRBACUnauthenticatedRequestsAreRejected(t *testing.T) {
 		{http.MethodGet, "/api/v1/clusters/does-not-matter/policy-results"},
 		{http.MethodGet, "/api/v1/timeline"},
 		{http.MethodGet, "/api/v1/clusters/does-not-matter/timeline"},
+		{http.MethodGet, "/api/v1/alerts"},
+		{http.MethodGet, "/api/v1/alert-rules"},
+		{http.MethodPost, "/api/v1/alerts/does-not-matter/acknowledge"},
+		{http.MethodPut, "/api/v1/alert-rules/does-not-matter"},
 		{http.MethodPost, "/api/v1/clusters/register"},
 		{http.MethodDelete, "/api/v1/clusters/does-not-matter"},
 		{http.MethodGet, "/api/v1/agents/pending"},
@@ -56,6 +60,8 @@ func TestRBACReadOnlyRoleCanReadButNotMutate(t *testing.T) {
 		{http.MethodGet, "/api/v1/policies"},
 		{http.MethodGet, "/api/v1/policies/results"},
 		{http.MethodGet, "/api/v1/timeline"},
+		{http.MethodGet, "/api/v1/alerts"},
+		{http.MethodGet, "/api/v1/alert-rules"},
 		{http.MethodGet, "/api/v1/agents/pending"},
 		{http.MethodGet, "/api/v1/auth/me"},
 	}
@@ -73,6 +79,8 @@ func TestRBACReadOnlyRoleCanReadButNotMutate(t *testing.T) {
 		{http.MethodPost, "/api/v1/clusters/register", `{"name":"blocked"}`},
 		{http.MethodDelete, "/api/v1/clusters/does-not-matter", ""},
 		{http.MethodPost, "/api/v1/agents/does-not-matter/approve", ""},
+		{http.MethodPost, "/api/v1/alerts/does-not-matter/acknowledge", `{}`},
+		{http.MethodPut, "/api/v1/alert-rules/does-not-matter", `{}`},
 		{http.MethodGet, "/api/v1/users", ""},
 		{http.MethodPost, "/api/v1/users", `{"username":"x","email":"x@example.com","password":"hunter2-hunter2","role":"operator"}`},
 		{http.MethodGet, "/api/v1/audit", ""},
@@ -110,6 +118,12 @@ func TestRBACOperatorRoleCanMutateFleetButNotUsers(t *testing.T) {
 		t.Errorf("delete cluster as operator status = %d, want %d", deleteResp.StatusCode, http.StatusNoContent)
 	}
 
+	acknowledgeResp := requestWithSession(t, server, http.MethodPost, "/api/v1/alerts/does-not-matter/acknowledge", operator, `{}`)
+	acknowledgeResp.Body.Close()
+	if acknowledgeResp.StatusCode == http.StatusForbidden || acknowledgeResp.StatusCode == http.StatusUnauthorized {
+		t.Errorf("acknowledge alert as operator status = %d, want a non-auth-error status", acknowledgeResp.StatusCode)
+	}
+
 	denied := []struct {
 		method, path, body string
 	}{
@@ -117,6 +131,7 @@ func TestRBACOperatorRoleCanMutateFleetButNotUsers(t *testing.T) {
 		{http.MethodPost, "/api/v1/users", `{"username":"x","email":"x@example.com","password":"hunter2-hunter2","role":"operator"}`},
 		{http.MethodGet, "/api/v1/audit", ""},
 		{http.MethodPost, "/api/v1/admin/registration-token/rotate", ""},
+		{http.MethodPut, "/api/v1/alert-rules/does-not-matter", `{}`},
 	}
 	for _, route := range denied {
 		resp := requestWithSession(t, server, route.method, route.path, operator, route.body)

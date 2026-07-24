@@ -119,6 +119,73 @@ type ClusterSnapshot struct {
 	Events      []Event
 }
 
+// AlertSeverity describes the operational impact of a fleet health alert.
+type AlertSeverity string
+
+const (
+	AlertSeverityWarning  AlertSeverity = "warning"
+	AlertSeverityCritical AlertSeverity = "critical"
+)
+
+// AlertStatus describes the operator lifecycle of an alert.
+type AlertStatus string
+
+const (
+	AlertStatusFiring       AlertStatus = "firing"
+	AlertStatusAcknowledged AlertStatus = "acknowledged"
+	AlertStatusResolved     AlertStatus = "resolved"
+)
+
+// AlertDeliveryStatus describes webhook delivery state independently from the
+// operator lifecycle.
+type AlertDeliveryStatus string
+
+const (
+	AlertDeliveryPending    AlertDeliveryStatus = "pending"
+	AlertDeliveryRetrying   AlertDeliveryStatus = "retrying"
+	AlertDeliveryDelivered  AlertDeliveryStatus = "delivered"
+	AlertDeliveryDeadLetter AlertDeliveryStatus = "dead_letter"
+	AlertDeliveryDisabled   AlertDeliveryStatus = "disabled"
+)
+
+// AlertRule maps a cluster health state to an alert severity and cooldown.
+type AlertRule struct {
+	ID              string        `json:"id"`
+	Name            string        `json:"name"`
+	Health          ClusterHealth `json:"health"`
+	Severity        AlertSeverity `json:"severity"`
+	CooldownSeconds int64         `json:"cooldownSeconds"`
+	Enabled         bool          `json:"enabled"`
+	CreatedAt       time.Time     `json:"createdAt"`
+	UpdatedAt       time.Time     `json:"updatedAt"`
+}
+
+// Alert is a durable fleet health alert and its webhook delivery record.
+type Alert struct {
+	ID                string              `json:"id"`
+	TenantID          string              `json:"-"`
+	RuleID            string              `json:"ruleId"`
+	RuleName          string              `json:"ruleName"`
+	ClusterID         string              `json:"clusterId"`
+	ClusterName       string              `json:"clusterName"`
+	DedupeKey         string              `json:"dedupeKey"`
+	Health            ClusterHealth       `json:"health"`
+	Severity          AlertSeverity       `json:"severity"`
+	Summary           string              `json:"summary"`
+	Status            AlertStatus         `json:"status"`
+	TriggeredAt       time.Time           `json:"triggeredAt"`
+	UpdatedAt         time.Time           `json:"updatedAt"`
+	AcknowledgedAt    *time.Time          `json:"acknowledgedAt,omitempty"`
+	AcknowledgedBy    string              `json:"acknowledgedBy,omitempty"`
+	ResolvedAt        *time.Time          `json:"resolvedAt,omitempty"`
+	DeliveryStatus    AlertDeliveryStatus `json:"deliveryStatus"`
+	DeliveryAttempts  int                 `json:"deliveryAttempts"`
+	NextDeliveryAt    *time.Time          `json:"nextDeliveryAt,omitempty"`
+	LastDeliveryError string              `json:"lastDeliveryError,omitempty"`
+	DeliveredAt       *time.Time          `json:"deliveredAt,omitempty"`
+	DeadLetteredAt    *time.Time          `json:"deadLetteredAt,omitempty"`
+}
+
 // OperationalEventKind categorizes an entry in the fleet timeline.
 type OperationalEventKind string
 

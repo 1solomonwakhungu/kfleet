@@ -260,6 +260,12 @@ The hub listens on `:8080` by default. Run the MCP subcommand during development
 KFLEET_HUB_URL=http://localhost:8080 go run ./cmd/hub mcp
 ```
 
+## Fleet health alerts
+
+The hub records alerts when a cluster becomes degraded or unreachable. Alert history and acknowledgement are available in the **Alerts** page and through the `/api/v1/alerts` API. Generic webhook delivery is disabled by default. When configured, every webhook is signed with HMAC-SHA256 and retried from durable SQLite state before moving to the dead-letter state.
+
+For a safe loopback-only walkthrough, signature contract, failure injection, and operational settings, see [Fleet health alerts](docs/alerts.md).
+
 ## Contributing
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the pull request flow, Conventional Commit format, DCO sign-off requirement, and local test/lint commands.

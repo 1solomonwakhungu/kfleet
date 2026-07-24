@@ -1,4 +1,5 @@
 import type { Cluster, ClusterStatus } from '@/types/cluster';
+import type { Alert, AlertStatus } from '@/types/alert';
 import type { PodInfo, EventInfo, ServiceInfo, DeploymentInfo } from '@/types/resources';
 import type { TimelinePage } from '@/types/timeline';
 import type { PolicyResultsResponse } from '@/types/policy';
@@ -23,9 +24,18 @@ function isErrorBody(body: unknown): body is { error: string } {
 }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return request<T>('GET', path, undefined, signal);
+}
+
+async function request<T>(method: string, path: string, payload?: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
+    method,
+    headers: {
+      Accept: 'application/json',
+      ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }),
+      ...(method === 'GET' ? {} : { 'X-Kfleet-CSRF': '1' }),
+    },
+    body: payload === undefined ? undefined : JSON.stringify(payload),
     signal,
   });
   notifyAuthenticationRequired(res);
@@ -122,6 +132,15 @@ export const api = {
   getDeployments: (id: string, ns?: string, signal?: AbortSignal) =>
     get<DeploymentInfo[]>(`${clusterPath(id, '/deployments')}${qs({ namespace: ns })}`, signal),
   getNamespaces: (id: string, signal?: AbortSignal) => get<string[]>(clusterPath(id, '/namespaces'), signal),
+  listAlerts: (status?: AlertStatus, signal?: AbortSignal) =>
+    get<{ alerts: Alert[] }>(`/alerts${qs({ status })}`, signal).then((response) => response.alerts),
+  acknowledgeAlert: (id: string, acknowledgedBy = 'operator', signal?: AbortSignal) =>
+    request<Alert>(
+      'POST',
+      `/alerts/${encodeURIComponent(id)}/acknowledge`,
+      { acknowledgedBy },
+      signal,
+    ),
   // Backed by the durable operational timeline, not Kubernetes snapshot events.
   getTimeline: (id: string, query: TimelineQuery = {}, signal?: AbortSignal) =>
     get<TimelinePage>(`${clusterPath(id, '/timeline')}${timelineQuery(query)}`, signal),
