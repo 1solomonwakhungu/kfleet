@@ -17,6 +17,11 @@ import (
 
 const shutdownTimeout = 5 * time.Second
 
+// eventPruneInterval controls how often the retention sweep runs. Hourly is
+// frequent enough to keep the table bounded without adding meaningful load.
+const eventPruneInterval = time.Hour
+const defaultEventRetention = 90 * 24 * time.Hour
+
 // Server is the kfleet hub HTTP server.
 type Server struct {
 	cfg        *config.Config
@@ -52,6 +57,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	server.registerAdminRoutes(mux)
 	server.registerAgentRoutes(mux)
 	server.registerClusterRoutes(mux)
+	server.registerEventRoutes(mux)
 	server.registerPolicyRoutes(mux)
 	mux.HandleFunc("GET /ws/clusters", server.requireAuth(server.handleWSClusters))
 	mux.Handle("/", hubweb.Handler())
@@ -81,6 +87,7 @@ func (s *Server) Start(ctx context.Context) error {
 	defer stopHub()
 	go s.broadcast.Run(hubCtx)
 	go s.monitorStaleClusters(hubCtx)
+	go s.monitorEventRetention(hubCtx)
 	go s.pruneExpiredSessions(hubCtx)
 
 	errCh := make(chan error, 1)
@@ -159,12 +166,48 @@ func (s *Server) markStaleClusters(ctx context.Context, now time.Time) {
 		if cluster.LastHeartbeat.IsZero() || !cluster.LastHeartbeat.Before(cutoff) || cluster.Health == types.HealthUnreachable {
 			continue
 		}
+		oldHealth := cluster.Health
 		if err := s.store.UpdateHealth(ctx, cluster.ID, types.HealthUnreachable, cluster.LastHeartbeat); err != nil {
 			s.logger.Error("failed to mark cluster unreachable", "cluster_id", cluster.ID, "error", err)
 			continue
 		}
 		cluster.Health = types.HealthUnreachable
 		s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: cluster})
+		s.recordAgentDisconnected(ctx, cluster, "heartbeat_timeout", now)
+		s.recordHeartbeatTransition(ctx, cluster, oldHealth, types.HealthUnreachable, now)
+	}
+}
+
+func (s *Server) monitorEventRetention(ctx context.Context) {
+	s.pruneExpiredEvents(ctx, time.Now().UTC())
+	ticker := time.NewTicker(eventPruneInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			s.pruneExpiredEvents(ctx, now.UTC())
+		}
+	}
+}
+
+func (s *Server) eventRetention() time.Duration {
+	if s.cfg.EventRetention > 0 {
+		return s.cfg.EventRetention
+	}
+	return defaultEventRetention
+}
+
+func (s *Server) pruneExpiredEvents(ctx context.Context, now time.Time) {
+	cutoff := now.UTC().Add(-s.eventRetention())
+	removed, err := s.store.PruneEventsBefore(ctx, cutoff)
+	if err != nil {
+		s.logger.Error("failed to prune operational events", "error", err)
+		return
+	}
+	if removed > 0 {
+		s.logger.Info("pruned expired operational events", "removed", removed, "cutoff", cutoff)
 	}
 }
 

@@ -101,6 +101,7 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.broadcast.Broadcast(ClusterUpdate{Type: "registered", Cluster: cluster})
+	s.recordClusterRegistered(r.Context(), cluster)
 	s.recordAudit(r.Context(), r, auditActorFromUser(actor), "cluster.register", "cluster", cluster.ID, types.AuditSuccess, "name="+cluster.Name)
 
 	response := api.RegisterClusterResponse{
@@ -209,6 +210,8 @@ func (s *Server) handleClusterSnapshot(w http.ResponseWriter, r *http.Request) {
 		s.broadcast.Broadcast(ClusterUpdate{Type: "health_changed", Cluster: updated})
 	}
 	s.broadcast.Broadcast(ClusterUpdate{Type: "snapshot", Cluster: updated})
+	s.recordHeartbeatTransition(r.Context(), updated, cluster.Health, updated.Health, now)
+	s.recordVersionChanged(r.Context(), updated, cluster.Version, updated.Version, now)
 	if err := api.WriteJSON(w, http.StatusOK, updated); err != nil {
 		s.logger.Error("failed to write snapshot response", "error", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/mcp/hubclient"
 	"github.com/1solomonwakhungu/kfleet/pkg/api"
@@ -71,6 +72,16 @@ func registerTools(server *mcpserver.MCPServer, hub *hubclient.Client) {
 				protocol.WithDescription("Diagnose a cluster by combining its status, crashlooping or frequently restarting pods, and recent Warning events."),
 				protocol.WithString("cluster", protocol.Required(), protocol.Description("Cluster name or ID"))),
 			Handler: handlers.diagnoseCluster,
+		},
+		mcpserver.ServerTool{
+			Tool: protocol.NewTool("get_recent_events",
+				protocol.WithDescription("Get recent operational timeline events (registration, approval, heartbeat state changes, version changes, reconnects, policy findings) for one cluster or the entire fleet."),
+				protocol.WithString("cluster", protocol.Description("Optional cluster name or ID; omit for a fleet-wide timeline")),
+				protocol.WithString("since", protocol.Description("Optional RFC3339 timestamp; only events at or after this time")),
+				protocol.WithString("until", protocol.Description("Optional RFC3339 timestamp; only events strictly before this time")),
+				protocol.WithNumber("before", protocol.Description("Optional positive cursor from nextCursor for the next older page")),
+				protocol.WithNumber("limit", protocol.Description("Maximum number of events to return (default 50, max 500)"))),
+			Handler: handlers.getTimeline,
 		},
 	)
 }
@@ -181,6 +192,53 @@ func (h *toolHandlers) diagnoseCluster(ctx context.Context, request protocol.Cal
 		Cluster: cluster, Status: status,
 		Crashloops: crashloopPods(cluster, pods), WarningEvents: warnings,
 	})
+}
+
+func (h *toolHandlers) getTimeline(ctx context.Context, request protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+	clusterID := ""
+	if name := strings.TrimSpace(request.GetString("cluster", "")); name != "" {
+		clusters, err := h.hub.ListClusters(ctx)
+		if err != nil {
+			return toolError("list clusters", err), nil
+		}
+		cluster, ok := findCluster(clusters, name)
+		if !ok {
+			return protocol.NewToolResultError(fmt.Sprintf("cluster %q was not found", name)), nil
+		}
+		clusterID = cluster.ID
+	}
+
+	query := hubclient.TimelineQuery{
+		ClusterID: clusterID,
+		Before:    int64(request.GetInt("before", 0)),
+		Limit:     request.GetInt("limit", 0),
+	}
+	if query.Before < 0 {
+		return protocol.NewToolResultError("before must be a positive cursor"), nil
+	}
+	if query.Limit < 0 || query.Limit > 500 {
+		return protocol.NewToolResultError("limit must be between 1 and 500"), nil
+	}
+	if since := strings.TrimSpace(request.GetString("since", "")); since != "" {
+		parsed, err := time.Parse(time.RFC3339, since)
+		if err != nil {
+			return protocol.NewToolResultError("since must be an RFC3339 timestamp"), nil
+		}
+		query.Since = &parsed
+	}
+	if until := strings.TrimSpace(request.GetString("until", "")); until != "" {
+		parsed, err := time.Parse(time.RFC3339, until)
+		if err != nil {
+			return protocol.NewToolResultError("until must be an RFC3339 timestamp"), nil
+		}
+		query.Until = &parsed
+	}
+
+	page, err := h.hub.GetTimeline(ctx, query)
+	if err != nil {
+		return toolError("get timeline", err), nil
+	}
+	return jsonResult(map[string]any{"events": page.Events, "count": len(page.Events), "nextCursor": page.NextCursor})
 }
 
 func (h *toolHandlers) requiredCluster(ctx context.Context, request protocol.CallToolRequest) (types.Cluster, *protocol.CallToolResult) {

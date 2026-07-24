@@ -119,6 +119,31 @@ type ClusterSnapshot struct {
 	Events      []Event
 }
 
+// OperationalEventKind categorizes an entry in the fleet timeline.
+type OperationalEventKind string
+
+const (
+	EventClusterRegistered    OperationalEventKind = "cluster_registered"
+	EventAgentApproved        OperationalEventKind = "agent_approved"
+	EventHeartbeatStateChange OperationalEventKind = "heartbeat_state_change"
+	EventVersionChanged       OperationalEventKind = "version_changed"
+	EventAgentReconnected     OperationalEventKind = "agent_reconnected"
+	EventAgentDisconnected    OperationalEventKind = "agent_disconnected"
+	EventPolicyFinding        OperationalEventKind = "policy_finding"
+)
+
+// OperationalEvent is a durable, append-only fleet lifecycle record.
+type OperationalEvent struct {
+	ID         int64                `json:"id"`
+	TenantID   string               `json:"-"`
+	ClusterID  string               `json:"clusterId"`
+	Kind       OperationalEventKind `json:"kind"`
+	Message    string               `json:"message"`
+	Details    map[string]string    `json:"details,omitempty"`
+	OccurredAt time.Time            `json:"occurredAt"`
+	DedupeKey  string               `json:"-"`
+}
+
 // Role identifies a user's permission level in the hub.
 type Role string
 

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -110,6 +111,45 @@ func (c *Client) GetEvents(ctx context.Context, id, namespace string) ([]types.E
 		return nil, err
 	}
 	return events, nil
+}
+
+// TimelineQuery narrows a GetTimeline call. An empty ClusterID queries the
+// whole fleet rather than a single cluster.
+type TimelineQuery struct {
+	ClusterID string
+	Since     *time.Time
+	Until     *time.Time
+	Before    int64
+	Limit     int
+}
+
+// GetTimeline returns a page of the durable operational event timeline,
+// optionally scoped to one cluster and a time range.
+func (c *Client) GetTimeline(ctx context.Context, q TimelineQuery) (api.ListTimelineEventsResponse, error) {
+	query := url.Values{}
+	if q.Since != nil {
+		query.Set("since", q.Since.UTC().Format(time.RFC3339))
+	}
+	if q.Until != nil {
+		query.Set("until", q.Until.UTC().Format(time.RFC3339))
+	}
+	if q.Before > 0 {
+		query.Set("before", strconv.FormatInt(q.Before, 10))
+	}
+	if q.Limit > 0 {
+		query.Set("limit", strconv.Itoa(q.Limit))
+	}
+
+	path := "/api/v1/timeline"
+	if clusterID := strings.TrimSpace(q.ClusterID); clusterID != "" {
+		path = clusterPath(clusterID, "/timeline")
+	}
+
+	var response api.ListTimelineEventsResponse
+	if err := c.get(ctx, path, query, &response); err != nil {
+		return api.ListTimelineEventsResponse{}, err
+	}
+	return response, nil
 }
 
 func clusterPath(id, suffix string) string {

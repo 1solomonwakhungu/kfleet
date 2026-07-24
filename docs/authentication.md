@@ -46,7 +46,7 @@ hub.
 
 | Capability | read_only | operator | admin |
 | --- | --- | --- | --- |
-| View clusters, resources, pending agents, and live updates | Yes | Yes | Yes |
+| View clusters, resources, timeline, policies, and live updates | Yes | Yes | Yes |
 | Register or remove clusters | No | Yes | Yes |
 | Approve pending agents | No | Yes | Yes |
 | Create, update, disable, or delete users | No | No | Yes |

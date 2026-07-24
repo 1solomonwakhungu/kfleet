@@ -41,6 +41,10 @@ ingress:
 registration:
   token: ""
 
+timeline:
+  # Operational events older than this duration are pruned by the hub.
+  retention: 2160h
+
 auth:
   sessionDuration: 24h
   # Keep false when the hub is served over HTTPS. Set true only for a local
