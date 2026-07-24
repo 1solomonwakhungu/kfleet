@@ -1,6 +1,8 @@
 import type { Cluster, ClusterStatus } from '@/types/cluster';
 import type { PodInfo, EventInfo, ServiceInfo, DeploymentInfo } from '@/types/resources';
 import type { TimelinePage } from '@/types/timeline';
+import type { PolicyResultsResponse } from '@/types/policy';
+import { notifyAuthenticationRequired } from './authApi';
 
 const BASE = '/api/v1';
 
@@ -26,6 +28,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     headers: { Accept: 'application/json' },
     signal,
   });
+  notifyAuthenticationRequired(res);
 
   const text = await res.text();
   let body: unknown;
@@ -124,4 +127,8 @@ export const api = {
     get<TimelinePage>(`${clusterPath(id, '/timeline')}${timelineQuery(query)}`, signal),
   getFleetTimeline: (query: TimelineQuery = {}, signal?: AbortSignal) =>
     get<TimelinePage>(`/timeline${timelineQuery(query)}`, signal),
+  // Built-in policies are evaluated read-only against the latest tenant snapshot.
+  getPolicyResults: (signal?: AbortSignal) => get<PolicyResultsResponse>('/policies/results', signal),
+  getClusterPolicyResults: (id: string, signal?: AbortSignal) =>
+    get<PolicyResultsResponse>(clusterPath(id, '/policy-results'), signal),
 };

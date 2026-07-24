@@ -73,6 +73,10 @@ The hub marks a cluster stale after three missed heartbeat intervals. That trans
 | `GET /api/v1/clusters/{id}/timeline` | Operational events for one cluster ID or name |
 | `POST /api/v1/clusters/{id}/policy-findings` | Ingest an idempotent policy finding using an approved agent bearer token |
 
+Timeline reads require a human user session. They are scoped by the validated
+`X-Kfleet-Tenant-ID` context, including retained events for deleted clusters.
+Policy-finding ingestion continues to use the approved agent bearer token.
+
 Timeline list endpoints return newest events first in `{ "events": [...], "nextCursor": 123 }`. Supported query parameters are:
 
 - `limit`: page size from 1 through 500, default 50
@@ -140,11 +144,15 @@ Create a shared registration token and install the hub:
 
 ```bash
 export KFLEET_REGISTRATION_TOKEN="$(openssl rand -hex 32)"
+export KFLEET_ADMIN_PASSWORD="$(openssl rand -base64 24)"
 
 helm upgrade --install kfleet-hub ./charts/kfleet-hub \
   --namespace kfleet-system \
   --create-namespace \
   --set registration.token="$KFLEET_REGISTRATION_TOKEN" \
+  --set-string auth.bootstrapAdmin.username=admin \
+  --set-string auth.bootstrapAdmin.email=admin@example.com \
+  --set-string auth.bootstrapAdmin.password="$KFLEET_ADMIN_PASSWORD" \
   --set persistence.enabled=true \
   --set persistence.size=1Gi
 ```
@@ -163,9 +171,18 @@ helm upgrade --install kfleet-agent ./charts/kfleet-agent \
 
 Important values include `hub.url`, `hub.token`, `cluster.name`, `cluster.labels`, `reportInterval`, `timeline.retention`, and the image repository/tag settings in each chart's `values.yaml`.
 
+The hub requires a human user session for its web UI and fleet APIs. It
+supports admin, operator, and read-only roles, and records security-relevant
+actions in an append-only audit log. See
+[Hub authentication and authorization](docs/authentication.md) for bootstrap,
+RBAC, cookie security, migrations, audit retention, and agent token rotation.
+
 ## Use the MCP server
 
-The MCP server communicates over stdio and calls the hub REST API. Set `KFLEET_HUB_URL` and, when the hub requires it, `KFLEET_HUB_TOKEN`. For Claude Desktop, add an entry like this to its MCP configuration:
+The MCP server communicates over stdio and calls the hub REST API. Create a
+dedicated read-only user, then set `KFLEET_HUB_URL`, `KFLEET_HUB_USERNAME`, and
+`KFLEET_HUB_PASSWORD`. For Claude Desktop, add an entry like this to its MCP
+configuration:
 
 ```json
 {
@@ -175,7 +192,8 @@ The MCP server communicates over stdio and calls the hub REST API. Set `KFLEET_H
       "args": ["mcp"],
       "env": {
         "KFLEET_HUB_URL": "http://localhost:8080",
-        "KFLEET_HUB_TOKEN": "replace-with-your-token"
+        "KFLEET_HUB_USERNAME": "mcp-reader",
+        "KFLEET_HUB_PASSWORD": "replace-with-the-read-only-user-password"
       }
     }
   }
@@ -191,6 +209,19 @@ Example prompts:
 - “Diagnose the production cluster and explain its recent Warning events.”
 - “Show pods in the payments namespace on staging.”
 - “Show recent reconnects and policy findings across the fleet.”
+
+## Detect policy and configuration drift
+
+The Policy dashboard evaluates seven built-in, read-only checks across the latest cluster snapshots. It reports Kubernetes version, cluster label, namespace, deployment configuration, workload availability, namespace Pod Security, and pod security posture results as `pass`, `fail`, `unknown`, or `stale`.
+
+Open `/policies` in the hub UI or query the REST API:
+
+```bash
+curl http://localhost:8080/api/v1/policies
+curl 'http://localhost:8080/api/v1/policies/results?status=fail'
+```
+
+The hub never remediates policy findings. Multi-tenant installations scope agent and API traffic with `KFLEET_TENANT_ID` and `X-Kfleet-Tenant-ID`. See [Policy and configuration drift](docs/policy-drift.md) for policy definitions, API filters, freshness behavior, tenant isolation, and compatibility details.
 
 ## Development
 
@@ -215,7 +246,12 @@ make web-build
 make test
 
 # Run the hub locally with a disposable database.
-KFLEET_DB_PATH=/tmp/kfleet.db go run ./cmd/hub
+KFLEET_DB_PATH=/tmp/kfleet.db \
+KFLEET_SESSION_COOKIE_INSECURE=true \
+KFLEET_BOOTSTRAP_ADMIN_USERNAME=admin \
+KFLEET_BOOTSTRAP_ADMIN_EMAIL=admin@localhost \
+KFLEET_BOOTSTRAP_ADMIN_PASSWORD='local-development-password' \
+go run ./cmd/hub
 ```
 
 The hub listens on `:8080` by default. Run the MCP subcommand during development with:

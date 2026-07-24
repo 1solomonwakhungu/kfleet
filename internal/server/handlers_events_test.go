@@ -104,6 +104,40 @@ func TestClusterTimelineUnknownCluster(t *testing.T) {
 	}
 }
 
+func TestTimelineEndpointsAreTenantScoped(t *testing.T) {
+	server := newTestHTTPServer(t)
+	st := serverStoreForTest(t, server)
+	now := time.Now().UTC()
+	for _, cluster := range []types.Cluster{
+		{ID: "timeline-a", TenantID: "tenant-a", Name: "alpha", RegisteredAt: now, Labels: map[string]string{}},
+		{ID: "timeline-b", TenantID: "tenant-b", Name: "bravo", RegisteredAt: now, Labels: map[string]string{}},
+	} {
+		if err := st.CreateCluster(context.Background(), cluster); err != nil {
+			t.Fatalf("CreateCluster(%s) error = %v", cluster.ID, err)
+		}
+		if _, err := st.AppendEvent(context.Background(), types.OperationalEvent{
+			TenantID: cluster.TenantID, ClusterID: cluster.ID,
+			Kind: types.EventClusterRegistered, Message: cluster.Name,
+			OccurredAt: now, DedupeKey: "registered",
+		}); err != nil {
+			t.Fatalf("AppendEvent(%s) error = %v", cluster.ID, err)
+		}
+	}
+
+	response := tenantRequest(t, server, http.MethodGet, "/api/v1/timeline", "tenant-a", "")
+	var page api.ListTimelineEventsResponse
+	decodeResponse(t, response, &page)
+	if len(page.Events) != 1 || page.Events[0].ClusterID != "timeline-a" {
+		t.Fatalf("tenant-a events = %#v, want only timeline-a", page.Events)
+	}
+
+	hidden := tenantRequest(t, server, http.MethodGet, "/api/v1/clusters/timeline-b/timeline", "tenant-a", "")
+	defer hidden.Body.Close()
+	if hidden.StatusCode != http.StatusNotFound {
+		t.Fatalf("cross-tenant timeline status = %d, want %d", hidden.StatusCode, http.StatusNotFound)
+	}
+}
+
 func TestRecordPolicyFindingIsDeduped(t *testing.T) {
 	server, registration := registeredAgent(t)
 	approveAgent(t, server, registration.ClusterID)

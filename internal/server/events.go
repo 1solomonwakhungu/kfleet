@@ -20,6 +20,7 @@ func (s *Server) recordEvent(ctx context.Context, event types.OperationalEvent) 
 
 func (s *Server) recordClusterRegistered(ctx context.Context, cluster types.Cluster) {
 	s.recordEvent(ctx, types.OperationalEvent{
+		TenantID:   cluster.TenantID,
 		ClusterID:  cluster.ID,
 		Kind:       types.EventClusterRegistered,
 		Message:    fmt.Sprintf("cluster %q registered", cluster.Name),
@@ -30,6 +31,7 @@ func (s *Server) recordClusterRegistered(ctx context.Context, cluster types.Clus
 
 func (s *Server) recordAgentApproved(ctx context.Context, cluster types.Cluster, occurredAt time.Time) {
 	s.recordEvent(ctx, types.OperationalEvent{
+		TenantID:   cluster.TenantID,
 		ClusterID:  cluster.ID,
 		Kind:       types.EventAgentApproved,
 		Message:    fmt.Sprintf("agent for cluster %q approved", cluster.Name),
@@ -53,6 +55,7 @@ func (s *Server) recordHeartbeatTransition(ctx context.Context, cluster types.Cl
 		message = fmt.Sprintf("cluster %q reconnected (now %s)", cluster.Name, newHealth)
 	}
 	s.recordEvent(ctx, types.OperationalEvent{
+		TenantID:   cluster.TenantID,
 		ClusterID:  cluster.ID,
 		Kind:       kind,
 		Message:    message,
@@ -72,6 +75,7 @@ func (s *Server) recordAgentDisconnected(ctx context.Context, cluster types.Clus
 		message = fmt.Sprintf("agent for cluster %q became stale after missing heartbeats", cluster.Name)
 	}
 	s.recordEvent(ctx, types.OperationalEvent{
+		TenantID:   cluster.TenantID,
 		ClusterID:  cluster.ID,
 		Kind:       types.EventAgentDisconnected,
 		Message:    message,
@@ -89,6 +93,7 @@ func (s *Server) recordVersionChanged(ctx context.Context, cluster types.Cluster
 		return
 	}
 	s.recordEvent(ctx, types.OperationalEvent{
+		TenantID:   cluster.TenantID,
 		ClusterID:  cluster.ID,
 		Kind:       types.EventVersionChanged,
 		Message:    fmt.Sprintf("cluster %q version changed from %s to %s", cluster.Name, oldVersion, newVersion),
