@@ -86,6 +86,9 @@ USE_GHCR=true IMAGE_TAG=latest ./hack/quickstart.sh
 
 Remove the demo with `./hack/cleanup.sh`.
 
+For the internet-facing, synthetic-data-only deployment and its security
+boundary, see [Public read-only demo](docs/public-demo.md).
+
 ## Install with Helm
 
 Create a shared registration token and install the hub:

@@ -3,6 +3,13 @@ import type { PodInfo, EventInfo, ServiceInfo, DeploymentInfo } from '@/types/re
 
 const BASE = '/api/v1';
 
+export interface RuntimeInfo {
+  demoMode: boolean;
+  readOnly: boolean;
+  syntheticData: boolean;
+  dataPolicy: string;
+}
+
 export class ApiError extends Error {
   status: number;
   body: unknown;
@@ -84,6 +91,7 @@ export function normalizeCluster(cluster: WireCluster): Cluster {
 }
 
 export const api = {
+  getRuntimeInfo: (signal?: AbortSignal) => get<RuntimeInfo>('/meta', signal),
   // Backed by GET /api/v1/clusters (internal/server/handlers_clusters.go).
   listClusters: (signal?: AbortSignal) => get<{ clusters: WireCluster[] }>('/clusters', signal).then((r) => r.clusters.map(normalizeCluster)),
   // Backed by GET /api/v1/clusters/{id}.

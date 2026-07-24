@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -21,6 +22,7 @@ type Config struct {
 	LogLevel          string
 	HeartbeatInterval time.Duration
 	RegistrationToken string
+	DemoMode          bool
 }
 
 // Load reads hub configuration from the environment, applying defaults where
@@ -35,12 +37,21 @@ func Load() (*Config, error) {
 		}
 		heartbeatInterval = parsed
 	}
+	demoMode := false
+	if value := os.Getenv("KFLEET_DEMO_MODE"); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return nil, fmt.Errorf("KFLEET_DEMO_MODE must be a boolean")
+		}
+		demoMode = parsed
+	}
 	return &Config{
 		ListenAddr:        envOrDefault("KFLEET_LISTEN_ADDR", defaultListenAddr),
 		DBPath:            envOrDefault("KFLEET_DB_PATH", defaultDBPath),
 		LogLevel:          envOrDefault("KFLEET_LOG_LEVEL", defaultLogLevel),
 		HeartbeatInterval: heartbeatInterval,
 		RegistrationToken: os.Getenv("KFLEET_REGISTRATION_TOKEN"),
+		DemoMode:          demoMode,
 	}, nil
 }
 

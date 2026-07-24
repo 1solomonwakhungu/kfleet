@@ -30,6 +30,10 @@ export const primaryNavigationItems: readonly NavigationItem[] = [
   },
 ]
 
+export const readOnlyNavigationItems: readonly NavigationItem[] = primaryNavigationItems.filter(
+  (item) => item.to !== '/agents',
+)
+
 interface PrimaryNavigationProps {
   className?: string
   items?: readonly NavigationItem[]

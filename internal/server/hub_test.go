@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -17,6 +19,69 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 )
+
+func TestDemoModeBlocksMutationsAndSetsSecurityHeaders(t *testing.T) {
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	srv := New(&config.Config{ListenAddr: ":0", DemoMode: true}, logger, st)
+	httpServer := httptest.NewServer(srv.httpServer.Handler)
+	t.Cleanup(httpServer.Close)
+
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		req, err := http.NewRequest(method, httpServer.URL+"/api/v1/clusters/register", bytes.NewBufferString(`{"name":"must-not-exist"}`))
+		if err != nil {
+			t.Fatalf("http.NewRequest(%s) error = %v", method, err)
+		}
+		response, err := httpServer.Client().Do(req)
+		if err != nil {
+			t.Fatalf("%s request error = %v", method, err)
+		}
+		_ = response.Body.Close()
+		if response.StatusCode != http.StatusMethodNotAllowed {
+			t.Errorf("%s status = %d, want %d", method, response.StatusCode, http.StatusMethodNotAllowed)
+		}
+		if got := response.Header.Get("Allow"); got != "GET, HEAD, OPTIONS" {
+			t.Errorf("%s Allow = %q", method, got)
+		}
+	}
+
+	response, err := http.Get(httpServer.URL + "/api/v1/meta")
+	if err != nil {
+		t.Fatalf("GET /api/v1/meta error = %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/v1/meta status = %d", response.StatusCode)
+	}
+	var metadata struct {
+		DemoMode      bool `json:"demoMode"`
+		ReadOnly      bool `json:"readOnly"`
+		SyntheticData bool `json:"syntheticData"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&metadata); err != nil {
+		t.Fatalf("decode metadata: %v", err)
+	}
+	if !metadata.DemoMode || !metadata.ReadOnly || !metadata.SyntheticData {
+		t.Fatalf("metadata = %#v, want all safety flags true", metadata)
+	}
+	for _, header := range []string{
+		"Content-Security-Policy",
+		"Permissions-Policy",
+		"Referrer-Policy",
+		"Strict-Transport-Security",
+		"X-Content-Type-Options",
+		"X-Frame-Options",
+	} {
+		if response.Header.Get(header) == "" {
+			t.Errorf("%s header is missing", header)
+		}
+	}
+}
 
 func TestBroadcastHubDeliversClusterUpdate(t *testing.T) {
 	st, err := store.Open(filepath.Join(t.TempDir(), "kfleet.db"))

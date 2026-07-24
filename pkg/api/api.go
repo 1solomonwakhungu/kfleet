@@ -12,6 +12,14 @@ import (
 // APIVersion is the current kfleet API version.
 const APIVersion = "v1"
 
+// RuntimeInfo describes the safety posture of the running hub.
+type RuntimeInfo struct {
+	DemoMode      bool   `json:"demoMode"`
+	ReadOnly      bool   `json:"readOnly"`
+	SyntheticData bool   `json:"syntheticData"`
+	DataPolicy    string `json:"dataPolicy"`
+}
+
 // RegisterClusterRequest is sent when an agent registers a cluster.
 type RegisterClusterRequest struct {
 	Name         string            `json:"name"`
