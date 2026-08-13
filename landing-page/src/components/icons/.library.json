@@ -1,0 +1,16 @@
+{
+  "library": "tabler",
+  "prefix": "tabler",
+  "source": "iconify",
+  "installedAt": "2026-08-13T17:24:49.978Z",
+  "icons": [
+    "activity-heartbeat",
+    "arrow-right",
+    "brand-github",
+    "check",
+    "external-link",
+    "server",
+    "shield-check",
+    "terminal-2"
+  ]
+}
