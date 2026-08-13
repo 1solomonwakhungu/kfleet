@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/1solomonwakhungu/kfleet-agent
+  repository: ghcr.io/1solomonwakhungu/kfleet/agent
   tag: ""
   pullPolicy: IfNotPresent
 
