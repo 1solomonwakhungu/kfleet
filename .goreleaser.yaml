@@ -1,6 +1,19 @@
 version: 2
 
 builds:
+  - id: kfleet
+    main: ./cmd/kfleet
+    binary: kfleet
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
   - id: hub
     main: ./cmd/hub
     binary: hub
@@ -29,20 +42,52 @@ builds:
       - -s -w -X main.version={{.Version}}
 
 archives:
+  - id: kfleet
+    ids:
+      - kfleet
+    formats:
+      - tar.gz
+    name_template: "kfleet_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
   - id: hub
     ids:
       - hub
-    name_template: >-
-      {{ .ProjectName }}_hub_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     formats:
       - tar.gz
+    name_template: "hub_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
   - id: agent
     ids:
       - agent
-    name_template: >-
-      {{ .ProjectName }}_agent_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     formats:
       - tar.gz
+    name_template: "agent_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+homebrew_casks:
+  - name: kfleet
+    ids:
+      - kfleet
+    binaries:
+      - kfleet
+    homepage: https://github.com/1solomonwakhungu/kfleet
+    description: Local multi-cluster Kubernetes quickstart and management CLI
+    license: Apache-2.0
+    dependencies:
+      - formula: kind
+      - formula: kubectl
+      - formula: helm
+    repository:
+      owner: 1solomonwakhungu
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/kfleet"]
+          end
+
+release:
+  extra_files:
+    - glob: .release/*.tgz
 
 changelog:
   use: github

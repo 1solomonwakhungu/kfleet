@@ -4,6 +4,7 @@
 
 build: web-build
 	@mkdir -p bin
+	go build -o bin/kfleet ./cmd/kfleet
 	go build -o bin/hub ./cmd/hub
 	go build -o bin/agent ./cmd/agent
 
@@ -35,7 +36,7 @@ clean:
 
 help:
 	@echo "Available targets:"
-	@echo "  build  Build hub and agent binaries"
+	@echo "  build  Build kfleet, hub, and agent binaries"
 	@echo "  web-build  Build the embedded React application"
 	@echo "  test   Run tests with the race detector and coverage"
 	@echo "  lint   Run golangci-lint"

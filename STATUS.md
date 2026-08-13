@@ -16,6 +16,9 @@
 - Published deployment is now defined by the production-ready `kfleet-hub` and `kfleet-agent` Helm charts.
 - Added tag-driven OCI chart packaging and publishing to the release workflow.
 - Added Helm lint and render checks to CI and removed duplicate placeholder charts.
+- Added a no-clone `kfleet` quickstart CLI with status, browser opening, and cleanup commands.
+- Configured GoReleaser to publish the CLI through the existing Homebrew tap.
+- Added release-attached Helm charts for version-aligned quickstarts.
 
 ## Results
 
@@ -27,7 +30,12 @@
 - Helm charts linted and rendered: 2/2 passed
 - Version synchronization: chart `1.2.3` deploys image `v1.2.3`
 - Go test suite: passed
+- CLI tests with race detector: passed
+- Full Go test suite with race detector: passed
+- GoReleaser cross-platform snapshot: passed
+- Helm chart lint: 2/2 passed
 
 ## Next
 
-- Release `v0.1.2` publishes the first complete public binaries, repository-scoped images, and matching OCI charts to GHCR.
+- Merge the Homebrew quickstart pull request.
+- Release `v0.1.2` to publish the CLI, images, charts, and Homebrew cask.
