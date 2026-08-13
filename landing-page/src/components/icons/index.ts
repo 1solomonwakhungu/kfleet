@@ -4,5 +4,6 @@ export { BrandGithubIcon } from "./brand-github";
 export { CheckIcon } from "./check";
 export { ExternalLinkIcon } from "./external-link";
 export { ServerIcon } from "./server";
+export { SearchIcon } from "./search";
 export { ShieldCheckIcon } from "./shield-check";
 export { Terminal2Icon } from "./terminal-2";
