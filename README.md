@@ -119,24 +119,29 @@ This table compares native, bundled capabilities; integrations and third-party e
 
 ## 60-second kind quickstart
 
-You need Docker, [kind](https://kind.sigs.k8s.io/), `kubectl`, and Helm 3. Then run:
+Install the kfleet CLI with Homebrew. The cask installs kind, `kubectl`, and
+Helm; Docker Desktop must be running.
 
 ```bash
-git clone https://github.com/1solomonwakhungu/kfleet.git
-cd kfleet
-./hack/quickstart.sh
+brew install --cask 1solomonwakhungu/tap/kfleet
+kfleet quickstart
 ```
 
-The script creates three kind clusters, builds and loads the local images, installs the hub and agents, and waits for all agents to register. When it finishes, open [http://localhost:8080](http://localhost:8080).
+The command creates three kind clusters, installs the released hub and agents,
+and starts a local port-forward. When it finishes, open the displayed URL or
+run `kfleet open`.
 
-Environment overrides are available for a different cluster count or image source:
+Flags are available for a different cluster count or port:
 
 ```bash
-KFLEET_CLUSTERS=2 IMAGE_TAG=dev ./hack/quickstart.sh
-USE_GHCR=true IMAGE_TAG=latest ./hack/quickstart.sh
+kfleet quickstart --clusters 2 --port 9090
+kfleet status
 ```
 
-Remove the demo with `./hack/cleanup.sh`.
+Remove the demo with `kfleet cleanup`.
+
+For local development from a source checkout, `./hack/quickstart.sh` remains
+available and builds images from the current working tree.
 
 For the internet-facing, synthetic-data-only deployment and its security
 boundary, see [Public read-only demo](docs/public-demo.md).

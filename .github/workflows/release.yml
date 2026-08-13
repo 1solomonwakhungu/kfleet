@@ -11,13 +11,12 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
-  packages: write
-
 jobs:
   images:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         component:
@@ -51,31 +50,12 @@ jobs:
           cache-from: type=gha,scope=release-${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=release-${{ matrix.component }}
 
-  release:
+  charts:
     needs: images
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ inputs.version || github.ref }}
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  helm-release:
-    needs: release
-    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     env:
       RELEASE_TAG: ${{ inputs.version || github.ref_name }}
     steps:
@@ -115,3 +95,42 @@ jobs:
           for chart in dist/charts/*.tgz; do
             helm push "$chart" "oci://ghcr.io/$owner/charts"
           done
+
+  release:
+    needs: charts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.version || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.version || github.ref }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+      - name: Package release charts
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          mkdir -p .release
+          helm package charts/kfleet-hub charts/kfleet-agent \
+            --version "$version" \
+            --app-version "$RELEASE_TAG" \
+            --destination .release
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
