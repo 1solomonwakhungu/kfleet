@@ -31,8 +31,8 @@ for i in $(seq 1 "$CLUSTERS"); do
 done
 
 if [ "$USE_GHCR" = "1" ]; then
-    HUB_IMAGE="ghcr.io/1solomonwakhungu/kfleet-hub:${IMAGE_TAG}"
-    AGENT_IMAGE="ghcr.io/1solomonwakhungu/kfleet-agent:${IMAGE_TAG}"
+    HUB_IMAGE="ghcr.io/1solomonwakhungu/kfleet/hub:${IMAGE_TAG}"
+    AGENT_IMAGE="ghcr.io/1solomonwakhungu/kfleet/agent:${IMAGE_TAG}"
 else
     HUB_IMAGE="kfleet-hub:${IMAGE_TAG}"
     AGENT_IMAGE="kfleet-agent:${IMAGE_TAG}"

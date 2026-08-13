@@ -30,4 +30,4 @@
 
 ## Next
 
-- Push a semantic version tag such as `v1.2.3` to publish the release images and matching OCI charts to GHCR.
+- Release `v0.1.1` publishes the first public binaries, repository-scoped images, and matching OCI charts to GHCR.
