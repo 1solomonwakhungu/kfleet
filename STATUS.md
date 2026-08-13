@@ -30,4 +30,4 @@
 
 ## Next
 
-- Release `v0.1.1` publishes the first public binaries, repository-scoped images, and matching OCI charts to GHCR.
+- Release `v0.1.2` publishes the first complete public binaries, repository-scoped images, and matching OCI charts to GHCR.

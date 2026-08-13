@@ -32,11 +32,15 @@ archives:
   - id: hub
     ids:
       - hub
+    name_template: >-
+      {{ .ProjectName }}_hub_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     formats:
       - tar.gz
   - id: agent
     ids:
       - agent
+    name_template: >-
+      {{ .ProjectName }}_agent_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     formats:
       - tar.gz
 
