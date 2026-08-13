@@ -34,8 +34,11 @@
 - Full Go test suite with race detector: passed
 - GoReleaser cross-platform snapshot: passed
 - Helm chart lint: 2/2 passed
+- Release `v0.1.2`: published successfully
+- GitHub release assets: 9
+- OCI Helm charts pulled and rendered: 2/2 passed
+- Multi-architecture image manifests verified: linux/amd64 and linux/arm64
 
 ## Next
 
-- Merge the Homebrew quickstart pull request.
-- Release `v0.1.2` to publish the CLI, images, charts, and Homebrew cask.
+- Future semantic version tags publish matching binaries, images, and OCI Helm charts automatically.
