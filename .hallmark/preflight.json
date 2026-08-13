@@ -1,8 +1,8 @@
 {
-  "date": "2026-07-17",
-  "framework": "Vite + React + TypeScript + Tailwind",
-  "fontStack": "new frontend; Space Grotesk + IBM Plex Sans + JetBrains Mono",
-  "palette": "Midnight dark OKLCH tokens",
-  "motion": "motion-cut with functional status feedback",
-  "spacing": "4pt scale"
+  "date": "2026-08-13",
+  "framework": "Vite 8 + React 19 + TypeScript + Tailwind 4",
+  "fontStack": "Geist Variable + system monospace",
+  "palette": "Cobalt-dark OKLCH semantic tokens",
+  "motion": "motion-cut with functional state feedback",
+  "spacing": "4pt named token scale"
 }
