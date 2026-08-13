@@ -2,13 +2,14 @@
   "library": "tabler",
   "prefix": "tabler",
   "source": "iconify",
-  "installedAt": "2026-08-13T17:24:49.978Z",
+  "installedAt": "2026-08-13T17:50:56.025Z",
   "icons": [
     "activity-heartbeat",
     "arrow-right",
     "brand-github",
     "check",
     "external-link",
+    "search",
     "server",
     "shield-check",
     "terminal-2"
