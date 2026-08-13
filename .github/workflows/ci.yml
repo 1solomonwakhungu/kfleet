@@ -78,6 +78,28 @@ jobs:
           file: Dockerfile.agent
           push: false
 
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+      - name: Lint charts
+        run: |
+          helm lint charts/kfleet-hub
+          helm lint charts/kfleet-agent \
+            --set hub.url=https://kfleet.example.com \
+            --set cluster.name=ci-validation
+      - name: Render charts
+        run: |
+          helm template kfleet-hub charts/kfleet-hub \
+            --namespace kfleet-system > /dev/null
+          helm template kfleet-agent charts/kfleet-agent \
+            --namespace kfleet-system \
+            --set hub.url=https://kfleet.example.com \
+            --set cluster.name=ci-validation > /dev/null
+
   web:
     runs-on: ubuntu-latest
     defaults:

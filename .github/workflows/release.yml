@@ -5,29 +5,65 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: Existing release tag to publish (for example, v1.2.3)
+        required: true
+        type: string
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  release:
+  images:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component:
+          - hub
+          - agent
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
+          ref: ${{ inputs.version || github.ref }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.${{ matrix.component }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/kfleet-${{ matrix.component }}:${{ inputs.version || github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/kfleet-${{ matrix.component }}:latest
+          cache-from: type=gha,scope=release-${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=release-${{ matrix.component }}
+
+  release:
+    needs: images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.version || github.ref }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -40,19 +76,42 @@ jobs:
   helm-release:
     needs: release
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.version || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version || github.ref }}
       - name: Set up Helm
         uses: azure/setup-helm@v4
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
       - name: Package Helm charts
+        shell: bash
         run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          if [[ "$RELEASE_TAG" != v* || ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]; then
+            echo "Release tag must be a semantic version prefixed with v (for example, v1.2.3)" >&2
+            exit 1
+          fi
+
           mkdir -p dist/charts
-          helm package charts/hub charts/agent -d dist/charts
+          for chart in charts/kfleet-hub charts/kfleet-agent; do
+            helm lint "$chart" \
+              --set hub.url=https://kfleet.example.com \
+              --set cluster.name=release-validation
+            helm package "$chart" \
+              --version "$version" \
+              --app-version "$RELEASE_TAG" \
+              --destination dist/charts
+          done
       - name: Push Helm charts
+        shell: bash
         run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
           for chart in dist/charts/*.tgz; do
-            helm push "$chart" oci://ghcr.io/1solomonwakhungu/charts
+            helm push "$chart" "oci://ghcr.io/$owner/charts"
           done

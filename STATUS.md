@@ -13,6 +13,9 @@
 - Deployed the production site to https://kfleet-landing.vercel.app.
 - Opened and merged GitHub PR #10 after all five CI checks passed.
 - Added the production URL to the GitHub repository homepage and updated the repository description.
+- Published deployment is now defined by the production-ready `kfleet-hub` and `kfleet-agent` Helm charts.
+- Added tag-driven OCI chart packaging and publishing to the release workflow.
+- Added Helm lint and render checks to CI and removed duplicate placeholder charts.
 
 ## Results
 
@@ -21,7 +24,10 @@
 - Better Design comprehension issues: 0 blocking
 - Hallmark slop test: 58/58 passed
 - Production deployment: ready
+- Helm charts linted and rendered: 2/2 passed
+- Version synchronization: chart `1.2.3` deploys image `v1.2.3`
+- Go test suite: passed
 
 ## Next
 
-- No remaining work for this task.
+- Push a semantic version tag such as `v1.2.3` to publish the release images and matching OCI charts to GHCR.
