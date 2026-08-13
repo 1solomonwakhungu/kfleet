@@ -149,7 +149,8 @@ Create a shared registration token and install the hub:
 export KFLEET_REGISTRATION_TOKEN="$(openssl rand -hex 32)"
 export KFLEET_ADMIN_PASSWORD="$(openssl rand -base64 24)"
 
-helm upgrade --install kfleet-hub ./charts/kfleet-hub \
+helm upgrade --install kfleet-hub \
+  oci://ghcr.io/1solomonwakhungu/charts/kfleet-hub \
   --namespace kfleet-system \
   --create-namespace \
   --set registration.token="$KFLEET_REGISTRATION_TOKEN" \
@@ -163,7 +164,8 @@ helm upgrade --install kfleet-hub ./charts/kfleet-hub \
 Expose the hub with an Ingress, a `LoadBalancer` service, or a local port-forward. Install the agent into every cluster you want to manage:
 
 ```bash
-helm upgrade --install kfleet-agent ./charts/kfleet-agent \
+helm upgrade --install kfleet-agent \
+  oci://ghcr.io/1solomonwakhungu/charts/kfleet-agent \
   --kube-context my-cluster \
   --namespace kfleet-system \
   --create-namespace \
@@ -173,6 +175,11 @@ helm upgrade --install kfleet-agent ./charts/kfleet-agent \
 ```
 
 Important values include `hub.url`, `hub.token`, `cluster.name`, `cluster.labels`, `reportInterval`, `timeline.retention`, and the image repository/tag settings in each chart's `values.yaml`.
+
+Each `v*` release publishes matching OCI charts to GHCR. Pin an installation
+with `--version 1.2.3`; that chart deploys the tool image tagged `v1.2.3`.
+For local chart development, replace the OCI URL with `./charts/kfleet-hub` or
+`./charts/kfleet-agent`.
 
 The hub requires a human user session for its web UI and fleet APIs. It
 supports admin, operator, and read-only roles, and records security-relevant
