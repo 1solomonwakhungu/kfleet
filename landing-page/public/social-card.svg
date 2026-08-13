@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0d0c12"/>
+  <circle cx="870" cy="80" r="360" fill="#5e6ad2" opacity=".18"/>
+  <rect x="90" y="110" width="58" height="58" rx="13" fill="#5e6ad2"/>
+  <text x="119" y="151" fill="white" text-anchor="middle" font-family="Arial, sans-serif" font-size="38" font-weight="700">k</text>
+  <text x="170" y="151" fill="#f5f4f8" font-family="Arial, sans-serif" font-size="38" font-weight="600">kfleet</text>
+  <text x="90" y="300" fill="#f5f4f8" font-family="Arial, sans-serif" font-size="74" font-weight="600">Operate every cluster.</text>
+  <text x="90" y="380" fill="#a7a3b2" font-family="Arial, sans-serif" font-size="32">Lightweight Kubernetes fleet operations with a built-in AI interface.</text>
+  <rect x="90" y="455" width="280" height="62" rx="9" fill="#5e6ad2"/>
+  <text x="230" y="496" fill="white" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="600">Open source · Apache 2.0</text>
+</svg>
