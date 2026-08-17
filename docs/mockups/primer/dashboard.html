@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kfleet · Fleet dashboard (Primer mockup)</title>
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/light.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/dark.css" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body data-page="fleet" data-breadcrumb="kfleet / Fleet">
+    <div class="app" data-app>
+      <div class="main">
+        <div class="content">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">Fleet dashboard</h1>
+              <p class="page-desc">
+                Operational health, capacity, and agent freshness across registered Kubernetes clusters.
+              </p>
+            </div>
+            <div class="row">
+              <span class="muted mono" style="font-size: 12px">Auto-refresh · 5s</span>
+              <button class="btn" type="button"><span data-icon="sync"></span>Refresh fleet</button>
+              <button class="btn btn-primary" type="button">Register cluster</button>
+            </div>
+          </div>
+
+          <div class="flash flash-warn" style="margin-bottom: 16px">
+            <span data-icon="alert"></span>
+            <div>
+              <strong>2 clusters need attention.</strong>
+              <span class="muted">eu-west-prod is degraded and ap-south-edge has not reported in 12 minutes.</span>
+            </div>
+            <a class="btn btn-sm spacer" href="alerts.html">View alerts</a>
+          </div>
+
+          <div class="grid grid-4">
+            <div class="box box-body">
+              <div class="row">
+                <div>
+                  <p class="metric-label">Clusters</p>
+                  <p class="metric-value">12</p>
+                </div>
+                <span class="spacer muted" data-icon="fleet"></span>
+              </div>
+              <p class="metric-detail">2 need attention</p>
+            </div>
+            <div class="box box-body">
+              <div class="row">
+                <div>
+                  <p class="metric-label">Healthy</p>
+                  <p class="metric-value">83%</p>
+                </div>
+                <span class="spacer" style="color: var(--fgColor-success)" data-icon="shield"></span>
+              </div>
+              <p class="metric-detail">10 of 12 clusters</p>
+            </div>
+            <div class="box box-body">
+              <div class="row">
+                <div>
+                  <p class="metric-label">Nodes</p>
+                  <p class="metric-value">248</p>
+                </div>
+                <span class="spacer muted" data-icon="server"></span>
+              </div>
+              <p class="metric-detail">Across the fleet</p>
+            </div>
+            <div class="box box-body">
+              <div class="row">
+                <div>
+                  <p class="metric-label">Pods</p>
+                  <p class="metric-value">6,412</p>
+                </div>
+                <span class="spacer muted" data-icon="box"></span>
+              </div>
+              <p class="metric-detail">Reported workload pods</p>
+            </div>
+          </div>
+
+          <div class="box box-body mt-3">
+            <dl class="grid grid-4" style="gap: 12px; margin: 0">
+              <div class="row"><span class="dot dot-success"></span><dt class="muted">Healthy</dt><dd class="spacer mono" style="margin: 0; font-weight: 600">10</dd></div>
+              <div class="row"><span class="dot dot-attention"></span><dt class="muted">Degraded</dt><dd class="spacer mono" style="margin: 0; font-weight: 600">1</dd></div>
+              <div class="row"><span class="dot dot-danger"></span><dt class="muted">Unreachable</dt><dd class="spacer mono" style="margin: 0; font-weight: 600">1</dd></div>
+              <div class="row"><span class="dot dot-neutral"></span><dt class="muted">Unknown</dt><dd class="spacer mono" style="margin: 0; font-weight: 600">0</dd></div>
+            </dl>
+          </div>
+
+          <div class="row row-wrap mt-3" style="gap: 8px">
+            <label class="field" style="flex: 1 1 280px">
+              <span data-icon="search"></span>
+              <input type="search" placeholder="Search clusters and labels" aria-label="Search clusters" />
+            </label>
+            <span class="field">
+              <select aria-label="Filter by health">
+                <option>All health states</option>
+                <option>Healthy</option>
+                <option>Degraded</option>
+                <option>Unreachable</option>
+              </select>
+            </span>
+            <span class="field">
+              <select aria-label="Sort clusters">
+                <option>Sort: health</option>
+                <option>Sort: name</option>
+                <option>Sort: last heartbeat</option>
+              </select>
+            </span>
+          </div>
+
+          <h2 class="visually-hidden">Clusters</h2>
+          <div class="grid grid-3 mt-3">
+            <a class="box cluster-card is-unreachable" href="cluster-detail.html">
+              <div class="box-body">
+                <div class="row">
+                  <span class="dot dot-danger"></span>
+                  <strong>ap-south-edge</strong>
+                  <span class="state state-danger spacer">Unreachable</span>
+                </div>
+                <p class="mono muted" style="margin: 4px 0 12px; font-size: 12px">cluster-ap-south-edge-01</p>
+                <dl class="cluster-metrics">
+                  <div class="cluster-metric"><dt>Nodes</dt><dd>6</dd></div>
+                  <div class="cluster-metric"><dt>Pods</dt><dd>184</dd></div>
+                  <div class="cluster-metric"><dt>Kubernetes</dt><dd class="mono">v1.29.4</dd></div>
+                  <div class="cluster-metric"><dt>Agent</dt><dd class="mono">v0.6.1</dd></div>
+                </dl>
+                <div class="row row-wrap" style="margin-top: 12px">
+                  <span class="label label-neutral">env=prod</span>
+                  <span class="label label-neutral">region=ap-south-1</span>
+                </div>
+                <p class="muted row" style="margin: 12px 0 0; font-size: 12px">
+                  <span data-icon="clock" data-icon-size="12"></span>Last heartbeat 12 minutes ago
+                </p>
+              </div>
+            </a>
+
+            <a class="box cluster-card is-degraded" href="cluster-detail.html">
+              <div class="box-body">
+                <div class="row">
+                  <span class="dot dot-attention"></span>
+                  <strong>eu-west-prod</strong>
+                  <span class="state state-attention spacer">Degraded</span>
+                </div>
+                <p class="mono muted" style="margin: 4px 0 12px; font-size: 12px">cluster-eu-west-prod-01</p>
+                <dl class="cluster-metrics">
+                  <div class="cluster-metric"><dt>Nodes</dt><dd>32</dd></div>
+                  <div class="cluster-metric"><dt>Pods</dt><dd>948</dd></div>
+                  <div class="cluster-metric"><dt>Kubernetes</dt><dd class="mono">v1.30.2</dd></div>
+                  <div class="cluster-metric"><dt>Agent</dt><dd class="mono">v0.7.0</dd></div>
+                </dl>
+                <div class="row row-wrap" style="margin-top: 12px">
+                  <span class="label label-neutral">env=prod</span>
+                  <span class="label label-neutral">region=eu-west-1</span>
+                  <span class="label label-neutral">+2</span>
+                </div>
+                <p class="muted row" style="margin: 12px 0 0; font-size: 12px">
+                  <span data-icon="clock" data-icon-size="12"></span>Last heartbeat 9 seconds ago
+                </p>
+              </div>
+            </a>
+
+            <a class="box cluster-card is-healthy" href="cluster-detail.html">
+              <div class="box-body">
+                <div class="row">
+                  <span class="dot dot-success"></span>
+                  <strong>us-east-prod</strong>
+                  <span class="state state-success spacer">Healthy</span>
+                </div>
+                <p class="mono muted" style="margin: 4px 0 12px; font-size: 12px">cluster-us-east-prod-01</p>
+                <dl class="cluster-metrics">
+                  <div class="cluster-metric"><dt>Nodes</dt><dd>48</dd></div>
+                  <div class="cluster-metric"><dt>Pods</dt><dd>1,402</dd></div>
+                  <div class="cluster-metric"><dt>Kubernetes</dt><dd class="mono">v1.30.2</dd></div>
+                  <div class="cluster-metric"><dt>Agent</dt><dd class="mono">v0.7.0</dd></div>
+                </dl>
+                <div class="row row-wrap" style="margin-top: 12px">
+                  <span class="label label-neutral">env=prod</span>
+                  <span class="label label-neutral">region=us-east-1</span>
+                  <span class="label label-neutral">+3</span>
+                </div>
+                <p class="muted row" style="margin: 12px 0 0; font-size: 12px">
+                  <span data-icon="clock" data-icon-size="12"></span>Last heartbeat 4 seconds ago
+                </p>
+              </div>
+            </a>
+
+            <a class="box cluster-card is-healthy" href="cluster-detail.html">
+              <div class="box-body">
+                <div class="row">
+                  <span class="dot dot-success"></span>
+                  <strong>us-west-stage</strong>
+                  <span class="state state-success spacer">Healthy</span>
+                </div>
+                <p class="mono muted" style="margin: 4px 0 12px; font-size: 12px">cluster-us-west-stage-01</p>
+                <dl class="cluster-metrics">
+                  <div class="cluster-metric"><dt>Nodes</dt><dd>18</dd></div>
+                  <div class="cluster-metric"><dt>Pods</dt><dd>512</dd></div>
+                  <div class="cluster-metric"><dt>Kubernetes</dt><dd class="mono">v1.30.1</dd></div>
+                  <div class="cluster-metric"><dt>Agent</dt><dd class="mono">v0.7.0</dd></div>
+                </dl>
+                <div class="row row-wrap" style="margin-top: 12px">
+                  <span class="label label-neutral">env=stage</span>
+                  <span class="label label-neutral">region=us-west-2</span>
+                </div>
+                <p class="muted row" style="margin: 12px 0 0; font-size: 12px">
+                  <span data-icon="clock" data-icon-size="12"></span>Last heartbeat 6 seconds ago
+                </p>
+              </div>
+            </a>
+
+            <a class="box cluster-card is-healthy" href="cluster-detail.html">
+              <div class="box-body">
+                <div class="row">
+                  <span class="dot dot-success"></span>
+                  <strong>eu-central-dev</strong>
+                  <span class="state state-success spacer">Healthy</span>
+                </div>
+                <p class="mono muted" style="margin: 4px 0 12px; font-size: 12px">cluster-eu-central-dev-01</p>
+                <dl class="cluster-metrics">
+                  <div class="cluster-metric"><dt>Nodes</dt><dd>9</dd></div>
+                  <div class="cluster-metric"><dt>Pods</dt><dd>236</dd></div>
+                  <div class="cluster-metric"><dt>Kubernetes</dt><dd class="mono">v1.29.6</dd></div>
+                  <div class="cluster-metric"><dt>Agent</dt><dd class="mono">v0.6.1</dd></div>
+                </dl>
+                <div class="row row-wrap" style="margin-top: 12px">
+                  <span class="label label-neutral">env=dev</span>
+                  <span class="label label-neutral">team=platform</span>
+                </div>
+                <p class="muted row" style="margin: 12px 0 0; font-size: 12px">
+                  <span data-icon="clock" data-icon-size="12"></span>Last heartbeat 3 seconds ago
+                </p>
+              </div>
+            </a>
+
+            <a class="box cluster-card is-healthy" href="cluster-detail.html">
+              <div class="box-body">
+                <div class="row">
+                  <span class="dot dot-success"></span>
+                  <strong>sa-east-prod</strong>
+                  <span class="state state-success spacer">Healthy</span>
+                </div>
+                <p class="mono muted" style="margin: 4px 0 12px; font-size: 12px">cluster-sa-east-prod-01</p>
+                <dl class="cluster-metrics">
+                  <div class="cluster-metric"><dt>Nodes</dt><dd>14</dd></div>
+                  <div class="cluster-metric"><dt>Pods</dt><dd>398</dd></div>
+                  <div class="cluster-metric"><dt>Kubernetes</dt><dd class="mono">v1.30.2</dd></div>
+                  <div class="cluster-metric"><dt>Agent</dt><dd class="mono">v0.7.0</dd></div>
+                </dl>
+                <div class="row row-wrap" style="margin-top: 12px">
+                  <span class="label label-neutral">env=prod</span>
+                  <span class="label label-neutral">region=sa-east-1</span>
+                </div>
+                <p class="muted row" style="margin: 12px 0 0; font-size: 12px">
+                  <span data-icon="clock" data-icon-size="12"></span>Last heartbeat 7 seconds ago
+                </p>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="assets/shell.js"></script>
+  </body>
+</html>

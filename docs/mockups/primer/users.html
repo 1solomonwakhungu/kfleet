@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kfleet · Users (Primer mockup)</title>
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/light.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/dark.css" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body data-page="users" data-breadcrumb="kfleet / Administration / Users">
+    <div class="app" data-app>
+      <div class="main">
+        <div class="content">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">Users</h1>
+              <p class="page-desc">Accounts that can sign in to this hub and the role each one holds.</p>
+            </div>
+            <button class="btn btn-primary" type="button">Invite user</button>
+          </div>
+
+          <div class="grid grid-3">
+            <div class="box box-body">
+              <p class="metric-label">Admins</p>
+              <p class="metric-value">2</p>
+              <p class="metric-detail">Full control including agent approval</p>
+            </div>
+            <div class="box box-body">
+              <p class="metric-label">Operators</p>
+              <p class="metric-value">5</p>
+              <p class="metric-detail">Can act on clusters, cannot manage users</p>
+            </div>
+            <div class="box box-body">
+              <p class="metric-label">Read only</p>
+              <p class="metric-value">9</p>
+              <p class="metric-detail">Dashboard and logs access</p>
+            </div>
+          </div>
+
+          <section class="box mt-3">
+            <div class="box-header">
+              <h2 class="box-title">All users</h2>
+              <label class="field btn-sm spacer" style="padding: 3px 10px">
+                <span data-icon="search" data-icon-size="14"></span>
+                <input type="search" placeholder="Find a user" aria-label="Find a user" />
+              </label>
+            </div>
+            <table class="list">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Auth</th>
+                  <th>Last sign-in</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div class="row">
+                      <span class="avatar">SW</span>
+                      <span><strong>solomon</strong><br /><span class="muted" style="font-size: 12px">solomon@kfleet.dev</span></span>
+                    </div>
+                  </td>
+                  <td><span class="label label-accent">Admin</span></td>
+                  <td class="muted">Local password</td>
+                  <td class="muted">Just now</td>
+                  <td><span class="label label-success">Active</span></td>
+                  <td><button class="btn btn-sm" type="button">Manage</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="row">
+                      <span class="avatar">AN</span>
+                      <span><strong>anika</strong><br /><span class="muted" style="font-size: 12px">anika@kfleet.dev</span></span>
+                    </div>
+                  </td>
+                  <td><span class="label label-accent">Admin</span></td>
+                  <td class="muted">OIDC</td>
+                  <td class="muted">3 h ago</td>
+                  <td><span class="label label-success">Active</span></td>
+                  <td><button class="btn btn-sm" type="button">Manage</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="row">
+                      <span class="avatar">JM</span>
+                      <span><strong>jmwangi</strong><br /><span class="muted" style="font-size: 12px">jmwangi@kfleet.dev</span></span>
+                    </div>
+                  </td>
+                  <td><span class="label label-neutral">Operator</span></td>
+                  <td class="muted">OIDC</td>
+                  <td class="muted">Yesterday</td>
+                  <td><span class="label label-success">Active</span></td>
+                  <td><button class="btn btn-sm" type="button">Manage</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="row">
+                      <span class="avatar">TD</span>
+                      <span><strong>tdiallo</strong><br /><span class="muted" style="font-size: 12px">tdiallo@kfleet.dev</span></span>
+                    </div>
+                  </td>
+                  <td><span class="label label-neutral">Read only</span></td>
+                  <td class="muted">OIDC</td>
+                  <td class="muted">12 d ago</td>
+                  <td><span class="label label-attention">Inactive</span></td>
+                  <td><button class="btn btn-sm" type="button">Manage</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+      </div>
+    </div>
+    <script src="assets/shell.js"></script>
+  </body>
+</html>

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kfleet · Alerts (Primer mockup)</title>
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/light.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/dark.css" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body data-page="alerts" data-breadcrumb="kfleet / Alerts">
+    <div class="app" data-app>
+      <div class="main">
+        <div class="content">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">Alerts</h1>
+              <p class="page-desc">Fleet health transitions recorded by the hub, newest first.</p>
+            </div>
+            <div class="row">
+              <button class="btn" type="button">Mark all as read</button>
+              <button class="btn btn-primary" type="button">Create alert rule</button>
+            </div>
+          </div>
+
+          <div class="grid grid-3">
+            <div class="box box-body">
+              <p class="metric-label">Open alerts</p>
+              <p class="metric-value">3</p>
+              <p class="metric-detail">1 critical · 2 warning</p>
+            </div>
+            <div class="box box-body">
+              <p class="metric-label">Resolved (24 h)</p>
+              <p class="metric-value">11</p>
+              <p class="metric-detail">Median time to resolve 6 m</p>
+            </div>
+            <div class="box box-body">
+              <p class="metric-label">Noisiest cluster</p>
+              <p class="metric-value" style="font-size: 20px">eu-west-prod</p>
+              <p class="metric-detail">7 transitions today</p>
+            </div>
+          </div>
+
+          <div class="row row-wrap mt-3">
+            <label class="field" style="flex: 1 1 260px">
+              <span data-icon="search"></span>
+              <input type="search" placeholder="Search alerts" aria-label="Search alerts" />
+            </label>
+            <span class="field">
+              <select aria-label="Severity">
+                <option>Severity: all</option>
+                <option>Critical</option>
+                <option>Warning</option>
+                <option>Info</option>
+              </select>
+            </span>
+            <span class="field">
+              <select aria-label="Cluster">
+                <option>Cluster: all</option>
+                <option>eu-west-prod</option>
+                <option>ap-south-edge</option>
+              </select>
+            </span>
+          </div>
+
+          <section class="box mt-3">
+            <div class="box-header">
+              <h2 class="box-title">Active</h2>
+              <span class="counter counter-attention spacer">3</span>
+            </div>
+
+            <div class="box-row">
+              <span style="color: var(--fgColor-danger)" data-icon="x"></span>
+              <div style="min-width: 0">
+                <div class="row">
+                  <strong>Agent unreachable</strong>
+                  <span class="label label-danger">Critical</span>
+                </div>
+                <p class="muted" style="margin: 2px 0 0">
+                  ap-south-edge has not sent a heartbeat for 12 minutes (threshold 5 m).
+                </p>
+              </div>
+              <div class="row spacer">
+                <span class="muted" style="font-size: 12px">12 m ago</span>
+                <button class="btn btn-sm" type="button">Silence</button>
+                <a class="btn btn-sm" href="cluster-detail.html">Investigate</a>
+              </div>
+            </div>
+
+            <div class="box-row">
+              <span style="color: var(--fgColor-attention)" data-icon="alert"></span>
+              <div style="min-width: 0">
+                <div class="row">
+                  <strong>Cluster degraded</strong>
+                  <span class="label label-attention">Warning</span>
+                </div>
+                <p class="muted" style="margin: 2px 0 0">eu-west-prod reported 2 NotReady nodes in eu-west-1b.</p>
+              </div>
+              <div class="row spacer">
+                <span class="muted" style="font-size: 12px">14 m ago</span>
+                <button class="btn btn-sm" type="button">Silence</button>
+                <a class="btn btn-sm" href="cluster-detail.html">Investigate</a>
+              </div>
+            </div>
+
+            <div class="box-row">
+              <span style="color: var(--fgColor-attention)" data-icon="alert"></span>
+              <div style="min-width: 0">
+                <div class="row">
+                  <strong>Workload restart storm</strong>
+                  <span class="label label-attention">Warning</span>
+                </div>
+                <p class="muted" style="margin: 2px 0 0">
+                  payments/checkout-api restarted 14 times in the last 30 minutes.
+                </p>
+              </div>
+              <div class="row spacer">
+                <span class="muted" style="font-size: 12px">22 m ago</span>
+                <button class="btn btn-sm" type="button">Silence</button>
+                <a class="btn btn-sm" href="cluster-detail.html">Investigate</a>
+              </div>
+            </div>
+          </section>
+
+          <section class="box mt-3">
+            <div class="box-header">
+              <h2 class="box-title">Recently resolved</h2>
+            </div>
+            <div class="box-body">
+              <ul class="timeline">
+                <li>
+                  <span class="timeline-badge is-success" data-icon="check" data-icon-size="12"></span>
+                  <strong>us-east-prod recovered</strong>
+                  <p class="muted" style="margin: 2px 0 0">Health returned to healthy after 4 m · 1 h ago</p>
+                </li>
+                <li>
+                  <span class="timeline-badge is-success" data-icon="check" data-icon-size="12"></span>
+                  <strong>eu-central-dev agent reconnected</strong>
+                  <p class="muted" style="margin: 2px 0 0">Heartbeat resumed after node reboot · 4 h ago</p>
+                </li>
+                <li>
+                  <span class="timeline-badge is-success" data-icon="check" data-icon-size="12"></span>
+                  <strong>sa-east-prod disk pressure cleared</strong>
+                  <p class="muted" style="margin: 2px 0 0">2 nodes back to Ready · 9 h ago</p>
+                </li>
+              </ul>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <script src="assets/shell.js"></script>
+  </body>
+</html>
