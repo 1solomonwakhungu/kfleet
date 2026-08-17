@@ -23,6 +23,8 @@ const maxSnapshotBodyBytes = 4 << 20
 // POST /api/v1/clusters/{id}/status is the agent snapshot ingestion route
 // and keeps authenticating with the per-agent bearer token, matching the
 // existing agent flow.
+// GET /api/v1/clusters/{id}/pods/{namespace}/{pod}/logs streams pod logs to
+// the browser as SSE, relayed from the cluster's agent reverse channel.
 func (s *Server) registerClusterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/clusters", s.requireAuth(s.handleListClusters))
 	mux.HandleFunc("GET /api/v1/clusters/{id}", s.requireAuth(s.handleGetCluster))
@@ -35,6 +37,7 @@ func (s *Server) registerClusterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/clusters/{id}/deployments", s.requireAuth(s.handleClusterDeployments))
 	mux.HandleFunc("GET /api/v1/clusters/{id}/namespaces", s.requireAuth(s.handleClusterNamespaces))
 	mux.HandleFunc("GET /api/v1/clusters/{id}/events", s.requireAuth(s.handleClusterEvents))
+	mux.HandleFunc("GET /api/v1/clusters/{id}/pods/{namespace}/{pod}/logs", s.requireAuth(s.handleClusterPodLogs))
 }
 
 func (s *Server) handleListClusters(w http.ResponseWriter, r *http.Request) {

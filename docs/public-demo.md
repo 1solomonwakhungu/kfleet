@@ -23,6 +23,9 @@ a connection to a live Kubernetes environment.
 - Synthetic alert history and timeline entries are seeded alongside the
   cluster snapshots so the demo covers the operational features without
   connecting to a live system.
+- Demo clusters have no agent, so the pod log stream is synthesized in the
+  hub from a fixed set of generic messages. No Kubernetes API server is
+  contacted and no real workload output is ever shown.
 - The UI identifies the environment as a read-only synthetic demo and removes
   the agent approval navigation.
 - The server applies CSP, HSTS, anti-framing, MIME sniffing, referrer, browser

@@ -22,6 +22,10 @@
 - Added the admin web surface: user management, audit log, agent registration
   token rotation, and guarded cluster removal, each gated on the signed-in
   user's role.
+- Delivered end-to-end pod log streaming: an authenticated agent reverse
+  WebSocket channel, hub SSE relay on
+  `GET /api/v1/clusters/{id}/pods/{namespace}/{pod}/logs`, synthetic demo-mode
+  output, and `pods/log` RBAC in the agent chart.
 
 ## Results
 

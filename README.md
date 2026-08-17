@@ -48,7 +48,7 @@ kfleet is a lightweight control plane for viewing and operating multiple Kuberne
        +-------------+ +-------------+ +-------------+
 ```
 
-The hub is the only service users connect to. Agents use Kubernetes RBAC to collect a normalized cluster snapshot, register with the hub, and send heartbeats and state updates.
+The hub is the only service users connect to. Agents use Kubernetes RBAC to collect a normalized cluster snapshot, register with the hub, and send heartbeats and state updates. Each approved agent also keeps an outbound WebSocket open to the hub so the hub can request pod logs without holding any Kubernetes credentials of its own (see [Pod log streaming](docs/pod-logs.md)).
 
 ## Operational event timeline
 
@@ -288,6 +288,23 @@ KFLEET_HUB_URL=http://localhost:8080 go run ./cmd/hub mcp
 The hub records alerts when a cluster becomes degraded or unreachable. Alert history and acknowledgement are available in the **Alerts** page and through the `/api/v1/alerts` API. Generic webhook delivery is disabled by default. When configured, every webhook is signed with HMAC-SHA256 and retried from durable SQLite state before moving to the dead-letter state.
 
 For a safe loopback-only walkthrough, signature contract, failure injection, and operational settings, see [Fleet health alerts](docs/alerts.md).
+
+## Stream pod logs
+
+The cluster detail **Logs** tab streams live pod logs. The hub holds no
+Kubernetes credentials, so it never talks to a cluster API server. Each
+approved agent keeps an outbound WebSocket open to the hub; the hub pushes
+log requests down that channel, and the agent streams lines back with
+client-go. The hub relays them to the browser as Server-Sent Events on
+`GET /api/v1/clusters/{id}/pods/{namespace}/{pod}/logs`, honoring the
+`container`, `follow`, and `tailLines` query parameters.
+
+A cluster with no connected agent answers `503` with a JSON error instead of
+an event stream, so the UI shows an explicit unavailable state with a retry
+action rather than reconnecting in a loop. The agent chart grants
+`pods/log` read access; upgrade it alongside the hub. See
+[Pod log streaming](docs/pod-logs.md) for the wire protocol, limits, and
+lifecycle guarantees.
 
 ## Contributing
 

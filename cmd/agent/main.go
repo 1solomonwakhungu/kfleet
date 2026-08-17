@@ -14,6 +14,7 @@ import (
 	"github.com/1solomonwakhungu/kfleet/internal/agent/collector"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/health"
+	"github.com/1solomonwakhungu/kfleet/internal/agent/logs"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/registrar"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/reporter"
 )
@@ -111,8 +112,29 @@ func run(
 		reportCfg := *cfg
 		reportCfg.HubToken = agentRegistrar.Token()
 		clusterReporter := reporter.New(&reportCfg)
+
+		// The log channel is scoped to this registration: its token becomes
+		// invalid as soon as the agent re-registers, so it is torn down
+		// alongside the report loop.
+		logCtx, stopLogs := context.WithCancel(ctx)
+		logsDone := make(chan struct{})
+		go func() {
+			defer close(logsDone)
+			logs.NewClient(
+				cfg.HubURL,
+				cfg.ClusterName,
+				agentRegistrar.Token(),
+				cfg.TenantID,
+				logs.NewStreamer(clusterCollector.Clientset()),
+				logger,
+			).Run(logCtx)
+		}()
+
 		reportState(ctx, clusterCollector, clusterReporter, logger)
-		if runAgentLoop(ctx, cfg.ReportInterval, clusterCollector, clusterReporter, agentRegistrar, logger) {
+		stopped := runAgentLoop(ctx, cfg.ReportInterval, clusterCollector, clusterReporter, agentRegistrar, logger)
+		stopLogs()
+		<-logsDone
+		if stopped {
 			break
 		}
 		delayBeforeRegister = true

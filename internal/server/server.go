@@ -33,6 +33,7 @@ type Server struct {
 	alerts     *alerts.Manager
 	policies   *policy.Engine
 	broadcast  *BroadcastHub
+	logs       *LogRelay
 	httpServer *http.Server
 }
 
@@ -50,6 +51,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 			PollInterval: cfg.AlertPollInterval,
 		}),
 		broadcast: NewBroadcastHub(logger),
+		logs:      NewLogRelay(logger),
 	}
 	server.policies = policy.NewEngine(st, 3*server.heartbeatInterval())
 
