@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kfleet · Agents (Primer mockup)</title>
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/light.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/dark.css" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body data-page="agents" data-breadcrumb="kfleet / Agents">
+    <div class="app" data-app>
+      <div class="main">
+        <div class="content">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">Agents</h1>
+              <p class="page-desc">Approve registration requests and manage the agents reporting to this hub.</p>
+            </div>
+            <button class="btn btn-primary" type="button">Generate registration token</button>
+          </div>
+
+          <div class="flash">
+            <span data-icon="shield"></span>
+            <div>
+              <strong>Approval required.</strong>
+              <span class="muted">
+                Agents stay in a pending state until an admin approves them. Verify the fingerprint out of band before
+                approving.
+              </span>
+            </div>
+          </div>
+
+          <section class="box mt-3">
+            <div class="box-header">
+              <h2 class="box-title">Pending approval</h2>
+              <span class="counter counter-attention">2</span>
+              <button class="btn btn-sm spacer" type="button">Reject all</button>
+            </div>
+            <table class="list">
+              <thead>
+                <tr>
+                  <th>Cluster</th>
+                  <th>Fingerprint</th>
+                  <th>Agent</th>
+                  <th>Source IP</th>
+                  <th>Requested</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>ca-central-stage</strong>
+                    <p class="mono muted" style="margin: 0; font-size: 12px">cluster-ca-central-stage-01</p>
+                  </td>
+                  <td class="mono">SHA256:9f2c…d41a</td>
+                  <td class="mono">v0.7.0</td>
+                  <td class="mono">10.19.4.71</td>
+                  <td class="muted">2 m ago</td>
+                  <td>
+                    <div class="row">
+                      <button class="btn btn-sm btn-primary" type="button">Approve</button>
+                      <button class="btn btn-sm btn-danger" type="button">Reject</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>ap-northeast-dev</strong>
+                    <p class="mono muted" style="margin: 0; font-size: 12px">cluster-ap-northeast-dev-01</p>
+                  </td>
+                  <td class="mono">SHA256:7b10…8ce3</td>
+                  <td class="mono">v0.6.1</td>
+                  <td class="mono">10.44.8.12</td>
+                  <td class="muted">37 m ago</td>
+                  <td>
+                    <div class="row">
+                      <button class="btn btn-sm btn-primary" type="button">Approve</button>
+                      <button class="btn btn-sm btn-danger" type="button">Reject</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <div class="grid grid-2 mt-3">
+            <section class="box">
+              <div class="box-header">
+                <h2 class="box-title">Registration token</h2>
+                <span class="label label-accent spacer">Expires in 58 m</span>
+              </div>
+              <div class="box-body stack">
+                <p class="muted" style="margin: 0">
+                  Pass this token to <code>kfleet-agent --hub https://hub.internal --token …</code> when installing the
+                  Helm chart. It can register a single cluster.
+                </p>
+                <div class="field mono" style="justify-content: space-between">
+                  <span>kft_2f8b9c1d4a6e7f30b5c8a1d2e3f40516</span>
+                  <button class="btn btn-sm" type="button">Copy</button>
+                </div>
+                <div class="row">
+                  <button class="btn" type="button"><span data-icon="sync"></span>Rotate token</button>
+                  <button class="btn btn-danger" type="button">Revoke</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="box">
+              <div class="box-header">
+                <h2 class="box-title">Connected agents</h2>
+                <span class="counter spacer">12</span>
+              </div>
+              <table class="list">
+                <thead>
+                  <tr>
+                    <th>Cluster</th>
+                    <th>Version</th>
+                    <th>Heartbeat</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>us-east-prod</td>
+                    <td class="mono">v0.7.0</td>
+                    <td class="muted">4 s ago</td>
+                    <td><span class="label label-success">Connected</span></td>
+                  </tr>
+                  <tr>
+                    <td>eu-west-prod</td>
+                    <td class="mono">v0.7.0</td>
+                    <td class="muted">9 s ago</td>
+                    <td><span class="label label-success">Connected</span></td>
+                  </tr>
+                  <tr>
+                    <td>ap-south-edge</td>
+                    <td class="mono">v0.6.1</td>
+                    <td class="muted">12 m ago</td>
+                    <td><span class="label label-danger">Stale</span></td>
+                  </tr>
+                  <tr>
+                    <td>eu-central-dev</td>
+                    <td class="mono">v0.6.1</td>
+                    <td class="muted">3 s ago</td>
+                    <td><span class="label label-attention">Upgrade available</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="assets/shell.js"></script>
+  </body>
+</html>

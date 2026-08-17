@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kfleet · Sign in (Primer mockup)</title>
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/light.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/dark.css" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body data-shell="none">
+    <div class="login-page">
+      <div style="position: fixed; top: 16px; right: 16px" data-theme-slot></div>
+
+      <div class="login-card stack">
+        <div style="text-align: center">
+          <span class="brand-mark" style="margin: 0 auto" data-icon="box" data-icon-size="20"></span>
+          <h1 style="margin: 12px 0 0; font-size: 24px; font-weight: 600">Sign in to kfleet</h1>
+          <p class="muted" style="margin: 4px 0 0">Multi-cluster control plane</p>
+        </div>
+
+        <div class="box box-body">
+          <div class="form-group">
+            <label class="form-label" for="username">Username</label>
+            <span class="field"><input id="username" type="text" autocomplete="username" /></span>
+          </div>
+          <div class="form-group">
+            <div class="row">
+              <label class="form-label" for="password" style="margin-bottom: 6px">Password</label>
+              <a class="spacer" style="font-size: 12px" href="#forgot">Forgot password?</a>
+            </div>
+            <span class="field"><input id="password" type="password" autocomplete="current-password" /></span>
+          </div>
+          <button class="btn btn-primary" type="button" style="width: 100%; justify-content: center">Sign in</button>
+
+          <div class="row" style="margin: 16px 0">
+            <span style="flex: 1; height: 1px; background: var(--borderColor-default)"></span>
+            <span class="muted" style="font-size: 12px">or</span>
+            <span style="flex: 1; height: 1px; background: var(--borderColor-default)"></span>
+          </div>
+
+          <button class="btn" type="button" style="width: 100%; justify-content: center">
+            <span data-icon="shield"></span>Continue with SSO
+          </button>
+        </div>
+
+        <div class="flash">
+          <span data-icon="alert"></span>
+          <p style="margin: 0">
+            <strong>Read-only demo.</strong>
+            <span class="muted">Sign in as <code>viewer</code> to browse synthetic fleet data.</span>
+          </p>
+        </div>
+
+        <p class="muted" style="text-align: center; font-size: 12px; margin: 0">
+          kfleet hub v0.7.0 · <a href="index.html">Mockup gallery</a>
+        </p>
+      </div>
+    </div>
+    <script src="assets/shell.js"></script>
+  </body>
+</html>
