@@ -13,6 +13,7 @@ import { DeploymentsTab } from '@/components/detail/DeploymentsTab';
 import { EventsTab } from '@/components/detail/EventsTab';
 import { LogsTab } from '@/components/detail/LogsTab';
 import { OperationalTimeline } from '@/components/detail/OperationalTimeline';
+import { RemoveClusterCard } from '@/components/admin/RemoveClusterCard';
 import { useClusterDetail } from '@/hooks/useClusterDetail';
 import type { PodInfo } from '@/types/resources';
 
@@ -237,6 +238,10 @@ export default function ClusterDetail() {
           <OperationalTimeline clusterId={id} />
         </TabsContent>
       </Tabs>
+
+      <section className="mt-10">
+        <RemoveClusterCard clusterId={id} clusterName={detail.cluster?.name ?? id} />
+      </section>
     </main>
   );
 }

@@ -8,6 +8,8 @@ import { Login } from './pages/Login'
 import PendingAgents from './pages/PendingAgents'
 import Alerts from './pages/Alerts'
 import PolicyDashboard from './pages/PolicyDashboard'
+import Users from './pages/Users'
+import AuditLog from './pages/AuditLog'
 
 export function App() {
   return (
@@ -20,6 +22,8 @@ export function App() {
           <Route path="agents" element={<PendingAgents />} />
           <Route path="alerts" element={<Alerts />} />
           <Route path="policies" element={<PolicyDashboard />} />
+          <Route path="admin/users" element={<Users />} />
+          <Route path="admin/audit" element={<AuditLog />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

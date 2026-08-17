@@ -19,6 +19,9 @@
 - Added a no-clone `kfleet` quickstart CLI with status, browser opening, and cleanup commands.
 - Configured GoReleaser to publish the CLI through the existing Homebrew tap.
 - Added release-attached Helm charts for version-aligned quickstarts.
+- Added the admin web surface: user management, audit log, agent registration
+  token rotation, and guarded cluster removal, each gated on the signed-in
+  user's role.
 
 ## Results
 
@@ -32,6 +35,7 @@
 - Go test suite: passed
 - CLI tests with race detector: passed
 - Full Go test suite with race detector: passed
+- Web test suite: 61 tests passed across 16 files
 - GoReleaser cross-platform snapshot: passed
 - Helm chart lint: 2/2 passed
 - Release `v0.1.2`: published successfully
