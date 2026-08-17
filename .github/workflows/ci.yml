@@ -106,6 +106,7 @@ jobs:
           helm lint charts/kfleet-hub
           helm lint charts/kfleet-agent \
             --set hub.url=https://kfleet.example.com \
+            --set hub.token=ci-validation-token \
             --set cluster.name=ci-validation
       - name: Render charts
         run: |
@@ -114,6 +115,7 @@ jobs:
           helm template kfleet-agent charts/kfleet-agent \
             --namespace kfleet-system \
             --set hub.url=https://kfleet.example.com \
+            --set hub.token=ci-validation-token \
             --set cluster.name=ci-validation > /dev/null
 
   web:

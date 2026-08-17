@@ -11,10 +11,9 @@ import (
 	"syscall"
 
 	"github.com/1solomonwakhungu/kfleet/internal/mcp/hubclient"
+	"github.com/1solomonwakhungu/kfleet/internal/version"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
-
-const serverVersion = "0.1.0"
 
 // Server is the kfleet MCP server.
 type Server struct {
@@ -25,7 +24,7 @@ type Server struct {
 func NewServer(hub *hubclient.Client) *Server {
 	server := mcpserver.NewMCPServer(
 		"kfleet",
-		serverVersion,
+		version.String(),
 		mcpserver.WithToolCapabilities(false),
 		mcpserver.WithInstructions("Inspect and diagnose Kubernetes clusters managed by kfleet."),
 	)

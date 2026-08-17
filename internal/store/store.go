@@ -95,6 +95,10 @@ type Store interface {
 	GetSetting(ctx context.Context, key string) (value string, ok bool, err error)
 	SetSetting(ctx context.Context, key, value string) error
 
+	// Ping verifies that the underlying database is reachable. It is used by
+	// the hub's readiness probe.
+	Ping(ctx context.Context) error
+
 	Close() error
 }
 

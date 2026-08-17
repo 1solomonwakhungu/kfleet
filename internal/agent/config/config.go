@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -34,9 +35,20 @@ func Load() (*Config, error) {
 	if hubURL == "" {
 		return nil, errors.New("KFLEET_HUB_URL is required")
 	}
+	parsedHubURL, err := url.Parse(hubURL)
+	if err != nil || parsedHubURL.Host == "" || (parsedHubURL.Scheme != "http" && parsedHubURL.Scheme != "https") {
+		return nil, errors.New("KFLEET_HUB_URL must be an absolute http or https URL (for example, https://kfleet.example.com)")
+	}
 	clusterName := strings.TrimSpace(os.Getenv("KFLEET_CLUSTER_NAME"))
 	if clusterName == "" {
 		return nil, errors.New("KFLEET_CLUSTER_NAME is required")
+	}
+	// The bootstrap token is what the agent presents to /api/v1/agents/register.
+	// Without it every registration attempt is rejected and the agent spins in
+	// backoff forever, so fail fast instead.
+	hubToken := strings.TrimSpace(os.Getenv("KFLEET_HUB_TOKEN"))
+	if hubToken == "" {
+		return nil, errors.New("KFLEET_HUB_TOKEN is required")
 	}
 
 	interval := defaultReportInterval
@@ -59,7 +71,7 @@ func Load() (*Config, error) {
 	return &Config{
 		HubURL:         hubURL,
 		ClusterName:    clusterName,
-		HubToken:       os.Getenv("KFLEET_HUB_TOKEN"),
+		HubToken:       hubToken,
 		TenantID:       tenantID,
 		ReportInterval: interval,
 		Kubeconfig:     os.Getenv("KUBECONFIG"),

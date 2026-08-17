@@ -1354,6 +1354,17 @@ func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
+// Ping verifies the SQLite connection is usable by running a trivial query
+// bounded by ctx. PingContext alone can succeed against a pooled connection
+// that is no longer usable, so a real query is issued.
+func (s *sqliteStore) Ping(ctx context.Context) error {
+	var result int
+	if err := s.db.QueryRowContext(ctx, "SELECT 1").Scan(&result); err != nil {
+		return fmt.Errorf("ping sqlite database: %w", err)
+	}
+	return nil
+}
+
 func (s *sqliteStore) Close() error {
 	return s.db.Close()
 }

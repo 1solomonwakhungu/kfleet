@@ -181,6 +181,11 @@ helm upgrade --install kfleet-agent \
 
 Important values include `hub.url`, `hub.token`, `cluster.name`, `cluster.labels`, `reportInterval`, `timeline.retention`, and the image repository/tag settings in each chart's `values.yaml`.
 
+`hub.url`, `hub.token`, and `cluster.name` are required for the agent chart; they
+become `KFLEET_HUB_URL`, `KFLEET_HUB_TOKEN`, and `KFLEET_CLUSTER_NAME`. The agent
+validates all three at startup and exits non-zero with the missing variable named
+rather than retrying registration forever.
+
 Each `v*` release publishes matching OCI charts to GHCR. Pin an installation
 with `--version 1.2.3`; that chart deploys the tool image tagged `v1.2.3`.
 For local chart development, replace the OCI URL with `./charts/kfleet-hub` or

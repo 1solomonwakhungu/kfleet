@@ -2,11 +2,14 @@
 
 .PHONY: build web-build test lint tidy receiver docker-hub docker-agent clean help
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS := -X github.com/1solomonwakhungu/kfleet/internal/version.Version=$(VERSION)
+
 build: web-build
 	@mkdir -p bin
-	go build -o bin/kfleet ./cmd/kfleet
-	go build -o bin/hub ./cmd/hub
-	go build -o bin/agent ./cmd/agent
+	go build -ldflags "$(LDFLAGS)" -o bin/kfleet ./cmd/kfleet
+	go build -ldflags "$(LDFLAGS)" -o bin/hub ./cmd/hub
+	go build -ldflags "$(LDFLAGS)" -o bin/agent ./cmd/agent
 
 web-build:
 	cd web && npm ci && npm run build

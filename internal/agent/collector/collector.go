@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
+	"github.com/1solomonwakhungu/kfleet/internal/version"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,10 +21,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-const (
-	agentVersion = "0.1.0"
-	maxEvents    = 100
-)
+const maxEvents = 100
 
 // Collector gathers Kubernetes state using a client-go clientset.
 type Collector struct {
@@ -89,7 +87,7 @@ func (c *Collector) Collect(ctx context.Context) (*ClusterState, error) {
 		NodeCount:    len(nodes.Items),
 		PodCount:     len(pods.Items),
 		CollectedAt:  collectedAt,
-		AgentVersion: agentVersion,
+		AgentVersion: version.String(),
 	}
 	for _, node := range nodes.Items {
 		info := nodeInfo(node)
