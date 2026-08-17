@@ -21,9 +21,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
-)
 
-var version = "dev"
+	"github.com/1solomonwakhungu/kfleet/internal/version"
+)
 
 const (
 	hubChart   = "oci://ghcr.io/1solomonwakhungu/charts/kfleet-hub"
@@ -132,7 +132,7 @@ func (a app) run(ctx context.Context, args []string) error {
 	case "open":
 		return a.openUI(args[1:])
 	case "version", "--version", "-v":
-		fmt.Fprintf(a.stdout, "kfleet %s\n", version)
+		fmt.Fprintf(a.stdout, "kfleet %s\n", version.String())
 		return nil
 	case "help", "--help", "-h":
 		a.usage()
@@ -509,7 +509,7 @@ func defaultReleaseVersion() string {
 	if value := os.Getenv("KFLEET_VERSION"); value != "" {
 		return value
 	}
-	return version
+	return version.String()
 }
 
 func envString(name, fallback string) string {

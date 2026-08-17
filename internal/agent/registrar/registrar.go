@@ -14,12 +14,10 @@ import (
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
+	"github.com/1solomonwakhungu/kfleet/internal/version"
 )
 
-const (
-	requestTimeout = 10 * time.Second
-	agentVersion   = "0.1.0"
-)
+const requestTimeout = 10 * time.Second
 
 // Registrar communicates with the hub's agent lifecycle API.
 type Registrar struct {
@@ -54,7 +52,7 @@ func New(cfg *config.Config, labels map[string]string) *Registrar {
 		registrationToken: cfg.HubToken,
 		token:             cfg.HubToken,
 		clusterName:       cfg.ClusterName,
-		agentVersion:      agentVersion,
+		agentVersion:      version.String(),
 		tenantID:          cfg.TenantID,
 		labels:            labels,
 		client:            &http.Client{Timeout: requestTimeout},

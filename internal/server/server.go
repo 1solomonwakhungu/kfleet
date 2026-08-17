@@ -58,10 +58,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ready"))
-	})
+	mux.HandleFunc("GET /readyz", server.handleReadyz)
 	mux.HandleFunc("GET /api/v1/meta", func(w http.ResponseWriter, _ *http.Request) {
 		if err := api.WriteJSON(w, http.StatusOK, api.RuntimeInfo{
 			DemoMode:      cfg.DemoMode,
@@ -96,6 +93,26 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	return server
+}
+
+// readinessTimeout bounds the store probe so a wedged database cannot hold the
+// readiness handler open indefinitely.
+const readinessTimeout = 2 * time.Second
+
+// handleReadyz reports readiness only when the backing store answers a query.
+// /healthz stays a pure liveness check.
+func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), readinessTimeout)
+	defer cancel()
+	if err := s.store.Ping(ctx); err != nil {
+		s.logger.Error("readiness probe failed", "error", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"status":"unavailable","reason":"store unavailable"}`))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ready"))
 }
 
 // Start serves HTTP requests until the context is cancelled or the server
