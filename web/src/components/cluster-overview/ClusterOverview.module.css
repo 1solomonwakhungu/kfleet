@@ -1,0 +1,186 @@
+.overview {
+  overflow: hidden;
+  background-color: var(--bgColor-default);
+  border: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-16, 16px);
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--base-size-20, 20px);
+  border-bottom: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+}
+
+.headerMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8, 8px);
+  min-width: 0;
+  flex: 1 1 24rem;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8, 8px);
+}
+
+.name {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-title-size-large, 32px);
+  font-weight: var(--base-text-weight-semibold, 600);
+  line-height: 1.25;
+}
+
+.description {
+  display: block;
+  max-width: 42rem;
+  color: var(--fgColor-muted);
+}
+
+.timestamps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--base-size-16, 16px);
+  margin: 0;
+}
+
+.timestamp {
+  min-width: 0;
+}
+
+.timestampValue {
+  margin: var(--base-size-4, 4px) 0 0;
+  font-family: var(--fontStack-monospace, ui-monospace, monospace);
+  font-weight: var(--base-text-weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
+}
+
+.timestampExact {
+  display: block;
+  overflow: hidden;
+  font-size: var(--text-body-size-small, 12px);
+  color: var(--fgColor-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--borderWidth-thin, 1px);
+  margin: 0;
+  background-color: var(--borderColor-default);
+}
+
+@media (min-width: 768px) {
+  .metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4, 4px);
+  min-width: 0;
+  padding: var(--base-size-16, 16px) var(--base-size-20, 20px);
+  background-color: var(--bgColor-default);
+}
+
+.metricLabel {
+  display: flex;
+  gap: var(--base-size-6, 6px);
+  align-items: center;
+  font-size: var(--text-body-size-small, 12px);
+  color: var(--fgColor-muted);
+}
+
+.metricValue {
+  margin: 0;
+  font-size: var(--text-title-size-medium, 26px);
+  font-weight: var(--base-text-weight-semibold, 600);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricDetail {
+  display: block;
+  font-size: var(--text-body-size-small, 12px);
+  color: var(--fgColor-muted);
+}
+
+.panelIcon {
+  flex: none;
+  color: var(--fgColor-accent);
+}
+
+.panels {
+  display: grid;
+  gap: var(--borderWidth-thin, 1px);
+  background-color: var(--borderColor-default);
+  border-top: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+}
+
+@media (min-width: 1012px) {
+  .panels {
+    grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
+  }
+}
+
+.panel {
+  min-width: 0;
+  padding: var(--base-size-20, 20px);
+  background-color: var(--bgColor-default);
+}
+
+.panelTitle {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+  margin: 0 0 var(--base-size-12, 12px);
+  font-size: var(--text-title-size-small, 16px);
+  font-weight: var(--base-text-weight-semibold, 600);
+}
+
+.capacity {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--base-size-16, 16px);
+  margin: 0;
+}
+
+.capacityItem {
+  min-width: 0;
+}
+
+.capacityValue {
+  margin: var(--base-size-4, 4px) 0 0;
+  overflow: hidden;
+  font-family: var(--fontStack-monospace, ui-monospace, monospace);
+  font-size: var(--text-title-size-small, 16px);
+  font-weight: var(--base-text-weight-semibold, 600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4, 4px);
+  padding: var(--base-size-16, 16px);
+  border: var(--borderWidth-thin, 1px) dashed var(--borderColor-default);
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+.labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8, 8px);
+}

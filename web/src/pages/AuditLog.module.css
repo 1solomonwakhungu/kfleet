@@ -1,0 +1,64 @@
+.flashBody {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-12, 12px);
+  align-items: center;
+}
+
+.flashBody > div {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.list {
+  margin-top: var(--base-size-24, 24px);
+}
+
+.listHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-12, 12px);
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: var(--base-size-12, 12px);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+}
+
+.block {
+  display: block;
+}
+
+.meta {
+  display: block;
+  font-size: var(--text-body-size-small, 12px);
+  color: var(--fgColor-muted);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.wrap {
+  overflow-wrap: anywhere;
+}
+
+.footer {
+  display: flex;
+  gap: var(--base-size-16, 16px);
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--base-size-16, 16px);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12, 12px);
+  padding: var(--base-size-20, 20px);
+}

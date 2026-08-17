@@ -40,7 +40,7 @@ describe('ApplicationShell public demo state', () => {
     })
     expect(screen.getByText(/Mutating API requests are disabled/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: /Agents/ })).toBeNull()
-    expect(screen.getByRole('link', { name: 'Fleet Cluster overview' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Fleet' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
   })
 })

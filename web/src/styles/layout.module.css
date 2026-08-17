@@ -1,0 +1,195 @@
+/*
+ * Reusable surface and layout primitives shared across kfleet pages, built on
+ * Primer tokens. These fill the gaps where @primer/react has no component
+ * (bordered boxes, metric tiles, responsive grids).
+ */
+
+.page {
+  max-width: var(--breakpoint-xlarge, 1280px);
+  padding: var(--base-size-24, 24px) var(--base-size-16, 16px) var(--base-size-40, 40px);
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding-right: var(--base-size-24, 24px);
+    padding-left: var(--base-size-24, 24px);
+  }
+}
+
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-16, 16px);
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: var(--base-size-16, 16px);
+  margin-bottom: var(--base-size-20, 20px);
+  border-bottom: var(--borderWidth-thin, 1px) solid var(--borderColor-muted);
+}
+
+.pageHeaderText {
+  min-width: 0;
+}
+
+.pageDescription {
+  display: block;
+  margin-top: var(--base-size-4, 4px);
+  color: var(--fgColor-muted);
+}
+
+.box {
+  background-color: var(--bgColor-default);
+  border: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+.boxHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+  padding: var(--base-size-12, 12px) var(--base-size-16, 16px);
+  background-color: var(--bgColor-muted);
+  border-bottom: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+  border-top-left-radius: var(--borderRadius-medium, 6px);
+  border-top-right-radius: var(--borderRadius-medium, 6px);
+}
+
+.boxBody {
+  padding: var(--base-size-16, 16px);
+}
+
+.boxRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-12, 12px);
+  align-items: center;
+  padding: var(--base-size-12, 12px) var(--base-size-16, 16px);
+  border-top: var(--borderWidth-thin, 1px) solid var(--borderColor-muted);
+}
+
+.boxRow:first-child {
+  border-top: 0;
+}
+
+.spacer {
+  margin-left: auto;
+}
+
+.grid {
+  display: grid;
+  gap: var(--base-size-16, 16px);
+}
+
+.grid2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid3 {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.grid4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 1012px) {
+  .grid4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.metricLabel {
+  display: block;
+  font-size: var(--text-body-size-small, 12px);
+  font-weight: var(--base-text-weight-semibold, 600);
+  color: var(--fgColor-muted);
+}
+
+.metricValue {
+  display: block;
+  margin-top: var(--base-size-4, 4px);
+  font-size: var(--text-title-size-medium, 26px);
+  font-weight: var(--base-text-weight-semibold, 600);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricDetail {
+  display: block;
+  margin-top: var(--base-size-6, 6px);
+  font-size: var(--text-body-size-small, 12px);
+  color: var(--fgColor-muted);
+}
+
+.metricSuccess {
+  color: var(--fgColor-success);
+}
+
+.metricDanger {
+  color: var(--fgColor-danger);
+}
+
+.mono {
+  font-family: var(--fontStack-monospace, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.muted {
+  color: var(--fgColor-muted);
+}
+
+.truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th {
+  padding: var(--base-size-8, 8px) var(--base-size-16, 16px);
+  font-size: var(--text-body-size-small, 12px);
+  font-weight: var(--base-text-weight-semibold, 600);
+  color: var(--fgColor-muted);
+  background-color: var(--bgColor-muted);
+  border-bottom: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+}
+
+.table td {
+  padding: var(--base-size-12, 12px) var(--base-size-16, 16px);
+  vertical-align: middle;
+  border-bottom: var(--borderWidth-thin, 1px) solid var(--borderColor-muted);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tableScroll {
+  width: 100%;
+  overflow-x: auto;
+}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -58,14 +58,14 @@ describe('RemoveClusterCard', () => {
 
     renderCard()
 
-    expect(screen.getByText('Remove cluster', { selector: 'button' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Remove cluster' }).hasAttribute('disabled')).toBe(true)
     expect(screen.getByText('Removing a cluster requires the operator or admin role.')).toBeTruthy()
   })
 
   it('requires confirmation and states the consequences before deleting', async () => {
     renderCard()
 
-    fireEvent.click(screen.getByText('Remove cluster', { selector: 'button' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove cluster' }))
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog.textContent).toContain('Remove production?')
@@ -81,9 +81,9 @@ describe('RemoveClusterCard', () => {
   it('deletes the cluster and returns to the fleet view once confirmed', async () => {
     renderCard()
 
-    fireEvent.click(screen.getByText('Remove cluster', { selector: 'button' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove cluster' }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(dialog.querySelectorAll('button')[1])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove cluster' }))
 
     await waitFor(() => expect(api.deleteCluster).toHaveBeenCalledWith('cluster-a'))
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/', { replace: true }))
@@ -93,9 +93,9 @@ describe('RemoveClusterCard', () => {
     vi.mocked(api.deleteCluster).mockRejectedValue(new Error('this action requires a higher role'))
 
     renderCard()
-    fireEvent.click(screen.getByText('Remove cluster', { selector: 'button' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove cluster' }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(dialog.querySelectorAll('button')[1])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove cluster' }))
 
     expect(await screen.findByText('this action requires a higher role')).toBeTruthy()
     expect(navigate).not.toHaveBeenCalled()

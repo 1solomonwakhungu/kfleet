@@ -1,21 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, BellRing, Check, CircleAlert, LoaderCircle, RefreshCw, type LucideIcon } from 'lucide-react'
+import { Button, Flash, Heading, Label, Spinner, Text } from '@primer/react'
+import { Blankslate } from '@primer/react/experimental'
+import { AlertIcon, BellIcon, CheckIcon, StopIcon, SyncIcon, type Icon } from '@primer/octicons-react'
 
 import { api } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
 import type { Alert, AlertDeliveryStatus, AlertStatus } from '../types/alert'
-import { Badge } from '../components/ui/badge'
-import { Button } from '../components/ui/button'
-import { Card, CardContent } from '../components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table'
-import { cn } from '../lib/utils'
+import layout from '../styles/layout.module.css'
+import styles from './Alerts.module.css'
 
 const timestampFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
@@ -40,6 +32,12 @@ const statusLabels: Record<AlertStatus, string> = {
   firing: 'Firing',
   acknowledged: 'Acknowledged',
   resolved: 'Resolved',
+}
+
+const statusVariants: Record<AlertStatus, 'danger' | 'accent' | 'success'> = {
+  firing: 'danger',
+  acknowledged: 'accent',
+  resolved: 'success',
 }
 
 export default function AlertsPage() {
@@ -106,171 +104,153 @@ export default function AlertsPage() {
   }), [alerts])
 
   return (
-    <main className="mx-auto w-full max-w-[96rem] px-4 py-8 sm:px-6 lg:px-8">
-      <header className="flex flex-col justify-between gap-5 border-b border-border pb-7 sm:flex-row sm:items-end">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-accent">
-            <BellRing className="size-4" aria-hidden="true" />
-            Operations
-          </div>
-          <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">Fleet alerts</h1>
-          <p className="mt-2 max-w-2xl text-muted">
+    <main className={layout.page}>
+      <header className={layout.pageHeader}>
+        <div className={layout.pageHeaderText}>
+          <Heading as="h1" variant="large">
+            Fleet alerts
+          </Heading>
+          <Text className={layout.pageDescription}>
             Health alert history, acknowledgement state, and durable webhook delivery outcomes.
-          </p>
+          </Text>
         </div>
-        <Button
-          variant="outline"
-          disabled={loading || refreshing}
-          onClick={() => void load(undefined, true)}
-        >
-          <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} aria-hidden="true" />
+        <Button leadingVisual={SyncIcon} disabled={loading || refreshing} onClick={() => void load(undefined, true)}>
           Refresh
         </Button>
       </header>
 
-      <section className="grid gap-3 py-6 sm:grid-cols-3" aria-label="Alert summary">
-        <SummaryCard label="Needs acknowledgement" value={summary.firing} icon={CircleAlert} tone="danger" />
-        <SummaryCard label="Acknowledged" value={summary.acknowledged} icon={Check} tone="accent" />
-        <SummaryCard label="Dead letter" value={summary.deadLetter} icon={AlertTriangle} tone="warning" />
+      <section className={`${layout.grid} ${styles.summary}`} aria-label="Alert summary">
+        <SummaryCard label="Needs acknowledgement" value={summary.firing} icon={StopIcon} tone="danger" />
+        <SummaryCard label="Acknowledged" value={summary.acknowledged} icon={CheckIcon} tone="accent" />
+        <SummaryCard label="Dead letter" value={summary.deadLetter} icon={AlertIcon} tone="attention" />
       </section>
 
       {loadError && (
-        <div className="mb-5 rounded-md border border-red-900 bg-red-950/40 p-4 text-sm text-red-200" role="alert">
+        <Flash variant="danger" role="alert" className={styles.flash}>
           {loadError}
-        </div>
+        </Flash>
       )}
 
       {loading ? (
-        <Card className="grid min-h-64 place-items-center ring-1 ring-inset ring-border">
-          <LoaderCircle className="size-7 animate-spin text-accent" aria-label="Loading alert history" />
-        </Card>
+        <div className={`${layout.box} ${styles.loading}`}>
+          <Spinner aria-label="Loading alert history" />
+        </div>
       ) : alerts.length === 0 ? (
-        <Card className="ring-1 ring-inset ring-border">
-          <CardContent className="grid min-h-64 place-items-center p-6 text-center">
-            <div>
-              <span className="mx-auto grid size-12 place-items-center rounded-full bg-blue-950 text-blue-300 ring-1 ring-inset ring-blue-800">
-                <BellRing className="size-6" aria-hidden="true" />
-              </span>
-              <p className="mt-4 font-display text-xl font-bold">No fleet health alerts</p>
-              <p className="mt-2 text-muted">Degraded and unreachable cluster events will appear here.</p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className={layout.box}>
+          <Blankslate>
+            <Blankslate.Visual>
+              <BellIcon size={24} />
+            </Blankslate.Visual>
+            <Blankslate.Heading as="h2">No fleet health alerts</Blankslate.Heading>
+            <Blankslate.Description>
+              Degraded and unreachable cluster events will appear here.
+            </Blankslate.Description>
+          </Blankslate>
+        </div>
       ) : (
-        <Card className="overflow-hidden ring-1 ring-inset ring-border">
-          <Table aria-label="Fleet alert history">
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">Alert</TableHead>
-                <TableHead scope="col">State</TableHead>
-                <TableHead scope="col">Delivery</TableHead>
-                <TableHead scope="col">Triggered</TableHead>
-                <TableHead scope="col" className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {alerts.map((alert) => {
-                const isAcknowledging = acknowledging.has(alert.id)
-                const actionError = actionErrors[alert.id]
-                return (
-                  <TableRow key={alert.id}>
-                    <TableCell>
-                      <div className="min-w-64">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className={alert.severity === 'critical'
-                            ? 'bg-red-950 text-red-200 ring-1 ring-inset ring-red-800'
-                            : 'bg-amber-950 text-amber-200 ring-1 ring-inset ring-amber-800'}
-                          >
-                            {alert.severity}
-                          </Badge>
-                          <p className="font-semibold text-foreground">{alert.summary}</p>
+        <div className={layout.box}>
+          <div className={layout.tableScroll}>
+            <table className={layout.table} aria-label="Fleet alert history">
+              <thead>
+                <tr>
+                  <th scope="col">Alert</th>
+                  <th scope="col">State</th>
+                  <th scope="col">Delivery</th>
+                  <th scope="col">Triggered</th>
+                  <th scope="col" className={styles.actionColumn}>
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {alerts.map((alert) => {
+                  const isAcknowledging = acknowledging.has(alert.id)
+                  const actionError = actionErrors[alert.id]
+
+                  return (
+                    <tr key={alert.id}>
+                      <td>
+                        <div className={styles.alertCell}>
+                          <div className={styles.alertTitle}>
+                            <Label variant={alert.severity === 'critical' ? 'danger' : 'attention'}>
+                              {alert.severity}
+                            </Label>
+                            <Text weight="semibold">{alert.summary}</Text>
+                          </div>
+                          <span className={styles.meta}>{alert.ruleName}</span>
+                          <span className={`${styles.meta} ${layout.mono} ${layout.truncate}`} title={alert.id}>
+                            {alert.id}
+                          </span>
                         </div>
-                        <p className="mt-2 text-xs text-muted">{alert.ruleName}</p>
-                        <p className="mt-1 max-w-72 truncate font-mono text-xs text-muted" title={alert.id}>{alert.id}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={cn(
-                        'ring-1 ring-inset',
-                        alert.status === 'firing' && 'bg-red-950 text-red-200 ring-red-800',
-                        alert.status === 'acknowledged' && 'bg-blue-950 text-blue-200 ring-blue-800',
-                        alert.status === 'resolved' && 'bg-emerald-950 text-emerald-200 ring-emerald-800',
-                      )}>
-                        {statusLabels[alert.status]}
-                      </Badge>
-                      {alert.acknowledgedBy && (
-                        <p className="mt-2 text-xs text-muted">by {alert.acknowledgedBy}</p>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-sm font-medium">{deliveryLabels[alert.deliveryStatus]}</p>
-                      <p className="mt-1 text-xs text-muted">
-                        {alert.deliveryAttempts} {alert.deliveryAttempts === 1 ? 'attempt' : 'attempts'}
-                      </p>
-                      {alert.lastDeliveryError && (
-                        <p className="mt-1 max-w-64 truncate text-xs text-danger" title={alert.lastDeliveryError}>
-                          {alert.lastDeliveryError}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <time dateTime={alert.triggeredAt} title={alert.triggeredAt} className="whitespace-nowrap text-sm">
-                        {formatTimestamp(alert.triggeredAt)}
-                      </time>
-                    </TableCell>
-                    <TableCell className="min-w-48 text-right">
-                      {alert.status === 'firing' ? (
-                        <Button
-                          size="sm"
-                          disabled={isAcknowledging || !canAcknowledge}
-                          onClick={() => void acknowledge(alert)}
-                        >
-                          {isAcknowledging
-                            ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-                            : <Check className="size-4" aria-hidden="true" />}
-                          {isAcknowledging ? 'Acknowledging...' : canAcknowledge ? 'Acknowledge' : 'View only'}
-                        </Button>
-                      ) : (
-                        <span className="text-sm text-muted">{statusLabels[alert.status]}</span>
-                      )}
-                      {actionError && <p className="mt-2 text-xs text-danger" role="alert">{actionError}</p>}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </Card>
+                      </td>
+                      <td>
+                        <Label variant={statusVariants[alert.status]}>{statusLabels[alert.status]}</Label>
+                        {alert.acknowledgedBy && <span className={styles.meta}>by {alert.acknowledgedBy}</span>}
+                      </td>
+                      <td>
+                        <Text weight="medium">{deliveryLabels[alert.deliveryStatus]}</Text>
+                        <span className={styles.meta}>
+                          {alert.deliveryAttempts} {alert.deliveryAttempts === 1 ? 'attempt' : 'attempts'}
+                        </span>
+                        {alert.lastDeliveryError && (
+                          <span className={`${styles.meta} ${styles.error}`} title={alert.lastDeliveryError}>
+                            {alert.lastDeliveryError}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <time dateTime={alert.triggeredAt} title={alert.triggeredAt} className={styles.nowrap}>
+                          {formatTimestamp(alert.triggeredAt)}
+                        </time>
+                      </td>
+                      <td className={styles.actionColumn}>
+                        {alert.status === 'firing' ? (
+                          <Button
+                            variant={canAcknowledge ? 'primary' : 'default'}
+                            disabled={isAcknowledging || !canAcknowledge}
+                            leadingVisual={isAcknowledging ? undefined : CheckIcon}
+                            onClick={() => void acknowledge(alert)}
+                          >
+                            {isAcknowledging ? 'Acknowledging...' : canAcknowledge ? 'Acknowledge' : 'View only'}
+                          </Button>
+                        ) : (
+                          <span className={layout.muted}>{statusLabels[alert.status]}</span>
+                        )}
+                        {actionError && (
+                          <p className={`${styles.meta} ${styles.error}`} role="alert">
+                            {actionError}
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </main>
   )
 }
 
-function SummaryCard({
-  label,
-  value,
-  icon: Icon,
-  tone,
-}: {
+interface SummaryCardProps {
   label: string
   value: number
-  icon: LucideIcon
-  tone: 'danger' | 'accent' | 'warning'
-}) {
+  icon: Icon
+  tone: 'danger' | 'accent' | 'attention'
+}
+
+function SummaryCard({ label, value, icon: SummaryIcon, tone }: SummaryCardProps) {
   return (
-    <Card className="p-4 ring-1 ring-inset ring-border">
-      <div className="flex items-center justify-between gap-4">
+    <div className={`${layout.box} ${layout.boxBody}`}>
+      <div className={styles.summaryHead}>
         <div>
-          <p className="text-sm text-muted">{label}</p>
-          <p className="mt-1 font-display text-3xl font-bold">{value}</p>
+          <p className={layout.metricLabel}>{label}</p>
+          <p className={layout.metricValue}>{value}</p>
         </div>
-        <Icon className={cn(
-          'size-6',
-          tone === 'danger' && 'text-red-400',
-          tone === 'accent' && 'text-blue-400',
-          tone === 'warning' && 'text-amber-400',
-        )} aria-hidden="true" />
+        <SummaryIcon size={24} className={styles[tone]} />
       </div>
-    </Card>
+    </div>
   )
 }

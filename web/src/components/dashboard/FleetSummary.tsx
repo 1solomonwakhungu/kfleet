@@ -1,8 +1,10 @@
-import { Boxes, Network, Server, ShieldCheck } from 'lucide-react'
+import { CounterLabel } from '@primer/react'
+import { ServerIcon, ShieldCheckIcon, StackIcon, WorkflowIcon } from '@primer/octicons-react'
 
 import { StatusDot } from '../StatusDot'
-import { Card } from '../ui/card'
 import type { Cluster, ClusterHealth } from '../../types/cluster'
+import layout from '../../styles/layout.module.css'
+import styles from './FleetSummary.module.css'
 
 interface FleetSummaryProps {
   clusters: Cluster[]
@@ -22,38 +24,42 @@ export function FleetSummary({ clusters }: FleetSummaryProps) {
   const attentionCount = counts.degraded + counts.unreachable + counts.unknown
 
   return (
-    <section className="mt-6" aria-labelledby="fleet-summary-heading">
-      <h2 id="fleet-summary-heading" className="sr-only">Fleet summary</h2>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <section aria-labelledby="fleet-summary-heading">
+      <h2 id="fleet-summary-heading" className={layout.srOnly}>
+        Fleet summary
+      </h2>
+
+      <div className={`${layout.grid} ${layout.grid4}`}>
         <SummaryMetric
           label="Clusters"
           value={clusters.length.toLocaleString()}
           detail={attentionCount === 0 ? 'None need attention' : `${attentionCount.toLocaleString()} need attention`}
-          icon={Network}
+          icon={WorkflowIcon}
         />
         <SummaryMetric
           label="Healthy"
           value={healthyPercent === null ? '—' : `${healthyPercent}%`}
           detail={`${counts.healthy.toLocaleString()} of ${clusters.length.toLocaleString()} clusters`}
-          icon={ShieldCheck}
-          status
+          icon={ShieldCheckIcon}
+          tone="success"
         />
-        <SummaryMetric label="Nodes" value={nodeCount.toLocaleString()} detail="Across the fleet" icon={Server} />
-        <SummaryMetric label="Pods" value={podCount.toLocaleString()} detail="Reported workload pods" icon={Boxes} />
+        <SummaryMetric label="Nodes" value={nodeCount.toLocaleString()} detail="Across the fleet" icon={ServerIcon} />
+        <SummaryMetric label="Pods" value={podCount.toLocaleString()} detail="Reported workload pods" icon={StackIcon} />
       </div>
-      <Card className="mt-3 border border-border px-4 py-3">
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4" aria-label="Cluster health counts">
+
+      <div className={`${layout.box} ${layout.boxBody} ${styles.breakdown}`}>
+        <dl className={styles.breakdownList} aria-label="Cluster health counts">
           {(['healthy', 'degraded', 'unreachable', 'unknown'] as const).map((health) => (
-            <div key={health} className="flex min-w-0 items-center gap-2">
+            <div key={health} className={styles.breakdownItem}>
               <StatusDot health={health} />
-              <dt className="truncate text-xs capitalize text-muted">{health}</dt>
-              <dd className="ml-auto font-mono text-sm font-semibold tabular-nums text-foreground">
-                {counts[health].toLocaleString()}
+              <dt className={styles.breakdownTerm}>{health}</dt>
+              <dd className={styles.breakdownValue}>
+                <CounterLabel>{counts[health]}</CounterLabel>
               </dd>
             </div>
           ))}
         </dl>
-      </Card>
+      </div>
     </section>
   )
 }
@@ -62,23 +68,21 @@ interface SummaryMetricProps {
   label: string
   value: string
   detail: string
-  icon: typeof Network
-  status?: boolean
+  icon: typeof ServerIcon
+  tone?: 'success'
 }
 
-function SummaryMetric({ label, value, detail, icon: Icon, status = false }: SummaryMetricProps) {
+function SummaryMetric({ label, value, detail, icon: Icon, tone }: SummaryMetricProps) {
   return (
-    <Card className="min-w-0 border border-border p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-muted">{label}</p>
-          <p className="mt-2 font-display text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">{value}</p>
+    <div className={`${layout.box} ${layout.boxBody}`}>
+      <div className={styles.metricHead}>
+        <div>
+          <span className={layout.metricLabel}>{label}</span>
+          <span className={`${layout.metricValue} ${tone === 'success' ? layout.metricSuccess : ''}`}>{value}</span>
         </div>
-        <span className={status ? 'text-healthy' : 'text-blue-400'}>
-          <Icon className="h-5 w-5" aria-hidden="true" />
-        </span>
+        <Icon size={16} className={tone === 'success' ? styles.iconSuccess : styles.iconMuted} />
       </div>
-      <p className="mt-2 truncate text-xs text-muted" title={detail}>{detail}</p>
-    </Card>
+      <span className={layout.metricDetail}>{detail}</span>
+    </div>
   )
 }

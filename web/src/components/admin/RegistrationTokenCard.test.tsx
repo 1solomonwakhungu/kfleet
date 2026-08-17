@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAuth } from '../../auth/AuthContext'
@@ -54,12 +54,12 @@ describe('RegistrationTokenCard', () => {
   it('confirms before rotating and shows the new token once', async () => {
     render(<RegistrationTokenCard />)
 
-    fireEvent.click(screen.getByText('Rotate token'))
+    fireEvent.click(screen.getByRole('button', { name: 'Rotate token' }))
     const dialog = await screen.findByRole('dialog')
     expect(dialog.textContent).toContain('stops working straight away')
     expect(adminApi.rotateRegistrationToken).not.toHaveBeenCalled()
 
-    fireEvent.click(dialog.querySelectorAll('button')[1])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rotate token' }))
 
     await waitFor(() => expect(adminApi.rotateRegistrationToken).toHaveBeenCalled())
     expect(await screen.findByText('new-token-value')).toBeTruthy()
@@ -71,9 +71,9 @@ describe('RegistrationTokenCard', () => {
     )
 
     render(<RegistrationTokenCard />)
-    fireEvent.click(screen.getByText('Rotate token'))
+    fireEvent.click(screen.getByRole('button', { name: 'Rotate token' }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(dialog.querySelectorAll('button')[1])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rotate token' }))
 
     expect(await screen.findByText('failed to rotate registration token')).toBeTruthy()
   })

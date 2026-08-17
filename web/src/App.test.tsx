@@ -38,7 +38,7 @@ describe('App routing', () => {
 
     expect(await screen.findByRole('heading', { name: 'Pending agents page' })).toBeTruthy()
     expect(screen.getByRole('link', { name: /Agents/ }).getAttribute('aria-current')).toBe('page')
-    expect(screen.getByRole('link', { name: 'Fleet Cluster overview' }).getAttribute('aria-current')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Fleet' }).getAttribute('aria-current')).toBeNull()
     expect(screen.getAllByRole('main')).toHaveLength(1)
   })
 

@@ -1,19 +1,20 @@
-import { useMemo } from 'react';
-import { Network } from 'lucide-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import type { ServiceInfo } from '@/types/resources';
-import { ResourceState, ResourceTablePanel, ResourceTableSkeleton } from './ResourceTabState';
+import { useMemo } from 'react'
+import { Label, Text } from '@primer/react'
+import { GlobeIcon } from '@primer/octicons-react'
+
+import type { ServiceInfo } from '../../types/resources'
+import { ResourceState, ResourceTablePanel, ResourceTableSkeleton } from './ResourceTabState'
+import styles from './resource.module.css'
 
 interface ServicesTabProps {
-  services: ServiceInfo[];
-  loading: boolean;
-  error: string | null;
-  search: string;
+  services: ServiceInfo[]
+  loading: boolean
+  error: string | null
+  search: string
 }
 
 export function ServicesTab({ services, loading, error, search }: ServicesTabProps) {
-  const query = search.trim().toLowerCase();
+  const query = search.trim().toLowerCase()
   const filtered = useMemo(
     () =>
       services.filter((service) =>
@@ -26,13 +27,13 @@ export function ServicesTab({ services, loading, error, search }: ServicesTabPro
         ].some((value) => value.toLowerCase().includes(query)),
       ),
     [services, query],
-  );
+  )
 
   if (error) {
-    return <ResourceState kind="error" title="Unable to load services" description={error} />;
+    return <ResourceState kind="error" title="Unable to load services" description={error} />
   }
   if (loading && services.length === 0) {
-    return <ResourceTableSkeleton label="Loading services" columns={6} />;
+    return <ResourceTableSkeleton label="Loading services" columns={6} />
   }
   if (filtered.length === 0) {
     return (
@@ -45,80 +46,80 @@ export function ServicesTab({ services, loading, error, search }: ServicesTabPro
             : 'No services were returned for this namespace.'
         }
       />
-    );
+    )
   }
 
   return (
     <ResourceTablePanel label="Services" count={filtered.length} noun="service">
-      <Table className="min-w-[940px]">
-        <caption className="sr-only">Services, their types, cluster endpoints, port mappings, and age</caption>
-        <TableHeader className="bg-background">
-          <TableRow>
-            <TableHead scope="col" className="w-[24%]">Name</TableHead>
-            <TableHead scope="col">Namespace</TableHead>
-            <TableHead scope="col">Type</TableHead>
-            <TableHead scope="col">Cluster endpoint</TableHead>
-            <TableHead scope="col" className="w-[30%]">Ports</TableHead>
-            <TableHead scope="col" className="text-right">Age</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <table className={styles.table}>
+        <caption className={styles.srOnly}>Services, their types, cluster endpoints, port mappings, and age</caption>
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Namespace</th>
+            <th scope="col">Type</th>
+            <th scope="col">Cluster endpoint</th>
+            <th scope="col">Ports</th>
+            <th scope="col" className={styles.numeric}>
+              Age
+            </th>
+          </tr>
+        </thead>
+        <tbody>
           {filtered.map((service) => {
-            const headless = !service.clusterIP || service.clusterIP.toLowerCase() === 'none';
+            const headless = !service.clusterIP || service.clusterIP.toLowerCase() === 'none'
+
             return (
-              <TableRow key={`${service.namespace}/${service.name}`} className="hover:bg-blue-500/5">
-                <TableCell>
-                  <span className="flex min-w-0 items-center gap-2 font-semibold text-foreground">
-                    <Network className="h-4 w-4 shrink-0 text-blue-400" aria-hidden="true" />
-                    <span className="truncate">{service.name}</span>
+              <tr key={`${service.namespace}/${service.name}`}>
+                <td>
+                  <span className={styles.readiness}>
+                    <GlobeIcon size={16} className={styles.panelIcon} />
+                    <Text weight="semibold" className={styles.nameCell}>
+                      {service.name}
+                    </Text>
                   </span>
-                </TableCell>
-                <TableCell className="text-muted">{service.namespace}</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="border border-border bg-elevated text-foreground">
-                    {service.type || 'Unknown'}
-                  </Badge>
-                </TableCell>
-                <TableCell>
+                </td>
+                <td className={styles.muted}>{service.namespace}</td>
+                <td>
+                  <Label variant="secondary">{service.type || 'Unknown'}</Label>
+                </td>
+                <td className={`${styles.mono} ${styles.muted}`}>
                   {headless ? (
-                    <span className="text-muted">Headless</span>
+                    'Headless'
+                  ) : service.ports.length > 0 ? (
+                    service.ports.map((port, index) => (
+                      <div key={`${port.name || 'port'}-${port.port}-${index}`}>
+                        {service.clusterIP}:{port.port}
+                      </div>
+                    ))
                   ) : (
-                    <div className="space-y-1 font-mono text-xs tabular-nums">
-                      {service.ports.length > 0 ? (
-                        service.ports.map((port, index) => (
-                          <div key={`${port.name || 'port'}-${port.port}-${index}`}>
-                            {service.clusterIP}:{port.port}
-                          </div>
-                        ))
-                      ) : (
-                        <div>{service.clusterIP}</div>
-                      )}
-                    </div>
+                    service.clusterIP
                   )}
-                </TableCell>
-                <TableCell>
+                </td>
+                <td>
                   {service.ports.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className={styles.labels}>
                       {service.ports.map((port, index) => (
-                        <span
+                        <Label
                           key={`${port.name || 'port'}-${port.port}-${index}`}
-                          className="inline-flex items-center rounded border border-border bg-background px-2 py-1 font-mono text-xs tabular-nums text-muted"
+                          variant="secondary"
                           title={`${port.port} routes to target port ${port.targetPort} over ${port.protocol}`}
                         >
-                          {port.name ? `${port.name} · ` : ''}{port.port}→{port.targetPort}/{port.protocol}
-                        </span>
+                          {port.name ? `${port.name} · ` : ''}
+                          {port.port}→{port.targetPort}/{port.protocol}
+                        </Label>
                       ))}
                     </div>
                   ) : (
-                    <span className="text-muted">No ports</span>
+                    <span className={styles.muted}>No ports</span>
                   )}
-                </TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-muted">{service.age || '—'}</TableCell>
-              </TableRow>
-            );
+                </td>
+                <td className={`${styles.numeric} ${styles.muted}`}>{service.age || '—'}</td>
+              </tr>
+            )
           })}
-        </TableBody>
-      </Table>
+        </tbody>
+      </table>
     </ResourceTablePanel>
-  );
+  )
 }

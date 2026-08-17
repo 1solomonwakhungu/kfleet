@@ -1,0 +1,95 @@
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12, 12px);
+}
+
+.messages:empty {
+  display: none;
+}
+
+.flashBody {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-12, 12px);
+  align-items: center;
+}
+
+.flashBody > div {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.columns {
+  display: grid;
+  gap: var(--base-size-24, 24px);
+  margin-top: var(--base-size-24, 24px);
+}
+
+@media (min-width: 1012px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    align-items: start;
+  }
+}
+
+.listHeader {
+  display: flex;
+  gap: var(--base-size-16, 16px);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--base-size-12, 12px);
+}
+
+.block {
+  display: block;
+}
+
+.meta {
+  display: block;
+  font-size: var(--text-body-size-small, 12px);
+  color: var(--fgColor-muted);
+}
+
+.active {
+  color: var(--fgColor-success);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.actionColumn {
+  text-align: right;
+}
+
+.rowActions {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  justify-content: flex-end;
+}
+
+.invite {
+  padding: var(--base-size-20, 20px);
+}
+
+.inviteTitle {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+  margin-bottom: var(--base-size-4, 4px);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-16, 16px);
+  margin-top: var(--base-size-16, 16px);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12, 12px);
+  padding: var(--base-size-20, 20px);
+}

@@ -1,0 +1,67 @@
+.danger {
+  padding: var(--base-size-20, 20px);
+  border-color: var(--borderColor-danger-muted);
+}
+
+.card {
+  padding: var(--base-size-20, 20px);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-16, 16px);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8, 8px);
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+
+.title {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+}
+
+.description {
+  display: block;
+  max-width: 46rem;
+  color: var(--fgColor-muted);
+}
+
+.flash {
+  margin-top: var(--base-size-16, 16px);
+}
+
+.token {
+  padding: var(--base-size-16, 16px);
+  margin-top: var(--base-size-16, 16px);
+  background-color: var(--bgColor-inset);
+  border: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+.tokenRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-12, 12px);
+  align-items: center;
+  margin-top: var(--base-size-12, 12px);
+}
+
+.tokenValue {
+  flex: 1 1 20rem;
+  min-width: 0;
+  padding: var(--base-size-8, 8px) var(--base-size-12, 12px);
+  overflow-wrap: anywhere;
+  font-family: var(--fontStack-monospace, ui-monospace, monospace);
+  font-size: var(--text-body-size-small, 12px);
+  background-color: var(--bgColor-muted);
+  border-radius: var(--borderRadius-medium, 6px);
+}

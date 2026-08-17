@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kfleet · Audit log (Primer mockup)</title>
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/light.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/dark.css" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body data-page="audit" data-breadcrumb="kfleet / Administration / Audit log">
+    <div class="app" data-app>
+      <div class="main">
+        <div class="content">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">Audit log</h1>
+              <p class="page-desc">Append-only security history kept by the hub in SQLite.</p>
+            </div>
+            <div class="row">
+              <span class="field">
+                <select aria-label="Time range">
+                  <option>Last 24 hours</option>
+                  <option>Last 7 days</option>
+                  <option>Last 30 days</option>
+                </select>
+              </span>
+              <button class="btn" type="button">Export</button>
+            </div>
+          </div>
+
+          <div class="row row-wrap">
+            <label class="field" style="flex: 1 1 260px">
+              <span data-icon="search"></span>
+              <input type="search" placeholder="Search actor, action, or target" aria-label="Search audit log" />
+            </label>
+            <span class="field">
+              <select aria-label="Action">
+                <option>Action: all</option>
+                <option>agent.approve</option>
+                <option>cluster.remove</option>
+                <option>user.role_change</option>
+                <option>auth.login</option>
+              </select>
+            </span>
+          </div>
+
+          <section class="box mt-3">
+            <div class="box-header">
+              <h2 class="box-title">Events</h2>
+              <span class="counter spacer">1,284</span>
+            </div>
+            <table class="list">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Actor</th>
+                  <th>Action</th>
+                  <th>Target</th>
+                  <th>Source IP</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono muted">15:48:12</td>
+                  <td>solomon</td>
+                  <td class="mono">agent.approve</td>
+                  <td class="mono">cluster-sa-east-prod-01</td>
+                  <td class="mono">10.2.0.14</td>
+                  <td><span class="label label-success">Success</span></td>
+                </tr>
+                <tr>
+                  <td class="mono muted">15:31:40</td>
+                  <td>anika</td>
+                  <td class="mono">user.role_change</td>
+                  <td class="mono">tdiallo → read_only</td>
+                  <td class="mono">10.2.0.31</td>
+                  <td><span class="label label-success">Success</span></td>
+                </tr>
+                <tr>
+                  <td class="mono muted">14:57:02</td>
+                  <td>jmwangi</td>
+                  <td class="mono">cluster.remove</td>
+                  <td class="mono">cluster-eu-west-old-02</td>
+                  <td class="mono">10.2.4.87</td>
+                  <td><span class="label label-danger">Denied</span></td>
+                </tr>
+                <tr>
+                  <td class="mono muted">14:12:55</td>
+                  <td class="muted">unknown</td>
+                  <td class="mono">auth.login</td>
+                  <td class="mono">admin</td>
+                  <td class="mono">203.0.113.44</td>
+                  <td><span class="label label-danger">Failed</span></td>
+                </tr>
+                <tr>
+                  <td class="mono muted">13:40:09</td>
+                  <td>solomon</td>
+                  <td class="mono">token.rotate</td>
+                  <td class="mono">registration token</td>
+                  <td class="mono">10.2.0.14</td>
+                  <td><span class="label label-success">Success</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="box-row">
+              <span class="muted">Showing 5 of 1,284 events</span>
+              <div class="row spacer">
+                <button class="btn btn-sm" type="button">Previous</button>
+                <button class="btn btn-sm" type="button">Next</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <script src="assets/shell.js"></script>
+  </body>
+</html>

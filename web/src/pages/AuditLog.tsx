@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react'
-import { LoaderCircle, RefreshCw, ScrollText } from 'lucide-react'
+import { Button, Flash, Heading, Label, Select, Text, TextInput } from '@primer/react'
+import { Blankslate, SkeletonText } from '@primer/react/experimental'
+import { LogIcon, SearchIcon, SyncIcon } from '@primer/octicons-react'
 
 import { useAuth } from '../auth/AuthContext'
 import { PermissionNotice } from '../components/admin/PermissionNotice'
-import { Badge } from '../components/ui/badge'
-import { Button } from '../components/ui/button'
-import { Card, CardContent } from '../components/ui/card'
-import { Input } from '../components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { useAuditEvents } from '../hooks/useAuditEvents'
 import type { AuditEvent, AuditOutcome } from '../types/admin'
+import layout from '../styles/layout.module.css'
+import styles from './AuditLog.module.css'
 
 type OutcomeFilter = 'all' | AuditOutcome
 
@@ -40,72 +39,58 @@ export function AuditLogPage() {
 
   if (!isAdmin) {
     return (
-      <main className="mx-auto min-h-dvh max-w-[100rem] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <main className={layout.page}>
         <AuditHeader loading={false} />
-        <div className="mt-7">
-          <PermissionNotice
-            title="Admin access required"
-            description="The audit log records security-relevant actions and is restricted to admins."
-          />
-        </div>
+        <PermissionNotice
+          title="Admin access required"
+          description="The audit log records security-relevant actions and is restricted to admins."
+        />
       </main>
     )
   }
 
   return (
-    <main className="mx-auto min-h-dvh max-w-[100rem] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+    <main className={layout.page}>
       <AuditHeader loading={loading} onRefresh={() => void reload()} />
 
-      <div className="mt-6" aria-live="polite">
+      <div aria-live="polite">
         {error && (
-          <section
-            className="flex flex-col gap-3 rounded-lg bg-danger-soft p-4 text-danger sm:flex-row sm:items-center sm:justify-between"
-            role="alert"
-          >
-            <div>
-              <p className="font-semibold">Audit events could not be loaded.</p>
-              <p className="mt-1 text-sm">{error}</p>
+          <Flash variant="danger" role="alert">
+            <div className={styles.flashBody}>
+              <div>
+                <Text weight="semibold">Audit events could not be loaded.</Text>
+                <Text className={layout.pageDescription}>{error}</Text>
+              </div>
+              <Button disabled={loading} onClick={() => void reload()}>
+                Retry
+              </Button>
             </div>
-            <Button variant="outline" size="sm" disabled={loading} onClick={() => void reload()}>
-              Retry
-            </Button>
-          </section>
+          </Flash>
         )}
       </div>
 
-      <section className="mt-7" aria-busy={loading} aria-labelledby="audit-list-title">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <h2 id="audit-list-title" className="font-display text-lg font-bold">
+      <section className={styles.list} aria-busy={loading} aria-labelledby="audit-list-title">
+        <div className={styles.listHeader}>
+          <Heading as="h2" variant="small" id="audit-list-title">
             Recent activity
-          </h2>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div>
-              <label className="sr-only" htmlFor="audit-search">
-                Filter audit events
-              </label>
-              <Input
-                id="audit-search"
-                className="h-9 sm:w-64"
-                placeholder="Filter by actor, action, or target"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="sr-only" htmlFor="audit-outcome">
-                Outcome
-              </label>
-              <select
-                id="audit-outcome"
-                className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                value={outcome}
-                onChange={(event) => setOutcome(event.target.value as OutcomeFilter)}
-              >
-                <option value="all">All outcomes</option>
-                <option value="success">Success</option>
-                <option value="failure">Failure</option>
-              </select>
-            </div>
+          </Heading>
+          <div className={styles.filters}>
+            <TextInput
+              aria-label="Filter audit events"
+              placeholder="Filter by actor, action, or target"
+              leadingVisual={SearchIcon}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <Select
+              aria-label="Outcome"
+              value={outcome}
+              onChange={(event) => setOutcome(event.target.value as OutcomeFilter)}
+            >
+              <Select.Option value="all">All outcomes</Select.Option>
+              <Select.Option value="success">Success</Select.Option>
+              <Select.Option value="failure">Failure</Select.Option>
+            </Select>
           </div>
         </div>
 
@@ -113,82 +98,74 @@ export function AuditLogPage() {
           <AuditSkeleton />
         ) : filtered.length > 0 ? (
           <>
-            <Card className="ring-1 ring-inset ring-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead scope="col">When</TableHead>
-                    <TableHead scope="col">Actor</TableHead>
-                    <TableHead scope="col">Action</TableHead>
-                    <TableHead scope="col">Target</TableHead>
-                    <TableHead scope="col">Outcome</TableHead>
-                    <TableHead scope="col">Details</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((event) => (
-                    <TableRow key={event.id}>
-                      <TableCell className="whitespace-nowrap text-muted">
-                        {formatTimestamp(event.occurredAt)}
-                      </TableCell>
-                      <TableCell>
-                        <span className="block font-semibold">{event.actorUsername || 'system'}</span>
-                        {event.sourceIp && (
-                          <span className="block font-mono text-xs text-muted">{event.sourceIp}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{event.action}</TableCell>
-                      <TableCell>
-                        <span className="block text-xs text-muted">{event.targetType}</span>
-                        <span className="block break-all font-mono text-xs">{event.targetId || '—'}</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={
-                            event.outcome === 'success'
-                              ? 'bg-elevated text-healthy'
-                              : 'bg-danger-soft text-danger'
-                          }
-                        >
-                          {event.outcome}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="break-words text-muted">{event.details || '—'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
+            <div className={layout.box}>
+              <div className={layout.tableScroll}>
+                <table className={layout.table}>
+                  <thead>
+                    <tr>
+                      <th scope="col">When</th>
+                      <th scope="col">Actor</th>
+                      <th scope="col">Action</th>
+                      <th scope="col">Target</th>
+                      <th scope="col">Outcome</th>
+                      <th scope="col">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((event) => (
+                      <tr key={event.id}>
+                        <td className={`${layout.muted} ${styles.nowrap}`}>{formatTimestamp(event.occurredAt)}</td>
+                        <td>
+                          <Text weight="semibold" className={styles.block}>
+                            {event.actorUsername || 'system'}
+                          </Text>
+                          {event.sourceIp && <span className={`${styles.meta} ${layout.mono}`}>{event.sourceIp}</span>}
+                        </td>
+                        <td className={layout.mono}>{event.action}</td>
+                        <td>
+                          <span className={styles.meta}>{event.targetType}</span>
+                          <span className={`${styles.meta} ${layout.mono} ${styles.wrap}`}>
+                            {event.targetId || '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <Label variant={event.outcome === 'success' ? 'success' : 'danger'}>{event.outcome}</Label>
+                        </td>
+                        <td className={`${layout.muted} ${styles.wrap}`}>{event.details || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-            <div className="mt-4 flex items-center justify-between gap-4">
-              <span className="font-mono text-sm text-muted">
+            <div className={styles.footer}>
+              <Text size="small" className={`${layout.mono} ${layout.muted}`}>
                 {filtered.length} of {events.length} loaded
-              </span>
+              </Text>
               {hasMore && (
-                <Button variant="outline" size="sm" disabled={loading} onClick={loadMore}>
+                <Button disabled={loading} onClick={loadMore}>
                   {loading ? 'Loading…' : 'Load more'}
                 </Button>
               )}
             </div>
           </>
         ) : !error ? (
-          <Card className="ring-1 ring-inset ring-border">
-            <CardContent className="grid min-h-64 place-items-center p-6 text-center">
-              <div>
-                <span className="mx-auto grid size-12 place-items-center rounded-full bg-elevated text-muted ring-1 ring-inset ring-border">
-                  <ScrollText className="size-6" aria-hidden="true" />
-                </span>
-                <p className="mt-4 font-display text-xl font-bold">
-                  {events.length === 0 ? 'No audit events yet' : 'No events match these filters'}
-                </p>
-                <p className="mt-2 text-muted">
-                  {events.length === 0
-                    ? 'Sign-ins, user changes, agent approvals, and cluster removals will appear here.'
-                    : 'Clear the filter or choose a different outcome to see more activity.'}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className={layout.box}>
+            <Blankslate>
+              <Blankslate.Visual>
+                <LogIcon size={24} />
+              </Blankslate.Visual>
+              <Blankslate.Heading as="h3">
+                {events.length === 0 ? 'No audit events yet' : 'No events match these filters'}
+              </Blankslate.Heading>
+              <Blankslate.Description>
+                {events.length === 0
+                  ? 'Sign-ins, user changes, agent approvals, and cluster removals will appear here.'
+                  : 'Clear the filter or choose a different outcome to see more activity.'}
+              </Blankslate.Description>
+            </Blankslate>
+          </div>
         ) : null}
       </section>
     </main>
@@ -197,21 +174,17 @@ export function AuditLogPage() {
 
 function AuditHeader({ loading, onRefresh }: { loading: boolean; onRefresh?: () => void }) {
   return (
-    <header className="flex flex-col gap-5 border-b border-border pb-7 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p className="font-mono text-sm text-blue-400">kfleet admin</p>
-        <h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">Audit log</h1>
-        <p className="mt-2 max-w-2xl text-muted">
+    <header className={layout.pageHeader}>
+      <div className={layout.pageHeaderText}>
+        <Heading as="h1" variant="large">
+          Audit log
+        </Heading>
+        <Text className={layout.pageDescription}>
           An immutable record of security-relevant actions, newest first.
-        </p>
+        </Text>
       </div>
       {onRefresh && (
-        <Button variant="outline" size="sm" disabled={loading} onClick={onRefresh}>
-          {loading ? (
-            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <RefreshCw className="size-4" aria-hidden="true" />
-          )}
+        <Button leadingVisual={SyncIcon} disabled={loading} onClick={onRefresh}>
           {loading ? 'Refreshing…' : 'Refresh'}
         </Button>
       )}
@@ -221,16 +194,12 @@ function AuditHeader({ loading, onRefresh }: { loading: boolean; onRefresh?: () 
 
 function AuditSkeleton() {
   return (
-    <Card className="animate-pulse p-5 ring-1 ring-inset ring-border" aria-label="Loading audit events">
-      <div className="h-5 w-48 rounded bg-elevated" />
+    <div className={`${layout.box} ${styles.skeleton}`} aria-label="Loading audit events">
+      <SkeletonText size="titleSmall" maxWidth="14rem" />
       {Array.from({ length: 4 }, (_, index) => (
-        <div key={index} className="mt-5 flex items-center gap-6 border-t border-border pt-5">
-          <div className="h-6 w-1/4 rounded bg-elevated" />
-          <div className="h-6 w-1/3 rounded bg-elevated" />
-          <div className="h-6 w-1/5 rounded bg-elevated" />
-        </div>
+        <SkeletonText key={index} size="bodyMedium" maxWidth="85%" />
       ))}
-    </Card>
+    </div>
   )
 }
 

@@ -1,0 +1,44 @@
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+}
+
+.refreshNote {
+  display: none;
+}
+
+@media (min-width: 1012px) {
+  .refreshNote {
+    display: inline;
+  }
+}
+
+.flash {
+  margin-top: var(--base-size-16, 16px);
+}
+
+.flashBody {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-12, 12px);
+  align-items: center;
+}
+
+.flashBody > div {
+  min-width: 0;
+  flex: 1 1 20rem;
+}
+
+.inventory {
+  margin-top: var(--base-size-24, 24px);
+}
+
+.inventoryHeader {
+  display: flex;
+  gap: var(--base-size-16, 16px);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--base-size-12, 12px);
+}
