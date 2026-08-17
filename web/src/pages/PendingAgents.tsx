@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, LoaderCircle, RefreshCw, ShieldCheck } from 'lucide-react'
 
 import { PendingAgentTable } from '../components/agents/PendingAgentTable'
+import { RegistrationTokenCard } from '../components/admin/RegistrationTokenCard'
 import { useAuth } from '../auth/AuthContext'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
@@ -190,6 +191,10 @@ function PendingAgentsPage() {
             </CardContent>
           </Card>
         ) : null}
+      </section>
+
+      <section className="mt-7">
+        <RegistrationTokenCard />
       </section>
     </main>
   )

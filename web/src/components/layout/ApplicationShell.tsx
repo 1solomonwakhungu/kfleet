@@ -8,6 +8,7 @@ import { cn } from '../../lib/utils'
 import { api, type RuntimeInfo } from '../../lib/api'
 import {
   PrimaryNavigation,
+  adminNavigationItems,
   primaryNavigationItems,
   readOnlyNavigationItems,
 } from '../navigation/PrimaryNavigation'
@@ -18,10 +19,11 @@ export function ApplicationShell() {
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
   const [runtime, setRuntime] = useState<RuntimeInfo | null>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
-  const navigationItems = useMemo(
-    () => (runtime?.readOnly ? readOnlyNavigationItems : primaryNavigationItems),
-    [runtime?.readOnly],
-  )
+  const navigationItems = useMemo(() => {
+    if (runtime?.readOnly) return readOnlyNavigationItems
+    if (user?.role === 'admin') return [...primaryNavigationItems, ...adminNavigationItems]
+    return primaryNavigationItems
+  }, [runtime?.readOnly, user?.role])
 
   useEffect(() => {
     const controller = new AbortController()

@@ -34,7 +34,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   return request<T>('GET', path, undefined, signal);
 }
 
-async function request<T>(method: string, path: string, payload?: unknown, signal?: AbortSignal): Promise<T> {
+export async function request<T>(method: string, path: string, payload?: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: {
@@ -158,4 +158,7 @@ export const api = {
   getPolicyResults: (signal?: AbortSignal) => get<PolicyResultsResponse>('/policies/results', signal),
   getClusterPolicyResults: (id: string, signal?: AbortSignal) =>
     get<PolicyResultsResponse>(clusterPath(id, '/policy-results'), signal),
+  // Backed by DELETE /api/v1/clusters/{id}; requires the operator role and
+  // responds 204 with no body.
+  deleteCluster: (id: string, signal?: AbortSignal) => request<void>('DELETE', clusterPath(id), undefined, signal),
 };
