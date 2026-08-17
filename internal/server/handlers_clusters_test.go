@@ -2,7 +2,9 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -79,6 +81,75 @@ func TestRegisterClusterRejectsEmptyName(t *testing.T) {
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusBadRequest)
+	}
+}
+
+// TestRegisterClusterIssuesUsableAgentToken proves the operator registration
+// path hands back a real credential: the returned token authenticates a
+// subsequent agent snapshot post without a separate approval step.
+func TestRegisterClusterIssuesUsableAgentToken(t *testing.T) {
+	server := newTestHTTPServer(t)
+
+	registered := request(t, server, http.MethodPost, "/api/v1/clusters/register", `{"name":"production"}`)
+	if registered.StatusCode != http.StatusCreated {
+		registered.Body.Close()
+		t.Fatalf("register status = %d, want %d", registered.StatusCode, http.StatusCreated)
+	}
+	var registration api.RegisterClusterResponse
+	decodeResponse(t, registered, &registration)
+	if len(registration.Token) != 64 {
+		t.Fatalf("token = %q, want 64 hex characters", registration.Token)
+	}
+
+	snapshot := agentRequest(t, server, http.MethodPost, "/api/v1/clusters/"+registration.ClusterID+"/status", registration.Token, snapshotPayload())
+	defer snapshot.Body.Close()
+	if snapshot.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(snapshot.Body)
+		t.Fatalf("snapshot status = %d, want %d: %s", snapshot.StatusCode, http.StatusOK, body)
+	}
+
+	wrong := agentRequest(t, server, http.MethodPost, "/api/v1/clusters/"+registration.ClusterID+"/status", registration.Token+"0", snapshotPayload())
+	defer wrong.Body.Close()
+	if wrong.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("tampered token status = %d, want %d", wrong.StatusCode, http.StatusUnauthorized)
+	}
+}
+
+// TestRegisterClusterIssuesDistinctTokens guards against a reintroduced
+// static placeholder credential.
+func TestRegisterClusterIssuesDistinctTokens(t *testing.T) {
+	server := newTestHTTPServer(t)
+
+	first := request(t, server, http.MethodPost, "/api/v1/clusters/register", `{"name":"alpha"}`)
+	var alpha api.RegisterClusterResponse
+	decodeResponse(t, first, &alpha)
+	second := request(t, server, http.MethodPost, "/api/v1/clusters/register", `{"name":"beta"}`)
+	var beta api.RegisterClusterResponse
+	decodeResponse(t, second, &beta)
+
+	if alpha.Token == "" || alpha.Token == beta.Token {
+		t.Fatalf("tokens = (%q, %q), want distinct non-empty tokens", alpha.Token, beta.Token)
+	}
+}
+
+// TestRegisterClusterPersistsOnlyTokenHash asserts the raw token never
+// reaches durable storage: only its SHA-256 digest validates.
+func TestRegisterClusterPersistsOnlyTokenHash(t *testing.T) {
+	server, st := newTestHTTPServerWithStore(t)
+
+	registered := request(t, server, http.MethodPost, "/api/v1/clusters/register", `{"name":"production"}`)
+	var registration api.RegisterClusterResponse
+	decodeResponse(t, registered, &registration)
+
+	if _, err := st.ValidateAgentToken(context.Background(), registration.ClusterID, registration.Token); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("ValidateAgentToken(raw) error = %v, want %v", err, store.ErrNotFound)
+	}
+	approved, err := st.ValidateAgentToken(context.Background(), registration.ClusterID, hashToken(registration.Token))
+	if err != nil {
+		t.Fatalf("ValidateAgentToken(hash) error = %v", err)
+	}
+	if !approved {
+		t.Fatal("operator-registered cluster agent = pending, want approved")
 	}
 }
 
@@ -276,6 +347,12 @@ func assertResourceList[T any](t *testing.T, server *httptest.Server, path strin
 
 func newTestHTTPServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	server, _ := newTestHTTPServerWithStore(t)
+	return server
+}
+
+func newTestHTTPServerWithStore(t *testing.T) (*httptest.Server, store.Store) {
+	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "kfleet.db"))
 	if err != nil {
 		t.Fatalf("store.Open() error = %v", err)
@@ -290,7 +367,7 @@ func newTestHTTPServer(t *testing.T) *httptest.Server {
 		}
 	})
 	registerDefaultSession(httpServer, st, sessionCookieFor(t, st, types.RoleAdmin))
-	return httpServer
+	return httpServer, st
 }
 
 // request issues an HTTP request against server using its default admin
