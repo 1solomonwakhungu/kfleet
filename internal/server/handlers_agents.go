@@ -25,6 +25,9 @@ import (
 // user session cookies, since agents are not hub users. Endpoints that
 // expose or approve pending agents to a human operator require an
 // authenticated hub session with sufficient role.
+// GET /api/v1/agents/{id}/logs is the agent's outbound log channel: it
+// authenticates with the same per-agent bearer token and gives the hub a
+// way to request pod logs from a cluster it cannot reach directly.
 func (s *Server) registerAgentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/agents/register", s.handleAgentRegister)
 	mux.HandleFunc("POST /api/v1/agents/{id}/approve", s.requireRole(types.RoleOperator, s.handleAgentApprove))
@@ -32,6 +35,7 @@ func (s *Server) registerAgentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/agents/heartbeat", s.handleHeartbeat)
 	mux.HandleFunc("POST /api/v1/agents/{id}/heartbeat", s.handleAgentLiveness)
 	mux.HandleFunc("POST /api/v1/agents/{id}/deregister", s.handleAgentDeregister)
+	mux.HandleFunc("GET /api/v1/agents/{id}/logs", s.handleAgentLogStream)
 }
 
 func (s *Server) handleAgentLiveness(w http.ResponseWriter, r *http.Request) {

@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, Eraser, Loader2, Search, SquareTerminal, Wifi, WifiOff, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, Eraser, Loader2, RefreshCw, Search, SquareTerminal, Wifi, WifiOff, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,26 @@ import { Input } from '@/components/ui/input';
 import { usePodLogs } from '@/hooks/usePodLogs';
 import { cn } from '@/lib/utils';
 import type { PodInfo } from '@/types/resources';
+import type { PodLogStatus } from '@/hooks/usePodLogs';
 import { ResourceState } from './ResourceTabState';
+
+const STREAM_LABELS: Record<PodLogStatus, string> = {
+  idle: 'Idle',
+  connecting: 'Connecting',
+  streaming: 'Streaming',
+  reconnecting: 'Reconnecting',
+  ended: 'Stream ended',
+  unavailable: 'Unavailable',
+};
+
+const STREAM_ICONS: Record<PodLogStatus, typeof Wifi> = {
+  idle: SquareTerminal,
+  connecting: Loader2,
+  streaming: Wifi,
+  reconnecting: WifiOff,
+  ended: SquareTerminal,
+  unavailable: AlertTriangle,
+};
 
 interface LogsTabProps {
   clusterId: string;
@@ -24,7 +43,7 @@ export function LogsTab({ clusterId, pods, selectedPod, onSelectPod }: LogsTabPr
   const podSelectId = useId();
   const logFilterId = useId();
 
-  const { lines, connected, error, clear } = usePodLogs({
+  const { lines, status: streamStatus, error, clear, retry } = usePodLogs({
     clusterId,
     namespace: selectedPod?.namespace ?? '',
     pod: selectedPod?.name ?? '',
@@ -59,8 +78,19 @@ export function LogsTab({ clusterId, pods, selectedPod, onSelectPod }: LogsTabPr
     );
   }
 
-  const status = connected ? 'Streaming' : error ? 'Reconnecting' : selectedPod ? 'Connecting' : 'Idle';
-  const StatusIcon = connected ? Wifi : error ? WifiOff : selectedPod ? Loader2 : SquareTerminal;
+  const status = STREAM_LABELS[streamStatus];
+  const StatusIcon = STREAM_ICONS[streamStatus];
+  const unavailable = streamStatus === 'unavailable';
+  const statusTone =
+    streamStatus === 'streaming'
+      ? 'text-emerald-300'
+      : unavailable
+        ? 'text-red-300'
+        : streamStatus === 'reconnecting'
+          ? 'text-amber-300'
+          : streamStatus === 'connecting'
+            ? 'text-blue-300'
+            : 'text-muted';
 
   return (
     <section aria-label="Pod log viewer" className="overflow-hidden rounded-lg border border-border bg-surface">
@@ -176,19 +206,27 @@ export function LogsTab({ clusterId, pods, selectedPod, onSelectPod }: LogsTabPr
 
       <div className="flex min-h-11 flex-wrap items-center justify-between gap-2 border-b border-border bg-background px-4 py-2 text-xs">
         <div
-          className={cn(
-            'flex items-center gap-2 font-medium',
-            connected ? 'text-emerald-300' : error ? 'text-amber-300' : selectedPod ? 'text-blue-300' : 'text-muted',
-          )}
+          className={cn('flex items-center gap-2 font-medium', statusTone)}
           role="status"
           aria-live="polite"
         >
           <StatusIcon
-            className={cn('h-3.5 w-3.5', selectedPod && !connected && !error && 'animate-spin')}
+            className={cn('h-3.5 w-3.5', streamStatus === 'connecting' && 'animate-spin')}
             aria-hidden="true"
           />
           <span>{status}</span>
           {error && <span className="font-normal text-muted">— {error}</span>}
+          {unavailable && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={retry}
+              className="h-7 border-border px-2 text-xs hover:border-blue-500/50 hover:text-blue-200"
+            >
+              <RefreshCw className="h-3 w-3" aria-hidden="true" />
+              Retry
+            </Button>
+          )}
         </div>
         <div className="flex items-center gap-3 font-mono tabular-nums text-muted">
           {query && <span>{visibleLines.length} matches</span>}
@@ -213,18 +251,40 @@ export function LogsTab({ clusterId, pods, selectedPod, onSelectPod }: LogsTabPr
             </div>
           ) : lines.length === 0 ? (
             <div className="flex min-h-72 flex-col items-center justify-center gap-3 text-center text-muted">
-              {error ? (
+              {unavailable ? (
+                <AlertTriangle className="h-8 w-8 text-red-300" aria-hidden="true" />
+              ) : error ? (
                 <AlertTriangle className="h-8 w-8 text-amber-300" aria-hidden="true" />
               ) : (
                 <SquareTerminal className="h-8 w-8 text-blue-400" aria-hidden="true" />
               )}
               <div>
                 <p className="font-sans text-sm font-semibold text-foreground">
-                  {error ? 'Waiting for the log stream' : 'No log output yet'}
+                  {unavailable
+                    ? 'Log streaming is unavailable'
+                    : error
+                      ? 'Waiting for the log stream'
+                      : streamStatus === 'ended'
+                        ? 'No log output'
+                        : 'No log output yet'}
                 </p>
                 <p className="mt-1 max-w-md font-sans text-sm">
-                  {error || 'The stream is connected; new output will appear here as the pod writes it.'}
+                  {error ||
+                    (streamStatus === 'ended'
+                      ? 'The pod produced no output for this stream.'
+                      : 'The stream is connected; new output will appear here as the pod writes it.')}
                 </p>
+                {unavailable && (
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={retry}
+                    className="mt-3 border-border hover:border-blue-500/50 hover:text-blue-200"
+                  >
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                    Try again
+                  </Button>
+                )}
               </div>
             </div>
           ) : visibleLines.length === 0 ? (
