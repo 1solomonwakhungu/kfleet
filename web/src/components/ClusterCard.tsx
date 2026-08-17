@@ -1,21 +1,15 @@
-import { ArrowUpRight, Clock3 } from 'lucide-react'
+import { Label, Text } from '@primer/react'
+import { ArrowUpRightIcon, ClockIcon } from '@primer/octicons-react'
 
-import { HealthBadge } from './HealthBadge'
+import { HealthLabel } from './HealthLabel'
 import { StatusDot } from './StatusDot'
-import { Card, CardContent, CardHeader } from './ui/card'
-import { cn, timeAgo } from '../lib/utils'
-import type { Cluster, ClusterHealth } from '../types/cluster'
+import { timeAgo } from '../lib/utils'
+import type { Cluster } from '../types/cluster'
+import styles from './ClusterCard.module.css'
 
 interface ClusterCardProps {
   cluster: Cluster
   onClick: () => void
-}
-
-const borderClasses: Record<ClusterHealth, string> = {
-  healthy: 'border-l-healthy',
-  degraded: 'border-l-degraded',
-  unreachable: 'border-l-unreachable',
-  unknown: 'border-l-unknown',
 }
 
 function heartbeatDetails(value: string) {
@@ -47,80 +41,67 @@ export function ClusterCard({ cluster, onClick }: ClusterCardProps) {
   return (
     <button
       type="button"
-      className="group block h-full w-full rounded-lg text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+      className={`${styles.card} ${styles[cluster.health]}`}
       aria-label={`Open ${cluster.name} cluster, health ${cluster.health}`}
       onClick={onClick}
     >
-      <Card
-        className={cn(
-          'h-full border border-l-2 border-border transition-[box-shadow] duration-200 ease-out group-hover:ring-1 group-hover:ring-blue-500/50 group-active:ring-2 group-active:ring-blue-500/70',
-          borderClasses[cluster.health],
-        )}
-      >
-        <CardHeader className="flex-row items-start justify-between gap-3 pb-4">
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
+      <div className={styles.body}>
+        <div>
+          <div className={styles.heading}>
+            <span className={styles.name}>
               <StatusDot health={cluster.health} />
-              <h3 className="truncate font-display text-lg font-bold tracking-tight" title={cluster.name}>
+              <span className={styles.clusterName} title={cluster.name}>
                 {cluster.name}
-              </h3>
-            </div>
-            {cluster.id !== cluster.name && (
-              <p className="mt-1 truncate font-mono text-xs text-muted" title={cluster.id}>
-                {cluster.id}
-              </p>
-            )}
-          </div>
-          <HealthBadge health={cluster.health} />
-        </CardHeader>
-
-        <CardContent>
-          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-border">
-            <Metric label="Nodes" value={cluster.nodeCount.toLocaleString()} />
-            <Metric label="Pods" value={cluster.podCount.toLocaleString()} />
-            <Metric label="Kubernetes" value={cluster.k8sVersion || 'Unknown'} mono />
-            <Metric label="Agent" value={cluster.agentVersion || 'Unknown'} mono />
-          </dl>
-
-          <div className="mt-4 min-h-[3.5rem]">
-            <p className="text-xs font-semibold text-muted">Labels</p>
-            {visibleLabels.length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-1.5" aria-label={`${labels.length} cluster labels`}>
-                {visibleLabels.map(([key, value]) => (
-                  <span
-                    key={key}
-                    className="max-w-full truncate rounded border border-border bg-background px-2 py-1 font-mono text-[11px] text-muted"
-                    title={`${key}=${value}`}
-                  >
-                    <span className="text-foreground">{key}</span>={value}
-                  </span>
-                ))}
-                {hiddenLabelCount > 0 && (
-                  <span className="rounded border border-border bg-background px-2 py-1 font-mono text-[11px] text-muted">
-                    +{hiddenLabelCount}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <p className="mt-2 text-xs text-muted">No labels reported</p>
-            )}
-          </div>
-
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
-            <div className="flex min-w-0 items-center gap-2 text-xs text-muted">
-              <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="truncate">
-                <span className="font-semibold text-foreground">{heartbeat.freshness}</span>
-                {' · '}
-                <time dateTime={heartbeat.dateTime} title={heartbeat.exact}>
-                  {heartbeat.relative}
-                </time>
               </span>
-            </div>
-            <ArrowUpRight className="h-4 w-4 shrink-0 text-blue-400" aria-hidden="true" />
+            </span>
+            <HealthLabel health={cluster.health} />
           </div>
-        </CardContent>
-      </Card>
+          {cluster.id !== cluster.name && (
+            <span className={styles.identifier} title={cluster.id}>
+              {cluster.id}
+            </span>
+          )}
+        </div>
+
+        <dl className={styles.metrics}>
+          <Metric label="Nodes" value={cluster.nodeCount.toLocaleString()} />
+          <Metric label="Pods" value={cluster.podCount.toLocaleString()} />
+          <Metric label="Kubernetes" value={cluster.k8sVersion || 'Unknown'} mono />
+          <Metric label="Agent" value={cluster.agentVersion || 'Unknown'} mono />
+        </dl>
+
+        <div>
+          <span className={styles.caption}>Labels</span>
+          {visibleLabels.length > 0 ? (
+            <div className={styles.labels} aria-label={`${labels.length} cluster labels`}>
+              {visibleLabels.map(([key, value]) => (
+                <Label key={key} variant="secondary" title={`${key}=${value}`}>
+                  {key}={value}
+                </Label>
+              ))}
+              {hiddenLabelCount > 0 && <Label variant="secondary">+{hiddenLabelCount}</Label>}
+            </div>
+          ) : (
+            <div className={styles.labels}>
+              <span className={styles.caption}>No labels reported</span>
+            </div>
+          )}
+        </div>
+
+        <div className={styles.footer}>
+          <span className={styles.heartbeat}>
+            <ClockIcon size={12} />
+            <span className={styles.clusterName}>
+              <Text weight="semibold">{heartbeat.freshness}</Text>
+              {' · '}
+              <time dateTime={heartbeat.dateTime} title={heartbeat.exact}>
+                {heartbeat.relative}
+              </time>
+            </span>
+          </span>
+          <ArrowUpRightIcon size={16} className={styles.arrow} />
+        </div>
+      </div>
     </button>
   )
 }
@@ -133,9 +114,9 @@ interface MetricProps {
 
 function Metric({ label, value, mono = false }: MetricProps) {
   return (
-    <div className="min-w-0 bg-surface px-3 py-3 group-hover:bg-elevated">
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className={cn('mt-1 truncate text-base font-bold tabular-nums', mono && 'font-mono text-xs')} title={value}>
+    <div className={styles.metric}>
+      <dt>{label}</dt>
+      <dd className={mono ? styles.metricMono : undefined} title={value}>
         {value}
       </dd>
     </div>

@@ -248,6 +248,15 @@ The hub never remediates policy findings. Multi-tenant installations scope agent
 
 ## Development
 
+The web UI is a React single-page app in `web/`, built with
+[Primer](https://primer.style) — GitHub's design system. Components come from
+`@primer/react` and `@primer/octicons-react`, and all colors, spacing, and radii
+resolve to `@primer/primitives` design tokens, so the interface supports both
+the light and dark Primer themes. Application-specific layout lives in CSS
+modules next to each component; avoid hardcoded colors and sizes there and use
+the primitives custom properties (`--bgColor-*`, `--fgColor-*`, `--base-size-*`)
+instead.
+
 Prerequisites:
 
 - Go 1.23 or newer

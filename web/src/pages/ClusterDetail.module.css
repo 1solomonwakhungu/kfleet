@@ -1,0 +1,61 @@
+.flash {
+  margin-top: var(--base-size-16, 16px);
+}
+
+.flashBody {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-12, 12px);
+  align-items: center;
+}
+
+.flashBody > div {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.flashDetail {
+  margin: var(--base-size-4, 4px) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.overview {
+  margin-top: var(--base-size-20, 20px);
+}
+
+.resources {
+  margin-top: var(--base-size-32, 32px);
+}
+
+.resourcesHeading {
+  margin-bottom: var(--base-size-12, 12px);
+}
+
+.tabsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-12, 12px);
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.tabs {
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+  padding-bottom: var(--base-size-8, 8px);
+}
+
+.tabPanel {
+  margin-top: var(--base-size-16, 16px);
+}
+
+.danger {
+  margin-top: var(--base-size-40, 40px);
+}

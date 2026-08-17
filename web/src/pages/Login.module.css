@@ -1,0 +1,55 @@
+.page {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--base-size-24, 24px);
+  background-color: var(--bgColor-inset);
+}
+
+.card {
+  width: 100%;
+  max-width: 24rem;
+  padding: var(--base-size-24, 24px);
+  background-color: var(--bgColor-default);
+  border: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+.brand {
+  display: flex;
+  gap: var(--base-size-12, 12px);
+  align-items: center;
+  margin-bottom: var(--base-size-24, 24px);
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: var(--base-size-40, 40px);
+  height: var(--base-size-40, 40px);
+  color: var(--fgColor-onEmphasis);
+  background-color: var(--bgColor-accent-emphasis);
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+.brandSub {
+  display: block;
+  font-size: var(--text-body-size-small, 12px);
+  color: var(--fgColor-muted);
+}
+
+.title {
+  margin-bottom: var(--base-size-4, 4px);
+}
+
+.subtitle {
+  display: block;
+  color: var(--fgColor-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-16, 16px);
+  margin-top: var(--base-size-24, 24px);
+}

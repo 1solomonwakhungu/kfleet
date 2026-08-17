@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CheckCircle2, LoaderCircle, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Button, Flash, Heading, Text } from '@primer/react'
+import { Blankslate, SkeletonText } from '@primer/react/experimental'
+import { CheckCircleIcon, ShieldCheckIcon, SyncIcon } from '@primer/octicons-react'
 
 import { PendingAgentTable } from '../components/agents/PendingAgentTable'
 import { RegistrationTokenCard } from '../components/admin/RegistrationTokenCard'
 import { useAuth } from '../auth/AuthContext'
-import { Button } from '../components/ui/button'
-import { Card, CardContent } from '../components/ui/card'
 import {
   approvePendingAgent,
   getPendingAgents,
   type PendingAgent,
 } from '../lib/pendingAgentsApi'
+import layout from '../styles/layout.module.css'
+import styles from './PendingAgents.module.css'
 
 function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
@@ -105,66 +107,58 @@ function PendingAgentsPage() {
   const initialLoading = loading && agents.length === 0 && !loadError
 
   return (
-    <main className="mx-auto min-h-dvh max-w-[100rem] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-      <header className="flex flex-col gap-5 border-b border-border pb-7 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="font-mono text-sm text-blue-400">kfleet access</p>
-          <h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">Pending agents</h1>
-          <p className="mt-2 max-w-2xl text-muted">
+    <main className={layout.page}>
+      <header className={layout.pageHeader}>
+        <div className={layout.pageHeaderText}>
+          <Heading as="h1" variant="large">
+            Pending agents
+          </Heading>
+          <Text className={layout.pageDescription}>
             Review agent identity and cluster metadata before granting fleet access.
-          </p>
+          </Text>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={loading}
-          onClick={() => void loadAgents()}
-        >
-          {loading ? (
-            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <RefreshCw className="size-4" aria-hidden="true" />
-          )}
+        <Button leadingVisual={SyncIcon} disabled={loading} onClick={() => void loadAgents()}>
           {loading ? 'Refreshing…' : 'Refresh'}
         </Button>
       </header>
 
-      <div className="mt-6 space-y-4" aria-live="polite">
+      <div className={styles.messages} aria-live="polite">
         {loadError && (
-          <section
-            className="flex flex-col gap-3 rounded-lg bg-danger-soft p-4 text-danger sm:flex-row sm:items-center sm:justify-between"
-            role="alert"
-          >
-            <div>
-              <p className="font-semibold">Pending agents could not be loaded.</p>
-              <p className="mt-1 text-sm">{loadError}</p>
+          <Flash variant="danger" role="alert">
+            <div className={styles.flashBody}>
+              <div>
+                <Text weight="semibold">Pending agents could not be loaded.</Text>
+                <Text className={layout.pageDescription}>{loadError}</Text>
+              </div>
+              <Button disabled={loading} onClick={() => void loadAgents()}>
+                Retry
+              </Button>
             </div>
-            <Button variant="outline" size="sm" disabled={loading} onClick={() => void loadAgents()}>
-              Retry
-            </Button>
-          </section>
+          </Flash>
         )}
 
         {successMessage && (
-          <section className="flex items-start gap-3 rounded-lg bg-blue-950 p-4 text-blue-100 ring-1 ring-inset ring-blue-800" role="status">
-            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-blue-400" aria-hidden="true" />
-            <div>
-              <p className="font-semibold">Approval complete</p>
-              <p className="mt-1 text-sm text-blue-200">{successMessage}</p>
+          <Flash variant="success" role="status">
+            <div className={styles.flashBody}>
+              <CheckCircleIcon size={16} />
+              <div>
+                <Text weight="semibold">Approval complete</Text>
+                <Text className={layout.pageDescription}>{successMessage}</Text>
+              </div>
             </div>
-          </section>
+          </Flash>
         )}
       </div>
 
-      <section className="mt-7" aria-busy={loading} aria-labelledby="pending-list-title">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 id="pending-list-title" className="font-display text-lg font-bold">
+      <section className={styles.list} aria-busy={loading} aria-labelledby="pending-list-title">
+        <div className={styles.listHeader}>
+          <Heading as="h2" variant="small" id="pending-list-title">
             Awaiting review
-          </h2>
+          </Heading>
           {!initialLoading && (
-            <span className="font-mono text-sm text-muted">
+            <Text size="small" className={`${layout.mono} ${layout.muted}`}>
               {agents.length} {agents.length === 1 ? 'agent' : 'agents'}
-            </span>
+            </Text>
           )}
         </div>
 
@@ -179,21 +173,21 @@ function PendingAgentsPage() {
             onApprove={(agent) => void approve(agent)}
           />
         ) : !loadError ? (
-          <Card className="ring-1 ring-inset ring-border">
-            <CardContent className="grid min-h-64 place-items-center p-6 text-center">
-              <div>
-                <span className="mx-auto grid size-12 place-items-center rounded-full bg-blue-950 text-blue-400 ring-1 ring-inset ring-blue-800">
-                  <ShieldCheck className="size-6" aria-hidden="true" />
-                </span>
-                <p className="mt-4 font-display text-xl font-bold">No agents awaiting approval</p>
-                <p className="mt-2 text-muted">New agent registrations will appear here for review.</p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className={layout.box}>
+            <Blankslate>
+              <Blankslate.Visual>
+                <ShieldCheckIcon size={24} />
+              </Blankslate.Visual>
+              <Blankslate.Heading as="h3">No agents awaiting approval</Blankslate.Heading>
+              <Blankslate.Description>
+                New agent registrations will appear here for review.
+              </Blankslate.Description>
+            </Blankslate>
+          </div>
         ) : null}
       </section>
 
-      <section className="mt-7">
+      <section className={styles.token}>
         <RegistrationTokenCard />
       </section>
     </main>
@@ -202,15 +196,12 @@ function PendingAgentsPage() {
 
 function PendingAgentsSkeleton() {
   return (
-    <Card className="animate-pulse p-5 ring-1 ring-inset ring-border" aria-label="Loading pending agents">
-      <div className="h-5 w-40 rounded bg-elevated" />
+    <div className={`${layout.box} ${styles.skeleton}`} aria-label="Loading pending agents">
+      <SkeletonText size="titleSmall" maxWidth="12rem" />
       {Array.from({ length: 3 }, (_, index) => (
-        <div key={index} className="mt-5 flex items-center justify-between gap-6 border-t border-border pt-5">
-          <div className="h-10 w-1/3 rounded bg-elevated" />
-          <div className="h-9 w-24 rounded bg-elevated" />
-        </div>
+        <SkeletonText key={index} size="bodyMedium" maxWidth="80%" />
       ))}
-    </Card>
+    </div>
   )
 }
 

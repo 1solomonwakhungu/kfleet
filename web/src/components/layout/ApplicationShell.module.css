@@ -1,0 +1,192 @@
+.shell {
+  min-height: 100dvh;
+  background-color: var(--bgColor-inset);
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--base-size-256, 256px) minmax(0, 1fr);
+}
+
+@media (max-width: 767px) {
+  .shell {
+    display: block;
+  }
+}
+
+.skipLink {
+  position: fixed;
+  top: var(--base-size-16, 16px);
+  left: var(--base-size-16, 16px);
+  z-index: 100;
+  padding: var(--base-size-8, 8px) var(--base-size-16, 16px);
+  color: var(--fgColor-onEmphasis);
+  background-color: var(--bgColor-accent-emphasis);
+  border-radius: var(--borderRadius-medium, 6px);
+  transform: translateY(-200%);
+}
+
+.skipLink:focus {
+  transform: translateY(0);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: var(--base-size-12, 12px);
+  background-color: var(--bgColor-default);
+  border-right: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+}
+
+@media (max-width: 767px) {
+  .sidebar {
+    display: none;
+  }
+}
+
+.brand {
+  display: flex;
+  gap: var(--base-size-12, 12px);
+  align-items: center;
+  padding: var(--base-size-8, 8px);
+  margin-bottom: var(--base-size-8, 8px);
+  color: var(--fgColor-default);
+  text-decoration: none;
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+.brand:hover {
+  background-color: var(--control-transparent-bgColor-hover, var(--bgColor-muted));
+}
+
+.brandMark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--base-size-32, 32px);
+  height: var(--base-size-32, 32px);
+  color: var(--fgColor-onEmphasis);
+  background-color: var(--bgColor-accent-emphasis);
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+.sidebarScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sidebarFooter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8, 8px);
+  padding-top: var(--base-size-12, 12px);
+  margin-top: auto;
+  border-top: var(--borderWidth-thin, 1px) solid var(--borderColor-muted);
+}
+
+.footerCard {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--base-size-8, 8px);
+  background-color: var(--bgColor-inset);
+  border: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+.footerLabel {
+  display: block;
+  font-size: var(--text-body-size-small, 12px);
+  color: var(--fgColor-muted);
+}
+
+.identity {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--base-size-28, 28px);
+  height: var(--base-size-28, 28px);
+  font-size: var(--text-body-size-small, 12px);
+  font-weight: var(--base-text-weight-semibold, 600);
+  color: var(--fgColor-onEmphasis);
+  background-color: var(--bgColor-neutral-emphasis);
+  border-radius: var(--borderRadius-full, 999px);
+}
+
+.identityName {
+  display: block;
+  overflow: hidden;
+  font-weight: var(--base-text-weight-semibold, 600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: var(--base-size-12, 12px);
+  align-items: center;
+  padding: var(--base-size-8, 8px) var(--base-size-16, 16px);
+  background-color: var(--bgColor-default);
+  border-bottom: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+}
+
+.topbarActions {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+  margin-left: auto;
+}
+
+.mobileOnly {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .mobileOnly {
+    display: inline-flex;
+  }
+}
+
+.mobileNav {
+  display: none;
+  padding: var(--base-size-8, 8px) var(--base-size-12, 12px) var(--base-size-16, 16px);
+  background-color: var(--bgColor-default);
+  border-bottom: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+}
+
+@media (max-width: 767px) {
+  .mobileNav {
+    display: block;
+  }
+}
+
+.main {
+  min-width: 0;
+}
+
+.demoNotice {
+  padding: var(--base-size-12, 12px) var(--base-size-16, 16px);
+  background-color: var(--bgColor-accent-muted);
+  border-bottom: var(--borderWidth-thin, 1px) solid var(--borderColor-accent-muted);
+}
+
+.demoNoticeInner {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  align-items: flex-start;
+  max-width: var(--breakpoint-xlarge, 1280px);
+  margin: 0 auto;
+}

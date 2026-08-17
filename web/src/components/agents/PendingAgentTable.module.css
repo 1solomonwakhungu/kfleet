@@ -1,0 +1,54 @@
+.identifier {
+  display: block;
+  max-width: 16rem;
+  overflow: hidden;
+  font-family: var(--fontStack-monospace, ui-monospace, monospace);
+  font-size: var(--text-body-size-small, 12px);
+  color: var(--fgColor-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-4, 4px);
+  min-width: 12rem;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.versions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4, 4px);
+  min-width: 8rem;
+  margin: 0;
+  font-size: var(--text-body-size-small, 12px);
+}
+
+.version {
+  display: flex;
+  gap: var(--base-size-12, 12px);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.versionValue {
+  margin: 0;
+  font-family: var(--fontStack-monospace, ui-monospace, monospace);
+}
+
+.actionColumn {
+  text-align: right;
+}
+
+.error {
+  max-width: 16rem;
+  margin: var(--base-size-8, 8px) 0 0;
+  font-size: var(--text-body-size-small, 12px);
+  color: var(--fgColor-danger);
+  text-align: left;
+}

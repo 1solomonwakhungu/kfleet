@@ -1,0 +1,21 @@
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12, 12px);
+}
+
+.controls {
+  display: grid;
+  gap: var(--base-size-12, 12px);
+  margin-top: var(--base-size-16, 16px);
+}
+
+@media (min-width: 1012px) {
+  .controls {
+    grid-template-columns: minmax(0, 1fr) 14rem 14rem;
+  }
+}
+
+.cards {
+  margin-top: var(--base-size-16, 16px);
+}
