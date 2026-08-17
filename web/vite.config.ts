@@ -17,6 +17,12 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    server: {
+      // @primer/react ships CSS modules that Node cannot load directly.
+      deps: {
+        inline: [/@primer\/react/],
+      },
+    },
   },
   server: {
     proxy: {

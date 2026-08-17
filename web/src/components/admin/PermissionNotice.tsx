@@ -1,6 +1,7 @@
-import { ShieldAlert } from 'lucide-react'
+import { Blankslate } from '@primer/react/experimental'
+import { ShieldLockIcon } from '@primer/octicons-react'
 
-import { Card, CardContent } from '../ui/card'
+import layout from '../../styles/layout.module.css'
 
 interface PermissionNoticeProps {
   title: string
@@ -13,16 +14,14 @@ interface PermissionNoticeProps {
  */
 export function PermissionNotice({ title, description }: PermissionNoticeProps) {
   return (
-    <Card className="ring-1 ring-inset ring-border" role="status">
-      <CardContent className="grid min-h-64 place-items-center p-6 text-center">
-        <div>
-          <span className="mx-auto grid size-12 place-items-center rounded-full bg-elevated text-muted ring-1 ring-inset ring-border">
-            <ShieldAlert className="size-6" aria-hidden="true" />
-          </span>
-          <p className="mt-4 font-display text-xl font-bold">{title}</p>
-          <p className="mt-2 max-w-lg text-muted">{description}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <div className={layout.box} role="status">
+      <Blankslate>
+        <Blankslate.Visual>
+          <ShieldLockIcon size={24} />
+        </Blankslate.Visual>
+        <Blankslate.Heading as="h2">{title}</Blankslate.Heading>
+        <Blankslate.Description>{description}</Blankslate.Description>
+      </Blankslate>
+    </div>
   )
 }

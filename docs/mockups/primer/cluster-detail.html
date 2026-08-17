@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kfleet · Cluster detail (Primer mockup)</title>
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/light.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/dark.css" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body data-page="fleet" data-breadcrumb="kfleet / Fleet / eu-west-prod">
+    <div class="app" data-app>
+      <div class="main">
+        <div class="content">
+          <div class="page-head">
+            <div>
+              <div class="row">
+                <h1 class="page-title">eu-west-prod</h1>
+                <span class="state state-attention">Degraded</span>
+              </div>
+              <p class="page-desc mono">cluster-eu-west-prod-01 · v1.30.2 · agent v0.7.0</p>
+            </div>
+            <div class="row">
+              <button class="btn" type="button"><span data-icon="sync"></span>Refresh</button>
+              <button class="btn btn-danger" type="button">Remove cluster</button>
+            </div>
+          </div>
+
+          <div class="grid grid-4">
+            <div class="box box-body">
+              <p class="metric-label">Nodes ready</p>
+              <p class="metric-value">30/32</p>
+              <p class="metric-detail">2 nodes NotReady</p>
+            </div>
+            <div class="box box-body">
+              <p class="metric-label">Pods running</p>
+              <p class="metric-value">921</p>
+              <p class="metric-detail">18 pending · 9 failed</p>
+            </div>
+            <div class="box box-body">
+              <p class="metric-label">Namespaces</p>
+              <p class="metric-value">24</p>
+              <p class="metric-detail">4 with workload errors</p>
+            </div>
+            <div class="box box-body">
+              <p class="metric-label">Last heartbeat</p>
+              <p class="metric-value" style="font-size: 22px">9s ago</p>
+              <p class="metric-detail">Reported over WebSocket</p>
+            </div>
+          </div>
+
+          <div class="box mt-3">
+            <div class="tabs">
+              <a class="tab" href="#pods" aria-current="page">Pods <span class="counter">948</span></a>
+              <a class="tab" href="#deployments">Deployments <span class="counter">86</span></a>
+              <a class="tab" href="#services">Services <span class="counter">61</span></a>
+              <a class="tab" href="#events">Events <span class="counter">37</span></a>
+              <a class="tab" href="#logs">Logs</a>
+              <a class="tab" href="#timeline">Timeline</a>
+            </div>
+
+            <div class="box-body">
+              <div class="row row-wrap">
+                <label class="field" style="flex: 1 1 260px">
+                  <span data-icon="search"></span>
+                  <input type="search" placeholder="Filter pods by name" aria-label="Filter pods" />
+                </label>
+                <span class="field">
+                  <select aria-label="Namespace">
+                    <option>Namespace: payments</option>
+                    <option>Namespace: all</option>
+                    <option>Namespace: kube-system</option>
+                  </select>
+                </span>
+                <span class="field">
+                  <select aria-label="Status">
+                    <option>Status: all</option>
+                    <option>Running</option>
+                    <option>Pending</option>
+                    <option>Failed</option>
+                  </select>
+                </span>
+              </div>
+            </div>
+
+            <table class="list">
+              <thead>
+                <tr>
+                  <th>Pod</th>
+                  <th>Namespace</th>
+                  <th>Status</th>
+                  <th>Restarts</th>
+                  <th>Node</th>
+                  <th>Age</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono">checkout-api-7d9f8c6b4-2xkqz</td>
+                  <td>payments</td>
+                  <td><span class="label label-danger"><span class="dot dot-danger"></span>CrashLoopBackOff</span></td>
+                  <td class="mono">14</td>
+                  <td class="mono">ip-10-4-31-88</td>
+                  <td class="muted">3h</td>
+                  <td><a href="#logs">Logs</a></td>
+                </tr>
+                <tr>
+                  <td class="mono">checkout-api-7d9f8c6b4-9tlvm</td>
+                  <td>payments</td>
+                  <td><span class="label label-success"><span class="dot dot-success"></span>Running</span></td>
+                  <td class="mono">0</td>
+                  <td class="mono">ip-10-4-22-14</td>
+                  <td class="muted">3h</td>
+                  <td><a href="#logs">Logs</a></td>
+                </tr>
+                <tr>
+                  <td class="mono">ledger-worker-5c4d7f9b8-lm2rd</td>
+                  <td>payments</td>
+                  <td><span class="label label-attention"><span class="dot dot-attention"></span>Pending</span></td>
+                  <td class="mono">0</td>
+                  <td class="muted">unscheduled</td>
+                  <td class="muted">6m</td>
+                  <td><a href="#logs">Logs</a></td>
+                </tr>
+                <tr>
+                  <td class="mono">ledger-worker-5c4d7f9b8-qq8vf</td>
+                  <td>payments</td>
+                  <td><span class="label label-success"><span class="dot dot-success"></span>Running</span></td>
+                  <td class="mono">1</td>
+                  <td class="mono">ip-10-4-18-63</td>
+                  <td class="muted">2d</td>
+                  <td><a href="#logs">Logs</a></td>
+                </tr>
+                <tr>
+                  <td class="mono">settlement-cron-28571220-hj4kd</td>
+                  <td>payments</td>
+                  <td><span class="label label-neutral"><span class="dot dot-neutral"></span>Succeeded</span></td>
+                  <td class="mono">0</td>
+                  <td class="mono">ip-10-4-9-201</td>
+                  <td class="muted">41m</td>
+                  <td><a href="#logs">Logs</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid grid-2 mt-3">
+            <section class="box" id="logs">
+              <div class="box-header">
+                <h2 class="box-title">Pod logs · checkout-api-7d9f8c6b4-2xkqz</h2>
+                <span class="label label-accent spacer">Streaming</span>
+              </div>
+              <div class="box-body">
+                <pre class="logs mono" style="margin: 0"><span class="log-time">15:41:02</span> starting checkout-api v2.14.3
+<span class="log-time">15:41:02</span> connected to postgres primary
+<span class="log-time">15:41:03</span> <span class="log-warn">WARN</span> redis pool saturated (32/32)
+<span class="log-time">15:41:07</span> <span class="log-error">ERROR</span> dial tcp 10.4.71.9:6379: i/o timeout
+<span class="log-time">15:41:07</span> <span class="log-error">FATAL</span> cache unavailable, shutting down
+<span class="log-time">15:41:12</span> starting checkout-api v2.14.3
+<span class="log-time">15:41:17</span> <span class="log-error">ERROR</span> dial tcp 10.4.71.9:6379: i/o timeout</pre>
+              </div>
+            </section>
+
+            <section class="box" id="timeline">
+              <div class="box-header">
+                <h2 class="box-title">Operational timeline</h2>
+                <a class="spacer" href="alerts.html">Full history</a>
+              </div>
+              <div class="box-body">
+                <ul class="timeline">
+                  <li>
+                    <span class="timeline-badge is-attention" data-icon="alert" data-icon-size="12"></span>
+                    <strong>Health changed to degraded</strong>
+                    <p class="muted" style="margin: 2px 0 0">2 nodes NotReady · 14 min ago</p>
+                  </li>
+                  <li>
+                    <span class="timeline-badge is-danger" data-icon="x" data-icon-size="12"></span>
+                    <strong>Pod checkout-api entered CrashLoopBackOff</strong>
+                    <p class="muted" style="margin: 2px 0 0">namespace payments · 22 min ago</p>
+                  </li>
+                  <li>
+                    <span class="timeline-badge is-success" data-icon="check" data-icon-size="12"></span>
+                    <strong>Agent reconnected</strong>
+                    <p class="muted" style="margin: 2px 0 0">agent v0.7.0 · 3 h ago</p>
+                  </li>
+                  <li>
+                    <span class="timeline-badge" data-icon="people" data-icon-size="12"></span>
+                    <strong>Agent approved by solomon</strong>
+                    <p class="muted" style="margin: 2px 0 0">registration token rotated · 6 d ago</p>
+                  </li>
+                </ul>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="assets/shell.js"></script>
+  </body>
+</html>

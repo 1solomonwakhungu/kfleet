@@ -1,17 +1,17 @@
 import { useCallback, useMemo, useState, type FormEvent } from 'react'
-import { LoaderCircle, RefreshCw, Trash2, UserPlus } from 'lucide-react'
+import { Button, Flash, FormControl, Heading, IconButton, Select, Text, TextInput } from '@primer/react'
+import { Blankslate, SkeletonText } from '@primer/react/experimental'
+import { PersonAddIcon, SyncIcon, TrashIcon } from '@primer/octicons-react'
 
 import { useAuth } from '../auth/AuthContext'
 import { ConfirmDialog } from '../components/admin/ConfirmDialog'
 import { PermissionNotice } from '../components/admin/PermissionNotice'
-import { Button } from '../components/ui/button'
-import { Card, CardContent } from '../components/ui/card'
-import { Input } from '../components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { useUsers } from '../hooks/useUsers'
 import { adminApi } from '../lib/adminApi'
 import { isAbortError, messageFrom } from '../lib/errors'
 import { roleLabels, roleOptions, type Role, type UserAccount } from '../types/admin'
+import layout from '../styles/layout.module.css'
+import styles from './Users.module.css'
 
 const minPasswordLength = 12
 const maxPasswordLength = 72
@@ -76,161 +76,145 @@ export function UsersPage() {
 
   if (!isAdmin) {
     return (
-      <main className="mx-auto min-h-dvh max-w-[100rem] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <PageHeader loading={false} onRefresh={undefined} />
-        <div className="mt-7">
-          <PermissionNotice
-            title="Admin access required"
-            description="User management is restricted to admins. Ask an admin to change your role if you need access."
-          />
-        </div>
+      <main className={layout.page}>
+        <UsersHeader loading={false} />
+        <PermissionNotice
+          title="Admin access required"
+          description="User management is restricted to admins. Ask an admin to change your role if you need access."
+        />
       </main>
     )
   }
 
   return (
-    <main className="mx-auto min-h-dvh max-w-[100rem] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-      <PageHeader loading={loading} onRefresh={() => void reload()} />
+    <main className={layout.page}>
+      <UsersHeader loading={loading} onRefresh={() => void reload()} />
 
-      <div className="mt-6 space-y-4" aria-live="polite">
+      <div className={styles.messages} aria-live="polite">
         {error && (
-          <section
-            className="flex flex-col gap-3 rounded-lg bg-danger-soft p-4 text-danger sm:flex-row sm:items-center sm:justify-between"
-            role="alert"
-          >
-            <div>
-              <p className="font-semibold">Users could not be loaded.</p>
-              <p className="mt-1 text-sm">{error}</p>
+          <Flash variant="danger" role="alert">
+            <div className={styles.flashBody}>
+              <div>
+                <Text weight="semibold">Users could not be loaded.</Text>
+                <Text className={layout.pageDescription}>{error}</Text>
+              </div>
+              <Button disabled={loading} onClick={() => void reload()}>
+                Retry
+              </Button>
             </div>
-            <Button variant="outline" size="sm" disabled={loading} onClick={() => void reload()}>
-              Retry
-            </Button>
-          </section>
+          </Flash>
         )}
         {actionError && (
-          <p className="rounded-lg bg-danger-soft p-4 text-sm text-danger" role="alert">
+          <Flash variant="danger" role="alert">
             {actionError}
-          </p>
+          </Flash>
         )}
         {status && (
-          <p
-            className="rounded-lg bg-blue-950 p-4 text-sm text-blue-100 ring-1 ring-inset ring-blue-800"
-            role="status"
-          >
+          <Flash variant="success" role="status">
             {status}
-          </p>
+          </Flash>
         )}
       </div>
 
-      <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className={styles.columns}>
         <section aria-busy={loading} aria-labelledby="user-list-title">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <h2 id="user-list-title" className="font-display text-lg font-bold">
+          <div className={styles.listHeader}>
+            <Heading as="h2" variant="small" id="user-list-title">
               Accounts
-            </h2>
+            </Heading>
             {!loading && (
-              <span className="font-mono text-sm text-muted">
+              <Text size="small" className={`${layout.mono} ${layout.muted}`}>
                 {sortedUsers.length} {sortedUsers.length === 1 ? 'account' : 'accounts'}
-              </span>
+              </Text>
             )}
           </div>
 
           {loading && sortedUsers.length === 0 ? (
             <UsersSkeleton />
           ) : sortedUsers.length === 0 && !error ? (
-            <Card className="ring-1 ring-inset ring-border">
-              <CardContent className="grid min-h-48 place-items-center p-6 text-center">
-                <div>
-                  <p className="font-display text-xl font-bold">No accounts yet</p>
-                  <p className="mt-2 text-muted">Invite a teammate to give them hub access.</p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className={layout.box}>
+              <Blankslate>
+                <Blankslate.Heading as="h3">No accounts yet</Blankslate.Heading>
+                <Blankslate.Description>Invite a teammate to give them hub access.</Blankslate.Description>
+              </Blankslate>
+            </div>
           ) : sortedUsers.length > 0 ? (
-            <Card className="ring-1 ring-inset ring-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead scope="col">User</TableHead>
-                    <TableHead scope="col">Role</TableHead>
-                    <TableHead scope="col">Status</TableHead>
-                    <TableHead scope="col">Created</TableHead>
-                    <TableHead scope="col" className="text-right">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedUsers.map((account) => {
-                    const isSelf = account.id === user?.id
-                    const busy = busyId === account.id
-                    return (
-                      <TableRow key={account.id}>
-                        <TableCell>
-                          <span className="block font-semibold">{account.username}</span>
-                          <span className="block text-xs text-muted">{account.email}</span>
-                        </TableCell>
-                        <TableCell>
-                          <label className="sr-only" htmlFor={`role-${account.id}`}>
-                            Role for {account.username}
-                          </label>
-                          <select
-                            id={`role-${account.id}`}
-                            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                            value={account.role}
-                            disabled={busy}
-                            onChange={(event) =>
-                              void mutate(account, { role: event.target.value as Role })
-                            }
-                          >
-                            {roleOptions.map((role) => (
-                              <option key={role} value={role}>
-                                {roleLabels[role]}
-                              </option>
-                            ))}
-                          </select>
-                        </TableCell>
-                        <TableCell>
-                          <span className={account.disabled ? 'text-muted' : 'text-healthy'}>
-                            {account.disabled ? 'Deactivated' : 'Active'}
-                          </span>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-muted">
-                          {formatTimestamp(account.createdAt)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={busy || isSelf}
-                              title={isSelf ? 'You cannot deactivate your own account.' : undefined}
-                              onClick={() => void mutate(account, { disabled: !account.disabled })}
+            <div className={layout.box}>
+              <div className={layout.tableScroll}>
+                <table className={layout.table}>
+                  <thead>
+                    <tr>
+                      <th scope="col">User</th>
+                      <th scope="col">Role</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Created</th>
+                      <th scope="col" className={styles.actionColumn}>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedUsers.map((account) => {
+                      const isSelf = account.id === user?.id
+                      const busy = busyId === account.id
+
+                      return (
+                        <tr key={account.id}>
+                          <td>
+                            <Text weight="semibold" className={styles.block}>
+                              {account.username}
+                            </Text>
+                            <span className={styles.meta}>{account.email}</span>
+                          </td>
+                          <td>
+                            <Select
+                              aria-label={`Role for ${account.username}`}
+                              value={account.role}
+                              disabled={busy}
+                              onChange={(event) => void mutate(account, { role: event.target.value as Role })}
                             >
-                              {account.disabled ? 'Reactivate' : 'Deactivate'}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-danger hover:text-danger"
-                              disabled={busy || isSelf}
-                              title={isSelf ? 'You cannot delete your own account.' : undefined}
-                              aria-label={`Delete ${account.username}`}
-                              onClick={() => {
-                                setDeleteError(null)
-                                setPendingDelete(account)
-                              }}
-                            >
-                              <Trash2 className="size-4" aria-hidden="true" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </Card>
+                              {roleOptions.map((role) => (
+                                <Select.Option key={role} value={role}>
+                                  {roleLabels[role]}
+                                </Select.Option>
+                              ))}
+                            </Select>
+                          </td>
+                          <td>
+                            <span className={account.disabled ? layout.muted : styles.active}>
+                              {account.disabled ? 'Deactivated' : 'Active'}
+                            </span>
+                          </td>
+                          <td className={`${layout.muted} ${styles.nowrap}`}>{formatTimestamp(account.createdAt)}</td>
+                          <td className={styles.actionColumn}>
+                            <div className={styles.rowActions}>
+                              <Button
+                                disabled={busy || isSelf}
+                                title={isSelf ? 'You cannot deactivate your own account.' : undefined}
+                                onClick={() => void mutate(account, { disabled: !account.disabled })}
+                              >
+                                {account.disabled ? 'Reactivate' : 'Deactivate'}
+                              </Button>
+                              <IconButton
+                                icon={TrashIcon}
+                                variant="danger"
+                                disabled={busy || isSelf}
+                                title={isSelf ? 'You cannot delete your own account.' : undefined}
+                                aria-label={`Delete ${account.username}`}
+                                onClick={() => {
+                                  setDeleteError(null)
+                                  setPendingDelete(account)
+                                }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : null}
         </section>
 
@@ -252,8 +236,8 @@ export function UsersPage() {
         onConfirm={() => void confirmDelete()}
       >
         <p>
-          {pendingDelete?.username} loses hub access immediately and any active sessions are invalidated.
-          Their past actions remain in the audit log.
+          {pendingDelete?.username} loses hub access immediately and any active sessions are invalidated. Their past
+          actions remain in the audit log.
         </p>
         <p>This cannot be undone. Deactivate the account instead if you may need it later.</p>
       </ConfirmDialog>
@@ -261,28 +245,24 @@ export function UsersPage() {
   )
 }
 
-interface PageHeaderProps {
+interface UsersHeaderProps {
   loading: boolean
   onRefresh?: () => void
 }
 
-function PageHeader({ loading, onRefresh }: PageHeaderProps) {
+function UsersHeader({ loading, onRefresh }: UsersHeaderProps) {
   return (
-    <header className="flex flex-col gap-5 border-b border-border pb-7 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p className="font-mono text-sm text-blue-400">kfleet admin</p>
-        <h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">Users</h1>
-        <p className="mt-2 max-w-2xl text-muted">
+    <header className={layout.pageHeader}>
+      <div className={layout.pageHeaderText}>
+        <Heading as="h1" variant="large">
+          Users
+        </Heading>
+        <Text className={layout.pageDescription}>
           Manage who can sign in to the hub and what each account is allowed to do.
-        </p>
+        </Text>
       </div>
       {onRefresh && (
-        <Button variant="outline" size="sm" disabled={loading} onClick={onRefresh}>
-          {loading ? (
-            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <RefreshCw className="size-4" aria-hidden="true" />
-          )}
+        <Button leadingVisual={SyncIcon} disabled={loading} onClick={onRefresh}>
           {loading ? 'Refreshing…' : 'Refresh'}
         </Button>
       )}
@@ -335,100 +315,84 @@ function InviteUserForm({ onCreated }: { onCreated: (user: UserAccount) => void 
   )
 
   return (
-    <Card className="h-fit p-5 ring-1 ring-inset ring-border">
-      <h2 className="flex items-center gap-2 font-display text-lg font-bold">
-        <UserPlus className="size-5 text-muted" aria-hidden="true" />
+    <section className={`${layout.box} ${styles.invite}`}>
+      <Heading as="h2" variant="small" className={styles.inviteTitle}>
+        <PersonAddIcon size={16} />
         Invite a user
-      </h2>
-      <p className="mt-2 text-sm text-muted">
+      </Heading>
+      <Text className={layout.pageDescription}>
         The hub creates the account immediately. Share the initial password over a secure channel.
-      </p>
+      </Text>
 
-      <form className="mt-4 space-y-4" onSubmit={(event) => void submit(event)} aria-label="Invite a user">
-        <div>
-          <label className="block text-sm font-semibold" htmlFor="new-username">
-            Username
-          </label>
-          <Input
-            id="new-username"
-            className="mt-1"
+      <form className={styles.form} onSubmit={(event) => void submit(event)} aria-label="Invite a user">
+        <FormControl>
+          <FormControl.Label>Username</FormControl.Label>
+          <TextInput
+            block
             value={username}
             autoComplete="off"
             onChange={(event) => setUsername(event.target.value)}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold" htmlFor="new-email">
-            Email
-          </label>
-          <Input
-            id="new-email"
-            className="mt-1"
+        </FormControl>
+
+        <FormControl>
+          <FormControl.Label>Email</FormControl.Label>
+          <TextInput
+            block
             type="email"
             value={email}
             autoComplete="off"
             onChange={(event) => setEmail(event.target.value)}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold" htmlFor="new-password">
-            Initial password
-          </label>
-          <Input
-            id="new-password"
-            className="mt-1"
+        </FormControl>
+
+        <FormControl>
+          <FormControl.Label>Initial password</FormControl.Label>
+          <TextInput
+            block
             type="password"
             value={password}
             autoComplete="new-password"
             onChange={(event) => setPassword(event.target.value)}
           />
-          <p className="mt-1 text-xs text-muted">
+          <FormControl.Caption>
             {minPasswordLength}–{maxPasswordLength} characters.
-          </p>
-        </div>
-        <div>
-          <label className="block text-sm font-semibold" htmlFor="new-role">
-            Role
-          </label>
-          <select
-            id="new-role"
-            className="mt-1 h-11 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
-            value={role}
-            onChange={(event) => setRole(event.target.value as Role)}
-          >
+          </FormControl.Caption>
+        </FormControl>
+
+        <FormControl>
+          <FormControl.Label>Role</FormControl.Label>
+          <Select value={role} onChange={(event) => setRole(event.target.value as Role)}>
             {roleOptions.map((option) => (
-              <option key={option} value={option}>
+              <Select.Option key={option} value={option}>
                 {roleLabels[option]}
-              </option>
+              </Select.Option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </FormControl>
 
         {error && (
-          <p className="rounded-md bg-danger-soft p-3 text-sm text-danger" role="alert">
+          <Flash variant="danger" role="alert">
             {error}
-          </p>
+          </Flash>
         )}
 
-        <Button type="submit" size="sm" disabled={submitting} className="w-full">
+        <Button type="submit" variant="primary" block disabled={submitting}>
           {submitting ? 'Creating…' : 'Create user'}
         </Button>
       </form>
-    </Card>
+    </section>
   )
 }
 
 function UsersSkeleton() {
   return (
-    <Card className="animate-pulse p-5 ring-1 ring-inset ring-border" aria-label="Loading users">
-      <div className="h-5 w-40 rounded bg-elevated" />
+    <div className={`${layout.box} ${styles.skeleton}`} aria-label="Loading users">
+      <SkeletonText size="titleSmall" maxWidth="12rem" />
       {Array.from({ length: 3 }, (_, index) => (
-        <div key={index} className="mt-5 flex items-center justify-between gap-6 border-t border-border pt-5">
-          <div className="h-10 w-1/3 rounded bg-elevated" />
-          <div className="h-9 w-24 rounded bg-elevated" />
-        </div>
+        <SkeletonText key={index} size="bodyMedium" maxWidth="80%" />
       ))}
-    </Card>
+    </div>
   )
 }
 

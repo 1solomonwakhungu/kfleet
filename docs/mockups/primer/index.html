@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kfleet UI mockups · Primer</title>
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/light.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/dark.css" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body data-shell="none">
+    <div style="position: fixed; top: 16px; right: 16px" data-theme-slot></div>
+
+    <div class="gallery">
+      <header style="margin-bottom: 32px">
+        <div class="row">
+          <span class="brand-mark" data-icon="box"></span>
+          <div>
+            <h1 style="margin: 0; font-size: 28px; font-weight: 600">kfleet UI mockups</h1>
+            <p class="muted" style="margin: 2px 0 0">
+              The kfleet control plane restyled with GitHub Primer — primitives tokens, Primer component patterns, and
+              full light/dark support.
+            </p>
+          </div>
+        </div>
+        <div class="row row-wrap" style="margin-top: 16px">
+          <span class="label label-accent">@primer/primitives tokens</span>
+          <span class="label label-neutral">No hardcoded colors</span>
+          <span class="label label-neutral">Light + dark themes</span>
+          <span class="label label-neutral">Static HTML, no build step</span>
+        </div>
+      </header>
+
+      <div class="grid grid-3">
+        <a class="box shot" href="dashboard.html">
+          <div class="shot-preview" data-icon="fleet" data-icon-size="32"></div>
+          <div class="box-body">
+            <strong>Fleet dashboard</strong>
+            <p class="muted" style="margin: 4px 0 0">Summary metrics, health filters, and cluster cards.</p>
+          </div>
+        </a>
+        <a class="box shot" href="cluster-detail.html">
+          <div class="shot-preview" data-icon="server" data-icon-size="32"></div>
+          <div class="box-body">
+            <strong>Cluster detail</strong>
+            <p class="muted" style="margin: 4px 0 0">Resource tabs, pod logs, and the operational timeline.</p>
+          </div>
+        </a>
+        <a class="box shot" href="alerts.html">
+          <div class="shot-preview" data-icon="bell" data-icon-size="32"></div>
+          <div class="box-body">
+            <strong>Alerts</strong>
+            <p class="muted" style="margin: 4px 0 0">Active health transitions and recently resolved history.</p>
+          </div>
+        </a>
+        <a class="box shot" href="agents.html">
+          <div class="shot-preview" data-icon="people" data-icon-size="32"></div>
+          <div class="box-body">
+            <strong>Agents</strong>
+            <p class="muted" style="margin: 4px 0 0">Pending approvals, registration token, connected agents.</p>
+          </div>
+        </a>
+        <a class="box shot" href="policies.html">
+          <div class="shot-preview" data-icon="shield" data-icon-size="32"></div>
+          <div class="box-body">
+            <strong>Policy and drift</strong>
+            <p class="muted" style="margin: 4px 0 0">Compliance rollup with failing checks by severity.</p>
+          </div>
+        </a>
+        <a class="box shot" href="users.html">
+          <div class="shot-preview" data-icon="person" data-icon-size="32"></div>
+          <div class="box-body">
+            <strong>Users</strong>
+            <p class="muted" style="margin: 4px 0 0">Accounts, roles, and sign-in activity.</p>
+          </div>
+        </a>
+        <a class="box shot" href="audit.html">
+          <div class="shot-preview" data-icon="log" data-icon-size="32"></div>
+          <div class="box-body">
+            <strong>Audit log</strong>
+            <p class="muted" style="margin: 4px 0 0">Append-only security history with filters and paging.</p>
+          </div>
+        </a>
+        <a class="box shot" href="login.html">
+          <div class="shot-preview" data-icon="shield" data-icon-size="32"></div>
+          <div class="box-body">
+            <strong>Sign in</strong>
+            <p class="muted" style="margin: 4px 0 0">Password and SSO entry point with demo notice.</p>
+          </div>
+        </a>
+      </div>
+
+      <section class="box mt-3" style="margin-top: 32px">
+        <div class="box-header"><h2 class="box-title">How to view</h2></div>
+        <div class="box-body">
+          <p style="margin: 0 0 8px">
+            Open any file directly in a browser, or serve the folder:
+            <code>python3 -m http.server 4173 --directory docs/mockups/primer</code>.
+          </p>
+          <p class="muted" style="margin: 0">
+            Every color, radius, and border comes from <code>@primer/primitives</code> functional tokens, so the same
+            markup renders correctly in both themes. Use the toggle in the top right to switch.
+          </p>
+        </div>
+      </section>
+    </div>
+    <script src="assets/shell.js"></script>
+  </body>
+</html>

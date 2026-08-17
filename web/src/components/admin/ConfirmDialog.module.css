@@ -1,0 +1,10 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8, 8px);
+  color: var(--fgColor-muted);
+}
+
+.error {
+  margin-top: var(--base-size-12, 12px);
+}

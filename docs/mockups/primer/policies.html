@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kfleet · Policy (Primer mockup)</title>
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/base/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/size/size.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/typography/typography.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/light.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@primer/primitives@10.6.0/dist/css/functional/themes/dark.css" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body data-page="policies" data-breadcrumb="kfleet / Policy">
+    <div class="app" data-app>
+      <div class="main">
+        <div class="content">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">Policy and drift</h1>
+              <p class="page-desc">Compliance checks evaluated against the latest snapshot from every cluster.</p>
+            </div>
+            <div class="row">
+              <span class="muted mono" style="font-size: 12px">Evaluated 2 m ago</span>
+              <button class="btn" type="button"><span data-icon="sync"></span>Re-evaluate</button>
+            </div>
+          </div>
+
+          <div class="grid grid-4">
+            <div class="box box-body">
+              <p class="metric-label">Checks</p>
+              <p class="metric-value">184</p>
+              <p class="metric-detail">Across 12 clusters</p>
+            </div>
+            <div class="box box-body">
+              <p class="metric-label">Passing</p>
+              <p class="metric-value" style="color: var(--fgColor-success)">91%</p>
+              <p class="metric-detail">168 of 184 checks</p>
+            </div>
+            <div class="box box-body">
+              <p class="metric-label">Failing</p>
+              <p class="metric-value" style="color: var(--fgColor-danger)">12</p>
+              <p class="metric-detail">3 critical · 5 high · 4 medium</p>
+            </div>
+            <div class="box box-body">
+              <p class="metric-label">Stale</p>
+              <p class="metric-value">4</p>
+              <p class="metric-detail">No snapshot in 15 m</p>
+            </div>
+          </div>
+
+          <div class="row row-wrap mt-3">
+            <label class="field" style="flex: 1 1 260px">
+              <span data-icon="search"></span>
+              <input type="search" placeholder="Search policies" aria-label="Search policies" />
+            </label>
+            <span class="field">
+              <select aria-label="Status">
+                <option>Status: failing</option>
+                <option>Status: all</option>
+                <option>Status: passing</option>
+                <option>Status: stale</option>
+              </select>
+            </span>
+            <span class="field">
+              <select aria-label="Severity">
+                <option>Severity: all</option>
+                <option>Critical</option>
+                <option>High</option>
+                <option>Medium</option>
+                <option>Low</option>
+              </select>
+            </span>
+          </div>
+
+          <section class="box mt-3">
+            <div class="box-header">
+              <h2 class="box-title">Failing checks</h2>
+              <span class="counter counter-attention">12</span>
+              <button class="btn btn-sm spacer" type="button">Export CSV</button>
+            </div>
+            <table class="list">
+              <thead>
+                <tr>
+                  <th>Policy</th>
+                  <th>Severity</th>
+                  <th>Scope</th>
+                  <th>Subject</th>
+                  <th>Detail</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>Privileged containers disallowed</strong>
+                    <p class="mono muted" style="margin: 0; font-size: 12px">pod-security/privileged</p>
+                  </td>
+                  <td><span class="label label-danger">Critical</span></td>
+                  <td class="muted">Workload</td>
+                  <td class="mono">eu-west-prod / payments / ledger-worker</td>
+                  <td class="muted">securityContext.privileged = true</td>
+                  <td><span class="label label-danger">Fail</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>Control plane version supported</strong>
+                    <p class="mono muted" style="margin: 0; font-size: 12px">cluster/k8s-version-floor</p>
+                  </td>
+                  <td><span class="label label-danger">Critical</span></td>
+                  <td class="muted">Cluster</td>
+                  <td class="mono">ap-south-edge</td>
+                  <td class="muted">v1.29.4 is below the fleet floor v1.30.0</td>
+                  <td><span class="label label-danger">Fail</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>Resource limits required</strong>
+                    <p class="mono muted" style="margin: 0; font-size: 12px">workload/resource-limits</p>
+                  </td>
+                  <td><span class="label label-attention">High</span></td>
+                  <td class="muted">Workload</td>
+                  <td class="mono">us-west-stage / web / storefront</td>
+                  <td class="muted">3 containers missing memory limits</td>
+                  <td><span class="label label-danger">Fail</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>Default namespace unused</strong>
+                    <p class="mono muted" style="margin: 0; font-size: 12px">namespace/no-default-workloads</p>
+                  </td>
+                  <td><span class="label label-attention">Medium</span></td>
+                  <td class="muted">Namespace</td>
+                  <td class="mono">eu-central-dev / default</td>
+                  <td class="muted">6 pods running in default</td>
+                  <td><span class="label label-danger">Fail</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>Agent version current</strong>
+                    <p class="mono muted" style="margin: 0; font-size: 12px">fleet/agent-version</p>
+                  </td>
+                  <td><span class="label label-neutral">Low</span></td>
+                  <td class="muted">Fleet</td>
+                  <td class="mono">4 clusters</td>
+                  <td class="muted">Snapshot older than 15 minutes</td>
+                  <td><span class="label label-neutral">Stale</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <div class="grid grid-2 mt-3">
+            <section class="box">
+              <div class="box-header"><h2 class="box-title">Compliance by category</h2></div>
+              <div class="box-body stack">
+                <div class="row"><span>Pod security</span><span class="label label-danger spacer">4 failing</span></div>
+                <div class="row"><span>Resource governance</span><span class="label label-attention spacer">5 failing</span></div>
+                <div class="row"><span>Networking</span><span class="label label-success spacer">All passing</span></div>
+                <div class="row"><span>Fleet hygiene</span><span class="label label-attention spacer">3 failing</span></div>
+              </div>
+            </section>
+
+            <section class="box">
+              <div class="box-header"><h2 class="box-title">Worst offenders</h2></div>
+              <table class="list">
+                <thead>
+                  <tr><th>Cluster</th><th>Failing</th><th>Critical</th><th>Trend (7 d)</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>eu-west-prod</td><td class="mono">6</td><td class="mono">2</td><td class="muted">+3</td></tr>
+                  <tr><td>ap-south-edge</td><td class="mono">4</td><td class="mono">1</td><td class="muted">+1</td></tr>
+                  <tr><td>us-west-stage</td><td class="mono">2</td><td class="mono">0</td><td class="muted">−2</td></tr>
+                </tbody>
+              </table>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="assets/shell.js"></script>
+  </body>
+</html>

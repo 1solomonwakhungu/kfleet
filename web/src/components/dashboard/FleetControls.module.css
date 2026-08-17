@@ -1,0 +1,24 @@
+.controls {
+  display: grid;
+  gap: var(--base-size-12, 12px);
+  margin-top: var(--base-size-16, 16px);
+}
+
+@media (min-width: 1012px) {
+  .controls {
+    grid-template-columns: minmax(0, 1fr) 14rem 14rem auto;
+    align-items: end;
+  }
+}
+
+.searchField {
+  min-width: 0;
+}
+
+.summary {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-body-size-small, 12px);
+}
