@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/1solomonwakhungu/kfleet/internal/auth"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
 	"github.com/1solomonwakhungu/kfleet/pkg/api"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
@@ -103,19 +103,20 @@ func (s *Server) clusterByIDOrName(r *http.Request, idOrName string) (types.Clus
 	return s.findClusterByName(r, idOrName)
 }
 
+// generateToken mints an agent bearer token. The raw value is returned to
+// the caller exactly once; only the hash is ever persisted. It returns empty
+// strings when the system entropy source fails.
 func generateToken() (raw string, hash string) {
 	token := make([]byte, 32)
 	if _, err := rand.Read(token); err != nil {
 		return "", ""
 	}
 	raw = hex.EncodeToString(token)
-	digest := sha256.Sum256([]byte(raw))
-	return raw, hex.EncodeToString(digest[:])
+	return raw, hashToken(raw)
 }
 
 func hashToken(raw string) string {
-	digest := sha256.Sum256([]byte(raw))
-	return hex.EncodeToString(digest[:])
+	return auth.HashToken(raw)
 }
 
 func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {

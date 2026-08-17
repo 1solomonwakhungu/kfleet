@@ -15,8 +15,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const placeholderClusterToken = "placeholder-token"
-
 const maxSnapshotBodyBytes = 4 << 20
 
 // registerClusterRoutes wires the human-facing cluster inventory endpoints.
@@ -100,13 +98,36 @@ func (s *Server) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, http.StatusInternalServerError, "failed to register cluster")
 		return
 	}
+
+	// This endpoint is operator-driven: a human with the operator role just
+	// created the cluster, so the agent token it hands out is approved
+	// immediately rather than landing in the pending-approval queue used by
+	// the self-service POST /api/v1/agents/register flow.
+	rawToken, tokenHash := generateToken()
+	if rawToken == "" {
+		s.logger.Error("failed to generate cluster agent token", "cluster_id", cluster.ID)
+		api.WriteError(w, http.StatusInternalServerError, "failed to register cluster")
+		return
+	}
+	if err := s.store.IssueAgentToken(r.Context(), cluster.ID, tokenHash); err != nil {
+		s.logger.Error("failed to issue cluster agent token", "cluster_id", cluster.ID, "error", err)
+		api.WriteError(w, http.StatusInternalServerError, "failed to register cluster")
+		return
+	}
+	if err := s.store.ApproveAgent(r.Context(), cluster.ID); err != nil {
+		s.logger.Error("failed to approve cluster agent", "cluster_id", cluster.ID, "error", err)
+		api.WriteError(w, http.StatusInternalServerError, "failed to register cluster")
+		return
+	}
+
 	s.broadcast.Broadcast(ClusterUpdate{Type: "registered", Cluster: cluster})
 	s.recordClusterRegistered(r.Context(), cluster)
 	s.recordAudit(r.Context(), r, auditActorFromUser(actor), "cluster.register", "cluster", cluster.ID, types.AuditSuccess, "name="+cluster.Name)
 
+	// rawToken is returned exactly once here; only its SHA-256 hash is persisted.
 	response := api.RegisterClusterResponse{
 		ClusterID: cluster.ID,
-		Token:     placeholderClusterToken,
+		Token:     rawToken,
 	}
 	if err := api.WriteJSON(w, http.StatusCreated, response); err != nil {
 		s.logger.Error("failed to write registration response", "error", err)
