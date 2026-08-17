@@ -78,6 +78,34 @@ Authentication endpoints:
 
 `KFLEET_SESSION_DURATION` controls session lifetime and defaults to `24h`.
 
+## Admin web UI
+
+The hub UI exposes every administrative capability above and gates each
+affordance on the signed-in user's role, so operators and read-only users never
+see actions the API would reject.
+
+| Surface | Route | Required role |
+| --- | --- | --- |
+| Users: list accounts, invite a user, change roles, deactivate or delete | `/admin/users` | Admin |
+| Audit log: filter by actor, action, target, and outcome | `/admin/audit` | Admin |
+| Agent registration token rotation | `/agents` | Admin |
+| Remove cluster | `/clusters/{id}` | Operator or admin |
+
+The **Users** and **Audit log** entries appear in the sidebar only for admins;
+users below that role who navigate directly to either route see an
+"Admin access required" notice instead of an empty page or a raw 403.
+
+Destructive actions — deleting a user, removing a cluster, and rotating the
+registration token — require a confirmation dialog that states exactly what is
+lost. The users page also disables deactivating or deleting your own account,
+matching the hub's 409 responses for self-deletion and last-admin removal.
+Rotated registration tokens are displayed exactly once, because the hub stores
+only their hash.
+
+The audit view requests the newest 100 events and widens the window in
+100-event steps up to the hub's 1000-event maximum. Filtering by free text and
+outcome happens over the loaded window.
+
 ## Audit log
 
 Security-relevant events include first-admin bootstrap, successful and failed

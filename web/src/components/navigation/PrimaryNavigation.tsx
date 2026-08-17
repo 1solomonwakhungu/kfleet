@@ -1,4 +1,4 @@
-import { BellRing, LayoutDashboard, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
+import { BellRing, LayoutDashboard, ScrollText, ShieldCheck, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 
 import { cn } from '../../lib/utils'
@@ -47,6 +47,28 @@ export const primaryNavigationItems: readonly NavigationItem[] = [
 export const readOnlyNavigationItems: readonly NavigationItem[] = primaryNavigationItems.filter(
   (item) => item.to !== '/agents',
 )
+
+/**
+ * Admin-only destinations. The backing endpoints are registered behind
+ * requireRole(types.RoleAdmin), so these are hidden for operators and
+ * read-only users.
+ */
+export const adminNavigationItems: readonly NavigationItem[] = [
+  {
+    label: 'Users',
+    description: 'Accounts and roles',
+    to: '/admin/users',
+    icon: UserCog,
+    end: true,
+  },
+  {
+    label: 'Audit log',
+    description: 'Security history',
+    to: '/admin/audit',
+    icon: ScrollText,
+    end: true,
+  },
+]
 
 interface PrimaryNavigationProps {
   className?: string

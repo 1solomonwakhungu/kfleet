@@ -188,7 +188,10 @@ For local chart development, replace the OCI URL with `./charts/kfleet-hub` or
 
 The hub requires a human user session for its web UI and fleet APIs. It
 supports admin, operator, and read-only roles, and records security-relevant
-actions in an append-only audit log. See
+actions in an append-only audit log. Admins manage accounts at `/admin/users`,
+review security history at `/admin/audit`, and rotate the agent registration
+token from `/agents`; operators and admins can remove a cluster from its detail
+page. See
 [Hub authentication and authorization](docs/authentication.md) for bootstrap,
 RBAC, cookie security, migrations, audit retention, and agent token rotation.
 
