@@ -1,17 +1,11 @@
-import { cn } from '../lib/utils'
 import type { ClusterHealth } from '../types/cluster'
+import styles from './StatusDot.module.css'
 
 interface StatusDotProps {
   health: ClusterHealth
 }
 
-const healthClasses: Record<ClusterHealth, string> = {
-  healthy: 'bg-healthy ring-healthy/20',
-  degraded: 'bg-degraded ring-degraded/20',
-  unreachable: 'bg-unreachable ring-unreachable/20',
-  unknown: 'bg-unknown ring-unknown/20',
-}
-
+/** Compact health indicator used beside cluster and fleet labels. */
 export function StatusDot({ health }: StatusDotProps) {
-  return <span className={cn('inline-flex h-2.5 w-2.5 shrink-0 rounded-full ring-4', healthClasses[health])} aria-hidden="true" />
+  return <span className={`${styles.dot} ${styles[health]}`} aria-hidden="true" />
 }

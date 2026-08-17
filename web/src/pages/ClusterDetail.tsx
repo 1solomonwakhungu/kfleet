@@ -1,195 +1,170 @@
-import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, ChevronRight, RefreshCw } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { ClusterOverview, ClusterOverviewSkeleton } from '@/components/cluster-overview/ClusterOverview';
-import { NamespaceSelector } from '@/components/detail/NamespaceSelector';
-import { SearchFilter } from '@/components/detail/SearchFilter';
-import { PodsTab } from '@/components/detail/PodsTab';
-import { ServicesTab } from '@/components/detail/ServicesTab';
-import { DeploymentsTab } from '@/components/detail/DeploymentsTab';
-import { EventsTab } from '@/components/detail/EventsTab';
-import { LogsTab } from '@/components/detail/LogsTab';
-import { OperationalTimeline } from '@/components/detail/OperationalTimeline';
-import { RemoveClusterCard } from '@/components/admin/RemoveClusterCard';
-import { useClusterDetail } from '@/hooks/useClusterDetail';
-import type { PodInfo } from '@/types/resources';
+import { useMemo, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { Breadcrumbs, Button, Flash, Heading, UnderlineNav } from '@primer/react'
+import { Blankslate } from '@primer/react/experimental'
+import { AlertIcon, SyncIcon } from '@primer/octicons-react'
+
+import { ClusterOverview, ClusterOverviewSkeleton } from '../components/cluster-overview/ClusterOverview'
+import { NamespaceSelector } from '../components/detail/NamespaceSelector'
+import { SearchFilter } from '../components/detail/SearchFilter'
+import { PodsTab } from '../components/detail/PodsTab'
+import { ServicesTab } from '../components/detail/ServicesTab'
+import { DeploymentsTab } from '../components/detail/DeploymentsTab'
+import { EventsTab } from '../components/detail/EventsTab'
+import { LogsTab } from '../components/detail/LogsTab'
+import { OperationalTimeline } from '../components/detail/OperationalTimeline'
+import { RemoveClusterCard } from '../components/admin/RemoveClusterCard'
+import { useClusterDetail } from '../hooks/useClusterDetail'
+import type { PodInfo } from '../types/resources'
+import layout from '../styles/layout.module.css'
+import styles from './ClusterDetail.module.css'
+
+type TabKey = 'pods' | 'services' | 'deployments' | 'events' | 'logs' | 'timeline'
 
 export default function ClusterDetail() {
-  const { id } = useParams<{ id: string }>();
-  const detail = useClusterDetail(id);
-  const [search, setSearch] = useState('');
-  const [tab, setTab] = useState('pods');
-  const [logsPod, setLogsPod] = useState<PodInfo | undefined>(undefined);
+  const { id } = useParams<{ id: string }>()
+  const detail = useClusterDetail(id)
+  const [search, setSearch] = useState('')
+  const [tab, setTab] = useState<TabKey>('pods')
+  const [logsPod, setLogsPod] = useState<PodInfo | undefined>(undefined)
 
   const namespaceFilteredPods = useMemo(
     () => (detail.namespace ? detail.pods.data.filter((p) => p.namespace === detail.namespace) : detail.pods.data),
     [detail.pods.data, detail.namespace],
-  );
+  )
   const namespaceFilteredServices = useMemo(
     () =>
       detail.namespace ? detail.services.data.filter((s) => s.namespace === detail.namespace) : detail.services.data,
     [detail.services.data, detail.namespace],
-  );
+  )
   const namespaceFilteredDeployments = useMemo(
     () =>
       detail.namespace
         ? detail.deployments.data.filter((d) => d.namespace === detail.namespace)
         : detail.deployments.data,
     [detail.deployments.data, detail.namespace],
-  );
+  )
 
   if (!id) {
     return (
-      <main className="mx-auto min-h-dvh max-w-[100rem] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <Link
-          to="/"
-          className="inline-flex min-h-11 items-center gap-2 whitespace-nowrap text-sm font-semibold text-blue-300 transition-[color,transform] duration-150 hover:text-blue-200 active:translate-y-px"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Back to clusters
-        </Link>
-        <Card className="mt-6 grid min-h-64 place-items-center border border-border px-6 text-center">
-          <div>
-            <AlertTriangle className="mx-auto h-7 w-7 text-degraded" aria-hidden="true" />
-            <h1 className="mt-4 font-display text-xl font-bold">No cluster selected</h1>
-            <p className="mt-2 text-muted">Choose a cluster from the fleet to view its resources and status.</p>
-          </div>
-        </Card>
+      <main className={layout.page}>
+        <div className={layout.box}>
+          <Blankslate>
+            <Blankslate.Visual>
+              <AlertIcon size={24} />
+            </Blankslate.Visual>
+            <Blankslate.Heading as="h1">No cluster selected</Blankslate.Heading>
+            <Blankslate.Description>
+              Choose a cluster from the fleet to view its resources and status.
+            </Blankslate.Description>
+            <Blankslate.PrimaryAction href="/">Back to clusters</Blankslate.PrimaryAction>
+          </Blankslate>
+        </div>
       </main>
-    );
+    )
   }
 
+  const showResourceFilters = tab !== 'logs' && tab !== 'timeline'
+
   return (
-    <main className="mx-auto min-h-dvh max-w-[100rem] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
-      <nav aria-label="Breadcrumb">
-        <ol className="flex min-h-11 min-w-0 items-center gap-2 text-sm">
-          <li className="shrink-0">
-            <Link
-              to="/"
-              className="inline-flex min-h-11 items-center gap-2 whitespace-nowrap font-semibold text-blue-300 transition-[color,transform] duration-150 hover:text-blue-200 active:translate-y-px"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Clusters
-            </Link>
-          </li>
-          <li aria-hidden="true" className="shrink-0 text-muted">
-            <ChevronRight className="h-4 w-4" />
-          </li>
-          <li className="min-w-0 truncate text-muted" aria-current="page">
-            {detail.cluster?.name ?? (detail.loading ? 'Loading…' : 'Cluster detail')}
-          </li>
-        </ol>
-      </nav>
+    <main className={layout.page}>
+      <Breadcrumbs>
+        <Breadcrumbs.Item as={Link} to="/">
+          Clusters
+        </Breadcrumbs.Item>
+        <Breadcrumbs.Item selected>
+          {detail.cluster?.name ?? (detail.loading ? 'Loading…' : 'Cluster detail')}
+        </Breadcrumbs.Item>
+      </Breadcrumbs>
 
       {detail.statusError && (
-        <section
-          className="mt-4 flex flex-col gap-3 rounded-lg border border-danger/40 bg-danger-soft p-4 text-danger sm:flex-row sm:items-center sm:justify-between"
-          role="alert"
-        >
-          <div className="flex min-w-0 items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-            <div className="min-w-0">
-              <p className="font-semibold">Cluster status could not be loaded</p>
-              <p className="mt-1 break-words text-sm">{detail.statusError}</p>
+        <Flash variant="danger" className={styles.flash}>
+          <div className={styles.flashBody}>
+            <AlertIcon size={16} />
+            <div>
+              <strong>Cluster status could not be loaded</strong>
+              <p className={styles.flashDetail}>{detail.statusError}</p>
             </div>
+            <Button leadingVisual={SyncIcon} onClick={() => window.location.reload()}>
+              Retry
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="self-start border-danger/40 sm:self-auto"
-            onClick={() => window.location.reload()}
-          >
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            Retry
-          </Button>
-        </section>
+        </Flash>
       )}
 
-      <section className="mt-5" aria-live="polite">
+      <section className={styles.overview} aria-live="polite">
         {detail.cluster ? (
           <ClusterOverview cluster={detail.cluster} nodes={detail.nodes} />
         ) : detail.loading ? (
           <ClusterOverviewSkeleton />
         ) : (
-          <Card className="grid min-h-64 place-items-center border border-border px-6 text-center">
-            <div>
-              <AlertTriangle className="mx-auto h-7 w-7 text-degraded" aria-hidden="true" />
-              <h1 className="mt-4 font-display text-xl font-bold">Cluster overview unavailable</h1>
-              <p className="mt-2 max-w-lg text-muted">
+          <div className={layout.box}>
+            <Blankslate>
+              <Blankslate.Visual>
+                <AlertIcon size={24} />
+              </Blankslate.Visual>
+              <Blankslate.Heading as="h1">Cluster overview unavailable</Blankslate.Heading>
+              <Blankslate.Description>
                 No cluster status was returned. Resource tabs remain available below when their data can be loaded.
-              </p>
-            </div>
-          </Card>
+              </Blankslate.Description>
+            </Blankslate>
+          </div>
         )}
       </section>
 
-      <Tabs value={tab} onValueChange={setTab} className="mt-8">
-        <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <h2 className="font-display text-xl font-bold">Cluster resources</h2>
-            <TabsList className="mt-3 flex-wrap overflow-visible border-b-0">
-              <TabsTrigger
-                value="pods"
-                className={tabTriggerClass(tab === 'pods')}
+      <section className={styles.resources}>
+        <Heading as="h2" variant="small" className={styles.resourcesHeading}>
+          Cluster resources
+        </Heading>
+
+        <div className={styles.tabsRow}>
+          <div className={styles.tabs}>
+            <UnderlineNav aria-label="Cluster resources">
+              <UnderlineNav.Item
+                aria-current={tab === 'pods' ? 'page' : undefined}
+                counter={tabCounter(detail.pods.data.length, detail.pods.loading, detail.pods.error)}
+                onSelect={selectTab(() => setTab('pods'))}
               >
-                Pods{' '}
-                <TabCount
-                  count={detail.pods.data.length}
-                  unavailable={detail.pods.loading || Boolean(detail.pods.error)}
-                />
-              </TabsTrigger>
-              <TabsTrigger
-                value="services"
-                className={tabTriggerClass(tab === 'services')}
+                Pods
+              </UnderlineNav.Item>
+              <UnderlineNav.Item
+                aria-current={tab === 'services' ? 'page' : undefined}
+                counter={tabCounter(detail.services.data.length, detail.services.loading, detail.services.error)}
+                onSelect={selectTab(() => setTab('services'))}
               >
-                Services{' '}
-                <TabCount
-                  count={detail.services.data.length}
-                  unavailable={detail.services.loading || Boolean(detail.services.error)}
-                />
-              </TabsTrigger>
-              <TabsTrigger
-                value="deployments"
-                className={tabTriggerClass(tab === 'deployments')}
+                Services
+              </UnderlineNav.Item>
+              <UnderlineNav.Item
+                aria-current={tab === 'deployments' ? 'page' : undefined}
+                counter={tabCounter(detail.deployments.data.length, detail.deployments.loading, detail.deployments.error)}
+                onSelect={selectTab(() => setTab('deployments'))}
               >
-                Deployments{' '}
-                <TabCount
-                  count={detail.deployments.data.length}
-                  unavailable={detail.deployments.loading || Boolean(detail.deployments.error)}
-                />
-              </TabsTrigger>
-              <TabsTrigger
-                value="events"
-                className={tabTriggerClass(tab === 'events')}
+                Deployments
+              </UnderlineNav.Item>
+              <UnderlineNav.Item
+                aria-current={tab === 'events' ? 'page' : undefined}
+                counter={tabCounter(detail.events.data.length, detail.events.loading, detail.events.error)}
+                onSelect={selectTab(() => setTab('events'))}
               >
-                Events{' '}
-                <TabCount
-                  count={detail.events.data.length}
-                  unavailable={detail.events.loading || Boolean(detail.events.error)}
-                />
-              </TabsTrigger>
-              <TabsTrigger
-                value="logs"
-                className={tabTriggerClass(tab === 'logs')}
+                Events
+              </UnderlineNav.Item>
+              <UnderlineNav.Item
+                aria-current={tab === 'logs' ? 'page' : undefined}
+                onSelect={selectTab(() => setTab('logs'))}
               >
                 Logs
-              </TabsTrigger>
-              <TabsTrigger
-                value="timeline"
-                className={tabTriggerClass(tab === 'timeline')}
+              </UnderlineNav.Item>
+              <UnderlineNav.Item
+                aria-current={tab === 'timeline' ? 'page' : undefined}
+                onSelect={selectTab(() => setTab('timeline'))}
               >
                 Timeline
-              </TabsTrigger>
-            </TabsList>
+              </UnderlineNav.Item>
+            </UnderlineNav>
           </div>
-          {tab !== 'logs' && tab !== 'timeline' && (
-            <div
-              className="flex min-w-0 flex-wrap items-center gap-2 [&_button]:h-11"
-              aria-label="Resource filters"
-            >
+
+          {showResourceFilters && (
+            <div className={styles.filters} aria-label="Resource filters">
               <NamespaceSelector
                 namespaces={detail.namespaces}
                 value={detail.namespace}
@@ -200,64 +175,64 @@ export default function ClusterDetail() {
           )}
         </div>
 
-        <TabsContent value="pods">
-          <PodsTab
-            pods={namespaceFilteredPods}
-            loading={detail.pods.loading}
-            error={detail.pods.error}
-            search={search}
-            onSelectPod={(pod) => {
-              setLogsPod(pod);
-              setTab('logs');
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="services">
-          <ServicesTab
-            services={namespaceFilteredServices}
-            loading={detail.services.loading}
-            error={detail.services.error}
-            search={search}
-          />
-        </TabsContent>
-        <TabsContent value="deployments">
-          <DeploymentsTab
-            deployments={namespaceFilteredDeployments}
-            loading={detail.deployments.loading}
-            error={detail.deployments.error}
-            search={search}
-          />
-        </TabsContent>
-        <TabsContent value="events">
-          <EventsTab events={detail.events.data} loading={detail.events.loading} error={detail.events.error} search={search} />
-        </TabsContent>
-        <TabsContent value="logs">
-          <LogsTab clusterId={id} pods={detail.pods.data} selectedPod={logsPod} onSelectPod={setLogsPod} />
-        </TabsContent>
-        <TabsContent value="timeline">
-          <OperationalTimeline clusterId={id} />
-        </TabsContent>
-      </Tabs>
+        <div className={styles.tabPanel}>
+          {tab === 'pods' && (
+            <PodsTab
+              pods={namespaceFilteredPods}
+              loading={detail.pods.loading}
+              error={detail.pods.error}
+              search={search}
+              onSelectPod={(pod) => {
+                setLogsPod(pod)
+                setTab('logs')
+              }}
+            />
+          )}
+          {tab === 'services' && (
+            <ServicesTab
+              services={namespaceFilteredServices}
+              loading={detail.services.loading}
+              error={detail.services.error}
+              search={search}
+            />
+          )}
+          {tab === 'deployments' && (
+            <DeploymentsTab
+              deployments={namespaceFilteredDeployments}
+              loading={detail.deployments.loading}
+              error={detail.deployments.error}
+              search={search}
+            />
+          )}
+          {tab === 'events' && (
+            <EventsTab
+              events={detail.events.data}
+              loading={detail.events.loading}
+              error={detail.events.error}
+              search={search}
+            />
+          )}
+          {tab === 'logs' && (
+            <LogsTab clusterId={id} pods={detail.pods.data} selectedPod={logsPod} onSelectPod={setLogsPod} />
+          )}
+          {tab === 'timeline' && <OperationalTimeline clusterId={id} />}
+        </div>
+      </section>
 
-      <section className="mt-10">
+      <section className={styles.danger}>
         <RemoveClusterCard clusterId={id} clusterName={detail.cluster?.name ?? id} />
       </section>
     </main>
-  );
+  )
 }
 
-function tabTriggerClass(active: boolean): string {
-  const states = 'active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50';
-  return active
-    ? `!border-blue-400 bg-blue-500/10 !text-blue-200 ${states}`
-    : `hover:text-blue-200 ${states}`;
+function tabCounter(count: number, loading: boolean, error: string | null): number | undefined {
+  return loading || error ? undefined : count
 }
 
-function TabCount({ count, unavailable }: { count: number; unavailable: boolean }) {
-  const label = unavailable ? 'Count unavailable' : `${count} items`;
-  return (
-    <span className="rounded bg-elevated px-1.5 py-0.5 font-mono text-xs tabular-nums text-muted" aria-label={label}>
-      {unavailable ? '—' : count.toLocaleString()}
-    </span>
-  );
+function selectTab(activate: () => void) {
+  return (event: React.MouseEvent<HTMLAnchorElement> | React.KeyboardEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    activate()
+  }
 }

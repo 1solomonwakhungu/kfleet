@@ -1,13 +1,14 @@
 import { useCallback, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Button, Flash, Heading, Text } from '@primer/react'
+import { TrashIcon } from '@primer/octicons-react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../auth/AuthContext'
 import { api } from '../../lib/api'
 import { isAbortError, messageFrom } from '../../lib/errors'
-import { Button } from '../ui/button'
-import { Card } from '../ui/card'
 import { ConfirmDialog } from './ConfirmDialog'
+import layout from '../../styles/layout.module.css'
+import styles from './AdminCard.module.css'
 
 interface RemoveClusterCardProps {
   clusterId: string
@@ -42,36 +43,38 @@ export function RemoveClusterCard({ clusterId, clusterName }: RemoveClusterCardP
   }, [clusterId, navigate])
 
   return (
-    <Card className="border border-danger/40 p-5" aria-labelledby="remove-cluster-title">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h2 id="remove-cluster-title" className="font-display text-lg font-bold">
+    <section className={`${layout.box} ${styles.danger}`} aria-labelledby="remove-cluster-title">
+      <div className={styles.header}>
+        <div className={styles.headerText}>
+          <Heading as="h2" variant="small" id="remove-cluster-title">
             Remove cluster
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm text-muted">
-            Deletes {clusterName} from the hub along with its stored snapshots, alerts, and agent token. The
-            cluster itself is untouched, but its agent must re-register before it appears again.
-          </p>
+          </Heading>
+          <Text className={styles.description}>
+            Deletes {clusterName} from the hub along with its stored snapshots, alerts, and agent token. The cluster
+            itself is untouched, but its agent must re-register before it appears again.
+          </Text>
           {!canRemove && (
-            <p className="mt-2 text-sm text-muted">
-              Removing a cluster requires the operator or admin role.
-            </p>
+            <Text className={styles.description}>Removing a cluster requires the operator or admin role.</Text>
           )}
         </div>
         <Button
           variant="danger"
-          size="sm"
-          className="self-start"
+          leadingVisual={TrashIcon}
           disabled={!canRemove}
           onClick={() => {
             setError(null)
             setConfirming(true)
           }}
         >
-          <Trash2 className="size-4" aria-hidden="true" />
           Remove cluster
         </Button>
       </div>
+
+      {error && !confirming && (
+        <Flash variant="danger" role="alert" className={styles.flash}>
+          {error}
+        </Flash>
+      )}
 
       <ConfirmDialog
         open={confirming}
@@ -83,11 +86,11 @@ export function RemoveClusterCard({ clusterId, clusterName }: RemoveClusterCardP
         onConfirm={() => void remove()}
       >
         <p>
-          This permanently removes {clusterName} and everything the hub stores about it: node and pod
-          snapshots, alert history, operational timeline, and the agent token.
+          This permanently removes {clusterName} and everything the hub stores about it: node and pod snapshots, alert
+          history, operational timeline, and the agent token.
         </p>
         <p>This cannot be undone.</p>
       </ConfirmDialog>
-    </Card>
+    </section>
   )
 }

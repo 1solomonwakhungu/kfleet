@@ -1,0 +1,52 @@
+.metricHead {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.iconMuted {
+  flex: none;
+  color: var(--fgColor-muted);
+}
+
+.iconSuccess {
+  flex: none;
+  color: var(--fgColor-success);
+}
+
+.breakdown {
+  margin-top: var(--base-size-16, 16px);
+}
+
+.breakdownList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--base-size-12, 12px);
+  margin: 0;
+}
+
+@media (min-width: 768px) {
+  .breakdownList {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.breakdownItem {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+  min-width: 0;
+}
+
+.breakdownTerm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
+  color: var(--fgColor-muted);
+}
+
+.breakdownValue {
+  margin: 0 0 0 auto;
+}

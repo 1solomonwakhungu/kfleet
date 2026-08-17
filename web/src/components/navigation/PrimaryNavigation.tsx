@@ -1,13 +1,20 @@
-import { BellRing, LayoutDashboard, ScrollText, ShieldCheck, UserCog, Users, type LucideIcon } from 'lucide-react'
-import { NavLink, useLocation } from 'react-router-dom'
-
-import { cn } from '../../lib/utils'
+import { NavList } from '@primer/react'
+import {
+  BellIcon,
+  LogIcon,
+  PeopleIcon,
+  PersonIcon,
+  ShieldCheckIcon,
+  StackIcon,
+  type Icon,
+} from '@primer/octicons-react'
+import { Link, useLocation } from 'react-router-dom'
 
 export interface NavigationItem {
   label: string
   description: string
   to: string
-  icon: LucideIcon
+  icon: Icon
   end?: boolean
   activePathPrefixes?: readonly string[]
 }
@@ -17,14 +24,14 @@ export const primaryNavigationItems: readonly NavigationItem[] = [
     label: 'Policy',
     description: 'Drift and compliance',
     to: '/policies',
-    icon: ShieldCheck,
+    icon: ShieldCheckIcon,
     end: true,
   },
   {
     label: 'Fleet',
     description: 'Cluster overview',
     to: '/',
-    icon: LayoutDashboard,
+    icon: StackIcon,
     end: true,
     activePathPrefixes: ['/clusters/'],
   },
@@ -32,14 +39,14 @@ export const primaryNavigationItems: readonly NavigationItem[] = [
     label: 'Alerts',
     description: 'Fleet health history',
     to: '/alerts',
-    icon: BellRing,
+    icon: BellIcon,
     end: true,
   },
   {
     label: 'Agents',
     description: 'Pending approvals',
     to: '/agents',
-    icon: Users,
+    icon: PeopleIcon,
     end: true,
   },
 ]
@@ -58,75 +65,53 @@ export const adminNavigationItems: readonly NavigationItem[] = [
     label: 'Users',
     description: 'Accounts and roles',
     to: '/admin/users',
-    icon: UserCog,
+    icon: PersonIcon,
     end: true,
   },
   {
     label: 'Audit log',
     description: 'Security history',
     to: '/admin/audit',
-    icon: ScrollText,
+    icon: LogIcon,
     end: true,
   },
 ]
 
+function isItemActive(item: NavigationItem, pathname: string): boolean {
+  if (item.activePathPrefixes?.some((prefix) => pathname.startsWith(prefix))) return true
+  if (item.end) return pathname === item.to
+  return pathname === item.to || pathname.startsWith(`${item.to}/`)
+}
+
 interface PrimaryNavigationProps {
-  className?: string
   items?: readonly NavigationItem[]
   onNavigate?: () => void
 }
 
-export function PrimaryNavigation({
-  className,
-  items = primaryNavigationItems,
-  onNavigate,
-}: PrimaryNavigationProps) {
-  const location = useLocation()
+export function PrimaryNavigation({ items = primaryNavigationItems, onNavigate }: PrimaryNavigationProps) {
+  const { pathname } = useLocation()
 
   return (
-    <nav className={className} aria-label="Primary navigation">
-      <ul className="space-y-1">
-        {items.map((item) => {
-          const Icon = item.icon
-          const isRelatedRoute = item.activePathPrefixes?.some((prefix) => location.pathname.startsWith(prefix)) ?? false
+    <NavList aria-label="Primary navigation">
+      {items.map((item) => {
+        const ItemIcon = item.icon
 
-          return (
-            <li key={item.to}>
-              <NavLink
-                to={item.to}
-                end={item.end}
-                onClick={onNavigate}
-                className={({ isActive }) =>
-                  cn(
-                    'group flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-150 ease-out active:translate-y-px',
-                    isActive || isRelatedRoute
-                      ? 'bg-elevated text-foreground'
-                      : 'text-muted hover:bg-elevated hover:text-foreground',
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <Icon
-                      className={cn(
-                        'h-5 w-5 shrink-0 transition-colors duration-150 ease-out',
-                        isActive || isRelatedRoute ? 'text-accent' : 'text-muted group-hover:text-foreground',
-                      )}
-                      aria-hidden="true"
-                    />
-                    <span className="min-w-0">
-                      <span className="block whitespace-nowrap">{item.label}</span>
-                      <span className="block truncate whitespace-nowrap text-xs font-normal text-muted">
-                        {item.description}
-                      </span>
-                    </span>
-                  </>
-                )}
-              </NavLink>
-            </li>
-          )
-        })}
-      </ul>
-    </nav>
+        return (
+          <NavList.Item
+            key={item.to}
+            as={Link}
+            to={item.to}
+            onClick={onNavigate}
+            aria-current={isItemActive(item, pathname) ? 'page' : undefined}
+          >
+            <NavList.LeadingVisual>
+              <ItemIcon />
+            </NavList.LeadingVisual>
+            {item.label}
+            <NavList.Description>{item.description}</NavList.Description>
+          </NavList.Item>
+        )
+      })}
+    </NavList>
   )
 }

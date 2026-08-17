@@ -1,0 +1,112 @@
+.flashAction {
+  margin-top: var(--base-size-12, 12px);
+}
+
+.summaryHead {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toneDanger {
+  flex: none;
+  color: var(--fgColor-danger);
+}
+
+.toneAttention {
+  flex: none;
+  color: var(--fgColor-attention);
+}
+
+.toneSuccess {
+  flex: none;
+  color: var(--fgColor-success);
+}
+
+.toneMuted {
+  flex: none;
+  color: var(--fgColor-muted);
+}
+
+.results {
+  margin-top: var(--base-size-24, 24px);
+}
+
+.resultsHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-16, 16px);
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: var(--base-size-16, 16px);
+  border-bottom: var(--borderWidth-thin, 1px) solid var(--borderColor-muted);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(9rem, 12rem));
+  gap: var(--base-size-12, 12px);
+}
+
+.resultList {
+  display: grid;
+  gap: var(--base-size-12, 12px);
+  margin-top: var(--base-size-16, 16px);
+}
+
+.emptyState {
+  margin-top: var(--base-size-16, 16px);
+}
+
+.resultHead {
+  display: flex;
+  gap: var(--base-size-12, 12px);
+  align-items: flex-start;
+}
+
+.resultBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4, 4px);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.resultTitle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8, 8px);
+  align-items: center;
+}
+
+.subject {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: var(--text-body-size-small, 12px);
+}
+
+.evidence {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--base-size-8, 8px) var(--base-size-16, 16px);
+  padding-top: var(--base-size-12, 12px);
+  margin: var(--base-size-12, 12px) 0 0;
+  font-size: var(--text-body-size-small, 12px);
+  border-top: var(--borderWidth-thin, 1px) solid var(--borderColor-muted);
+}
+
+.evidenceItem {
+  min-width: 0;
+}
+
+.evidenceItem dt {
+  font-family: var(--fontStack-monospace, ui-monospace, monospace);
+  color: var(--fgColor-muted);
+  text-transform: uppercase;
+}
+
+.evidenceItem dd {
+  margin: var(--base-size-2, 2px) 0 0;
+  overflow-wrap: anywhere;
+}

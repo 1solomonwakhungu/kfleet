@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react'
-import { Copy, KeyRound, RefreshCw } from 'lucide-react'
+import { Button, Flash, Heading, Text } from '@primer/react'
+import { CopyIcon, KeyIcon, SyncIcon } from '@primer/octicons-react'
 
 import { useAuth } from '../../auth/AuthContext'
 import { adminApi } from '../../lib/adminApi'
 import { isAbortError, messageFrom } from '../../lib/errors'
-import { Button } from '../ui/button'
-import { Card } from '../ui/card'
 import { ConfirmDialog } from './ConfirmDialog'
+import layout from '../../styles/layout.module.css'
+import styles from './AdminCard.module.css'
 
 /**
  * Rotates the shared agent registration token
@@ -50,50 +51,44 @@ export function RegistrationTokenCard() {
   if (!isAdmin) return null
 
   return (
-    <Card className="p-5 ring-1 ring-inset ring-border" aria-labelledby="registration-token-title">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h2 id="registration-token-title" className="flex items-center gap-2 font-display text-lg font-bold">
-            <KeyRound className="size-5 text-muted" aria-hidden="true" />
+    <section className={`${layout.box} ${styles.card}`} aria-labelledby="registration-token-title">
+      <div className={styles.header}>
+        <div className={styles.headerText}>
+          <Heading as="h2" variant="small" id="registration-token-title" className={styles.title}>
+            <KeyIcon size={16} />
             Agent registration token
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm text-muted">
-            Agents present this shared token when they first register. Rotating it invalidates the previous
-            token immediately; already-registered agents keep working with their own per-agent tokens.
-          </p>
+          </Heading>
+          <Text className={styles.description}>
+            Agents present this shared token when they first register. Rotating it invalidates the previous token
+            immediately; already-registered agents keep working with their own per-agent tokens.
+          </Text>
         </div>
         <Button
-          variant="outline"
-          size="sm"
-          className="self-start"
+          leadingVisual={SyncIcon}
           onClick={() => {
             setError(null)
             setConfirming(true)
           }}
         >
-          <RefreshCw className="size-4" aria-hidden="true" />
           Rotate token
         </Button>
       </div>
 
       {error && !confirming && (
-        <p className="mt-4 rounded-md bg-danger-soft p-3 text-sm text-danger" role="alert">
+        <Flash variant="danger" role="alert" className={styles.flash}>
           {error}
-        </p>
+        </Flash>
       )}
 
       {token && (
-        <div className="mt-4 rounded-md border border-border bg-background p-4" role="status">
-          <p className="text-sm font-semibold">New registration token</p>
-          <p className="mt-1 text-sm text-muted">
+        <div className={styles.token} role="status">
+          <Text weight="semibold">New registration token</Text>
+          <Text className={styles.description}>
             Copy it now — the hub stores only its hash and will not show it again.
-          </p>
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <code className="min-w-0 flex-1 break-all rounded-md bg-elevated px-3 py-2 font-mono text-xs">
-              {token}
-            </code>
-            <Button variant="outline" size="sm" className="self-start sm:self-auto" onClick={() => void copy()}>
-              <Copy className="size-4" aria-hidden="true" />
+          </Text>
+          <div className={styles.tokenRow}>
+            <code className={styles.tokenValue}>{token}</code>
+            <Button leadingVisual={CopyIcon} onClick={() => void copy()}>
               {copied ? 'Copied' : 'Copy'}
             </Button>
           </div>
@@ -110,11 +105,11 @@ export function RegistrationTokenCard() {
         onConfirm={() => void rotate()}
       >
         <p>
-          The current registration token stops working straight away. Any install scripts or automation that
-          embed it must be updated before new agents can register.
+          The current registration token stops working straight away. Any install scripts or automation that embed it
+          must be updated before new agents can register.
         </p>
         <p>The replacement token is displayed once and cannot be retrieved later.</p>
       </ConfirmDialog>
-    </Card>
+    </section>
   )
 }

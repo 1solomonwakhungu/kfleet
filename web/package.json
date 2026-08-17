@@ -11,9 +11,9 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@radix-ui/react-scroll-area": "^1.2.2",
-    "@radix-ui/react-select": "^2.1.4",
-    "lucide-react": "^0.468.0",
+    "@primer/octicons-react": "^19.33.0",
+    "@primer/primitives": "^11.10.0",
+    "@primer/react": "^38.35.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.1",
@@ -25,10 +25,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^6.0.4",
-    "autoprefixer": "^10.4.20",
     "jsdom": "^25.0.1",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.16",
     "typescript": "~5.6.3",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"

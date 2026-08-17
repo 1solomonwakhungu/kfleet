@@ -1,0 +1,23 @@
+.dot {
+  display: inline-block;
+  flex: none;
+  width: var(--base-size-8, 8px);
+  height: var(--base-size-8, 8px);
+  border-radius: var(--borderRadius-full, 999px);
+}
+
+.healthy {
+  background-color: var(--bgColor-success-emphasis);
+}
+
+.degraded {
+  background-color: var(--bgColor-attention-emphasis);
+}
+
+.unreachable {
+  background-color: var(--bgColor-danger-emphasis);
+}
+
+.unknown {
+  background-color: var(--bgColor-neutral-emphasis);
+}
