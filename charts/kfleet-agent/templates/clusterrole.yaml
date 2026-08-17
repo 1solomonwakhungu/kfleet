@@ -9,6 +9,11 @@ rules:
   - apiGroups: [""]
     resources: ["pods", "services", "nodes", "events", "namespaces"]
     verbs: ["get", "list", "watch"]
+  # Pod log streaming is served by the agent over its reverse channel to the
+  # hub, so the agent needs read access to the pod log subresource.
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
   - apiGroups: ["apps"]
     resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
     verbs: ["get", "list", "watch"]

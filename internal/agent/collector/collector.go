@@ -49,6 +49,12 @@ func New(cfg *config.Config) (*Collector, error) {
 	return &Collector{clientset: clientset}, nil
 }
 
+// Clientset exposes the underlying Kubernetes client so other agent
+// components (such as pod log streaming) can reuse the same credentials.
+func (c *Collector) Clientset() kubernetes.Interface {
+	return c.clientset
+}
+
 // Collect lists cluster-wide resources and returns a point-in-time snapshot.
 func (c *Collector) Collect(ctx context.Context) (*ClusterState, error) {
 	collectedAt := time.Now().UTC()
