@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -32,6 +33,7 @@ func TestLoad(t *testing.T) {
 func TestLoadDefaultReportInterval(t *testing.T) {
 	t.Setenv("KFLEET_HUB_URL", "http://hub")
 	t.Setenv("KFLEET_CLUSTER_NAME", "development")
+	t.Setenv("KFLEET_HUB_TOKEN", "secret")
 	t.Setenv("KFLEET_REPORT_INTERVAL", "")
 	cfg, err := Load()
 	if err != nil {
@@ -51,6 +53,7 @@ func TestLoadDefaultReportInterval(t *testing.T) {
 func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 	t.Setenv("KFLEET_HUB_URL", "")
 	t.Setenv("KFLEET_CLUSTER_NAME", "production")
+	t.Setenv("KFLEET_HUB_TOKEN", "secret")
 	if _, err := Load(); err == nil {
 		t.Fatal("Load() with missing hub URL returned nil error")
 	}
@@ -65,5 +68,32 @@ func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 	t.Setenv("KFLEET_TENANT_ID", "../invalid")
 	if _, err := Load(); err == nil {
 		t.Fatal("Load() with invalid tenant ID returned nil error")
+	}
+}
+
+// TestLoadRequiresHubToken proves a misconfigured agent fails fast instead of
+// starting up and retrying registration forever with an empty bearer token.
+func TestLoadRequiresHubToken(t *testing.T) {
+	t.Setenv("KFLEET_HUB_URL", "https://hub.example.test")
+	t.Setenv("KFLEET_CLUSTER_NAME", "production")
+	t.Setenv("KFLEET_HUB_TOKEN", "   ")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() with blank hub token returned nil error")
+	}
+	if !strings.Contains(err.Error(), "KFLEET_HUB_TOKEN") {
+		t.Fatalf("Load() error = %v, want the missing variable named", err)
+	}
+}
+
+func TestLoadRejectsMalformedHubURL(t *testing.T) {
+	t.Setenv("KFLEET_CLUSTER_NAME", "production")
+	t.Setenv("KFLEET_HUB_TOKEN", "secret")
+	for _, raw := range []string{"hub.example.test", "ftp://hub.example.test", "://nope"} {
+		t.Setenv("KFLEET_HUB_URL", raw)
+		if _, err := Load(); err == nil {
+			t.Fatalf("Load() with hub URL %q returned nil error", raw)
+		}
 	}
 }

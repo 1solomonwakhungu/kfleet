@@ -29,7 +29,8 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Error("failed to load agent configuration", "error", err)
+		logger.Error("invalid agent configuration; the agent cannot start", "error", err)
+		fmt.Fprintf(os.Stderr, "kfleet agent configuration error: %v\n", err)
 		os.Exit(1)
 	}
 	labels, err := clusterLabels(os.Getenv("KFLEET_CLUSTER_LABELS"))

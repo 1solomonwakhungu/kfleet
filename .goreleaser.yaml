@@ -13,7 +13,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w -X github.com/1solomonwakhungu/kfleet/internal/version.Version={{.Version}}
   - id: hub
     main: ./cmd/hub
     binary: hub
@@ -26,7 +26,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w -X github.com/1solomonwakhungu/kfleet/internal/version.Version={{.Version}}
   - id: agent
     main: ./cmd/agent
     binary: agent
@@ -39,7 +39,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w -X github.com/1solomonwakhungu/kfleet/internal/version.Version={{.Version}}
 
 archives:
   - id: kfleet
