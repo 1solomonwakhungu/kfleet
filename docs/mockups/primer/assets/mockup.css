@@ -79,13 +79,9 @@ a:hover {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
+  flex: none;
   width: 32px;
   height: 32px;
-  color: var(--fgColor-onEmphasis);
-  background-color: var(--bgColor-accent-emphasis);
-  border-radius: var(--borderRadius-medium, 6px);
 }
 
 .brand-name {

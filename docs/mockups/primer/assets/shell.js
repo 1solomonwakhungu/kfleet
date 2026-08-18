@@ -78,9 +78,7 @@
     var html =
       '<aside class="sidebar">' +
       '<a class="brand" href="index.html">' +
-      '<span class="brand-mark">' +
-      icon("box") +
-      "</span>" +
+      '<img class="brand-mark" src="../../brand/favicon/favicon.svg" width="32" height="32" alt="" aria-hidden="true">' +
       '<span><span class="brand-name">kfleet</span><br><span class="brand-sub">Control plane</span></span>' +
       "</a>";
 
