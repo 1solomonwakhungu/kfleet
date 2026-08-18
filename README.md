@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/png/kfleet-logo-dark-128.png">
+    <img src="docs/brand/png/kfleet-logo-128.png" alt="kfleet" width="128" height="128">
+  </picture>
+</p>
+
 # kfleet
 
 > Lightweight multi-cluster Kubernetes management with a built-in AI interface.
