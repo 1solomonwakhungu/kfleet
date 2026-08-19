@@ -109,7 +109,7 @@ function App() {
     <div className="site-shell dark">
       <a className="skip-link" href="#main">Skip to content</a>
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="kfleet home"><span className="brand-mark" aria-hidden="true">k</span><span>kfleet</span></a>
+        <a className="brand" href="#top" aria-label="kfleet home"><img className="brand-mark" src="/brand/kfleet-mark.svg" width="28" height="28" alt="" aria-hidden="true" draggable={false} /><span>kfleet</span></a>
         <details className="command-nav">
           <summary><SearchIcon aria-hidden="true" /><span>Navigate kfleet</span><kbd>⌘ K</kbd></summary>
           <nav aria-label="Page navigation">
@@ -173,7 +173,7 @@ function App() {
       </main>
 
       <footer>
-        <span>kfleet · Apache 2.0 · 2026</span>
+        <span className="footer-brand"><img className="footer-mark" src="/brand/kfleet-mark.svg" width="24" height="24" alt="" aria-hidden="true" draggable={false} />kfleet · Apache 2.0 · 2026</span>
         <div><a href={`${repositoryUrl}/blob/main/CONTRIBUTING.md`}>Contribute</a><a href={`${repositoryUrl}/releases`}>Releases</a><a href={repositoryUrl}>GitHub</a></div>
       </footer>
     </div>

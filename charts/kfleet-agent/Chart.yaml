@@ -1,6 +1,7 @@
 apiVersion: v2
 name: kfleet-agent
 description: kfleet agent daemon for multi-cluster Kubernetes management
+icon: https://raw.githubusercontent.com/1solomonwakhungu/kfleet/main/docs/brand/png/kfleet-logo-256.png
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
