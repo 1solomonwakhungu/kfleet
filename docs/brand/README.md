@@ -38,6 +38,31 @@ PNG sizes rendered: 16, 24, 32, 48, 64, 96, 128, 180, 256.
 - The favicons are copied into `landing-page/public/` and `web/public/`; re-copy
   them after regenerating.
 
+## Where the mark is used
+
+| Surface | Asset | Size |
+| --- | --- | --- |
+| Hub app sidebar (`web`) | `brand/kfleet-mark.svg` | 32 px |
+| Hub app mobile topbar | `brand/kfleet-mark.svg` | 24 px |
+| Hub app sign-in card | `brand/kfleet-logo{,-dark}.svg` | 40 px |
+| Landing page header | `brand/kfleet-mark.svg` | 28 px |
+| Landing page footer | `brand/kfleet-mark.svg` | 24 px |
+| Landing page social card | inlined in `social-card.svg` | 58 px |
+| Primer mockups sidebar / sign-in | `favicon/favicon.svg` | 32 / 48 px |
+| Helm charts | `png/kfleet-logo-256.png` via `icon:` | 256 px |
+| Repository README | `png/kfleet-logo{,-dark}-128.png` | 128 px |
+
+`web/public/brand/` and `landing-page/public/brand/` are copies of this
+directory's SVGs plus the 256 px PNG. Re-copy them after regenerating:
+
+```bash
+for app in web landing-page; do
+  cp docs/brand/favicon/favicon.svg "$app/public/brand/kfleet-mark.svg"
+  cp docs/brand/kfleet-logo*.svg docs/brand/kfleet-lockup*.svg "$app/public/brand/"
+  cp docs/brand/png/kfleet-logo-256.png "$app/public/brand/"
+done
+```
+
 ## Regenerating
 
 The SVGs are the source of truth. After editing them, re-render the raster

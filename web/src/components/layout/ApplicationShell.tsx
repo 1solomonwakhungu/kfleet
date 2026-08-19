@@ -6,7 +6,6 @@ import {
   PulseIcon,
   ShieldCheckIcon,
   SignOutIcon,
-  StackIcon,
   SunIcon,
   ThreeBarsIcon,
   XIcon,
@@ -14,6 +13,7 @@ import {
 import { Link, Outlet, useLocation } from 'react-router-dom'
 
 import { useAuth } from '../../auth/AuthContext'
+import { BrandLogo } from '../brand/BrandLogo'
 import { api, type RuntimeInfo } from '../../lib/api'
 import { useColorMode } from '../../theme/ColorModeProvider'
 import {
@@ -95,9 +95,10 @@ export function ApplicationShell() {
             aria-label={mobileNavigationOpen ? 'Close navigation menu' : 'Open navigation menu'}
             onClick={() => setMobileNavigationOpen((open) => !open)}
           />
-          <Text className={styles.mobileOnly} weight="semibold">
-            kfleet
-          </Text>
+          <Link to="/" className={`${styles.mobileOnly} ${styles.topbarBrand}`} aria-label="kfleet home">
+            <BrandLogo size={24} className={styles.topbarMark} />
+            <Text weight="semibold">kfleet</Text>
+          </Link>
           <div className={styles.topbarActions}>
             <ColorModeToggle />
           </div>
@@ -167,9 +168,7 @@ function AccountSummary({ username, role, onLogout }: AccountSummaryProps) {
 function BrandLink() {
   return (
     <Link to="/" className={styles.brand}>
-      <span className={styles.brandMark}>
-        <StackIcon size={16} />
-      </span>
+      <BrandLogo size={32} className={styles.brandMark} />
       <span>
         <Text weight="semibold">kfleet</Text>
         <span className={styles.footerLabel}>Control plane</span>

@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Button, Flash, FormControl, Heading, Text, TextInput } from '@primer/react'
-import { StackIcon } from '@primer/octicons-react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
+import { BrandLogo } from '../components/brand/BrandLogo'
 import styles from './Login.module.css'
 
 export function Login() {
@@ -49,9 +49,7 @@ export function Login() {
     <main className={styles.page}>
       <section className={styles.card}>
         <div className={styles.brand}>
-          <span className={styles.brandMark}>
-            <StackIcon size={20} />
-          </span>
+          <BrandLogo size={40} className={styles.brandMark} />
           <div>
             <Text weight="semibold">kfleet</Text>
             <span className={styles.brandSub}>Control plane</span>

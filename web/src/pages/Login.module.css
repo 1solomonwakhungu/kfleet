@@ -23,13 +23,9 @@
 }
 
 .brandMark {
-  display: grid;
-  place-items: center;
+  flex: none;
   width: var(--base-size-40, 40px);
   height: var(--base-size-40, 40px);
-  color: var(--fgColor-onEmphasis);
-  background-color: var(--bgColor-accent-emphasis);
-  border-radius: var(--borderRadius-medium, 6px);
 }
 
 .brandSub {
