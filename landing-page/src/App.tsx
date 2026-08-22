@@ -8,6 +8,7 @@ import {
   ShieldCheckIcon,
   Terminal2Icon,
 } from '@/components/icons'
+import { capture } from '@/lib/posthog'
 import './App.css'
 
 const repositoryUrl = 'https://github.com/1solomonwakhungu/kfleet'
@@ -127,7 +128,7 @@ function App() {
           <h1>One control plane.<br /><span>Your whole fleet.</span></h1>
           <div className="orientation-meta">
             <p>See fleet health, find policy drift, and diagnose Kubernetes issues with AI.</p>
-            <div className="orientation-actions"><Button asChild size="lg"><a href="#quickstart">Run locally <ArrowRightIcon aria-hidden="true" /></a></Button></div>
+            <div className="orientation-actions"><Button asChild size="lg"><a href="#quickstart" onClick={() => capture('quickstart_cta_clicked')}>Run locally <ArrowRightIcon aria-hidden="true" /></a></Button></div>
           </div>
         </section>
 
@@ -168,13 +169,13 @@ function App() {
             <div><span>02</span><code>cd kfleet</code></div>
             <div><span>03</span><code>./hack/quickstart.sh</code></div>
           </div>
-          <div className="quickstart-result"><CheckIcon aria-hidden="true" /><p>The script creates three local clusters, installs the hub and agents, then waits for registration.</p><a href="http://localhost:8080">Open localhost:8080</a></div>
+          <div className="quickstart-result"><CheckIcon aria-hidden="true" /><p>The script creates three local clusters, installs the hub and agents, then waits for registration.</p><a href="http://localhost:8080" onClick={() => capture('local_dashboard_opened')}>Open localhost:8080</a></div>
         </section>
       </main>
 
       <footer>
         <span className="footer-brand"><img className="footer-mark" src="/brand/kfleet-mark.svg" width="24" height="24" alt="" aria-hidden="true" draggable={false} />kfleet · Apache 2.0 · 2026</span>
-        <div><a href={`${repositoryUrl}/blob/main/CONTRIBUTING.md`}>Contribute</a><a href={`${repositoryUrl}/releases`}>Releases</a><a href={repositoryUrl}>GitHub</a></div>
+        <div><a href={`${repositoryUrl}/blob/main/CONTRIBUTING.md`} onClick={() => capture('contribution_guide_opened')}>Contribute</a><a href={`${repositoryUrl}/releases`} onClick={() => capture('release_notes_opened')}>Releases</a><a href={repositoryUrl} onClick={() => capture('repository_opened')}>GitHub</a></div>
       </footer>
     </div>
   )
