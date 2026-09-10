@@ -80,7 +80,7 @@ The agent needs read access to the pod log subresource. The
 ```yaml
 - apiGroups: [""]
   resources: ["pods/log"]
-  verbs: ["get", "list"]
+  verbs: ["get"]
 ```
 
 Upgrade the agent chart when moving to a version with log streaming;

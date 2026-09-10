@@ -62,7 +62,7 @@ func TestClientStreamsLogsBackToHub(t *testing.T) {
 	})
 
 	opener := &stubOpener{reader: nopCloser{strings.NewReader("alpha\nbravo\n")}}
-	client := NewClient(server.URL, "prod", "agent-token", "acme", NewStreamerWithOpener(opener), testLogger())
+	client := NewClient(server.URL, "prod", "agent-token", "acme", NewStreamerWithOpener(opener), testLogger(), nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -112,7 +112,7 @@ func TestClientHandshakeErrorIncludesResponseBody(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	client := NewClient(server.URL, "prod", "agent-token", "", NewStreamerWithOpener(&stubOpener{}), testLogger())
+	client := NewClient(server.URL, "prod", "agent-token", "", NewStreamerWithOpener(&stubOpener{}), testLogger(), nil)
 	err := client.connect(context.Background())
 	if err == nil {
 		t.Fatal("connect() error = nil, want error for rejected handshake")
@@ -142,7 +142,7 @@ func TestClientStopsStreamOnStopFrame(t *testing.T) {
 		<-ctx.Done()
 	})
 
-	client := NewClient(server.URL, "prod", "agent-token", "", NewStreamerWithOpener(&stubOpener{reader: reader}), testLogger())
+	client := NewClient(server.URL, "prod", "agent-token", "", NewStreamerWithOpener(&stubOpener{reader: reader}), testLogger(), nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	go func() {
@@ -181,7 +181,7 @@ func TestClientReportsStreamFailureToHub(t *testing.T) {
 	})
 
 	client := NewClient(server.URL, "prod", "token", "",
-		NewStreamerWithOpener(&stubOpener{err: http.ErrNotSupported}), testLogger())
+		NewStreamerWithOpener(&stubOpener{err: http.ErrNotSupported}), testLogger(), nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	go func() { _ = client.connect(ctx) }()

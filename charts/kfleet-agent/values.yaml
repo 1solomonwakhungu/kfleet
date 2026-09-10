@@ -7,7 +7,20 @@ imagePullSecrets: []
 
 hub:
   url: ""
+  # Registration token presented to the hub. Required unless hub.existingSecret
+  # names a Secret that already holds the token.
   token: ""
+  # PEM-encoded CA bundle used to verify the hub's TLS certificate. Set this
+  # when the hub serves a certificate signed by a private CA or is
+  # self-signed. Leave empty to use the operating system trust store.
+  caBundle: ""
+  # Name of an existing Secret that holds the hub registration token. When
+  # set, the chart does not render its own token Secret and hub.token is
+  # ignored. Useful with External Secrets Operator / Sealed Secrets so the
+  # token never appears in values.
+  existingSecret: ""
+  # Key within hub.existingSecret that holds the registration token.
+  existingSecretKey: "hub-token"
 
 tenant:
   id: default

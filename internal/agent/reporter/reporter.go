@@ -36,7 +36,7 @@ func New(cfg *config.Config) *Reporter {
 		token:       cfg.HubToken,
 		clusterName: cfg.ClusterName,
 		tenantID:    cfg.TenantID,
-		client:      &http.Client{Timeout: requestTimeout},
+		client:      cfg.HubHTTPClient(requestTimeout),
 	}
 }
 

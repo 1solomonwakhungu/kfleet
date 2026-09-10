@@ -6,15 +6,17 @@ metadata:
   labels:
     {{- include "kfleet-agent.labels" . | nindent 4 }}
 rules:
+  # The collector lists cluster-wide resources on every report interval; it
+  # never watches or fetches individual objects, so only `list` is granted.
   - apiGroups: [""]
     resources: ["pods", "services", "nodes", "events", "namespaces"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["list"]
   # Pod log streaming is served by the agent over its reverse channel to the
   # hub, so the agent needs read access to the pod log subresource.
   - apiGroups: [""]
     resources: ["pods/log"]
-    verbs: ["get", "list"]
-  - apiGroups: ["apps"]
-    resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get"]
 {{- end }}
