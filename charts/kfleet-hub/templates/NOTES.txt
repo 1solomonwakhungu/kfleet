@@ -43,7 +43,17 @@ The kfleet hub has been installed. Release: {{ .Release.Name }}
 
     kubectl -n {{ $ns }} get secret {{ include "kfleet-hub.bootstrapAdmin.secretName" . }} -o jsonpath='{.data.{{ include "kfleet-hub.bootstrapAdmin.passwordKey" . }}}' | base64 -d && echo
 
-4. Install an agent into every cluster you want to manage. hub.url must be
+{{- $nextStep := 4 }}
+{{- if not .Values.registration.existingSecret }}
+
+4. Retrieve the agent registration token for the agent install below:
+
+    kubectl -n {{ $ns }} get secret {{ $fullname }} -o jsonpath='{.data.registration-token}' | base64 -d && echo
+
+{{- $nextStep = 5 }}
+{{- end }}
+
+{{ $nextStep }}. Install an agent into every cluster you want to manage. hub.url must be
    reachable from that cluster:
 
     helm upgrade --install kfleet-agent \
