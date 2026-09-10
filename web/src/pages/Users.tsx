@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type FormEvent } from 'react'
 import { Button, Flash, FormControl, Heading, IconButton, Select, Text, TextInput } from '@primer/react'
 import { Blankslate, SkeletonText } from '@primer/react/experimental'
-import { PersonAddIcon, SyncIcon, TrashIcon } from '@primer/octicons-react'
+import { CopyIcon, KeyIcon, PersonAddIcon, SyncIcon, TrashIcon } from '@primer/octicons-react'
 
 import { useAuth } from '../auth/AuthContext'
 import { ConfirmDialog } from '../components/admin/ConfirmDialog'
@@ -15,6 +15,23 @@ import styles from './Users.module.css'
 
 const minPasswordLength = 12
 const maxPasswordLength = 72
+
+const passwordAlphabet = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#%^*_-+='
+const generatedPasswordLength = 24
+
+/**
+ * Generates the random password handed to the hub on reset. The plaintext is
+ * only ever held in component state and shown once.
+ */
+function generatePassword(): string {
+  const bytes = new Uint8Array(generatedPasswordLength)
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes)
+  } else {
+    for (let index = 0; index < bytes.length; index++) bytes[index] = Math.floor(Math.random() * 256)
+  }
+  return Array.from(bytes, (byte) => passwordAlphabet[byte % passwordAlphabet.length]).join('')
+}
 
 function formatTimestamp(value: string): string {
   const parsed = new Date(value)
@@ -31,6 +48,11 @@ export function UsersPage() {
   const [pendingDelete, setPendingDelete] = useState<UserAccount | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [pendingReset, setPendingReset] = useState<UserAccount | null>(null)
+  const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
+  const [resetPassword, setResetPassword] = useState<{ username: string; password: string } | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const sortedUsers = useMemo(
     () => [...users].sort((a, b) => a.username.localeCompare(b.username)),
@@ -74,6 +96,36 @@ export function UsersPage() {
     }
   }, [pendingDelete, removeUser])
 
+  const confirmReset = useCallback(async () => {
+    if (!pendingReset) return
+    setResetting(true)
+    setResetError(null)
+    try {
+      const newPassword = generatePassword()
+      const input = { newPassword }
+      await adminApi.resetUserPassword(pendingReset.id, input)
+      setResetPassword({ username: pendingReset.username, password: newPassword })
+      setCopied(false)
+      setPendingReset(null)
+      setStatus(null)
+      await reload()
+    } catch (caught) {
+      if (!isAbortError(caught)) setResetError(messageFrom(caught, 'The password could not be reset.'))
+    } finally {
+      setResetting(false)
+    }
+  }, [pendingReset, reload])
+
+  const copyResetPassword = useCallback(async () => {
+    if (!resetPassword) return
+    try {
+      await navigator.clipboard.writeText(resetPassword.password)
+      setCopied(true)
+    } catch {
+      setCopied(false)
+    }
+  }, [resetPassword])
+
   if (!isAdmin) {
     return (
       <main className={layout.page}>
@@ -115,6 +167,21 @@ export function UsersPage() {
           </Flash>
         )}
       </div>
+
+      {resetPassword && (
+        <section className={`${layout.box} ${styles.passwordReveal}`} role="status">
+          <Text weight="semibold">New password for {resetPassword.username}</Text>
+          <Text className={layout.pageDescription}>
+            Copy it now — share it over a secure channel. The hub stores only a hash and will not show it again.
+          </Text>
+          <div className={styles.passwordRow}>
+            <code className={styles.passwordValue}>{resetPassword.password}</code>
+            <Button leadingVisual={CopyIcon} onClick={() => void copyResetPassword()}>
+              {copied ? 'Copied' : 'Copy'}
+            </Button>
+          </div>
+        </section>
+      )}
 
       <div className={styles.columns}>
         <section aria-busy={loading} aria-labelledby="user-list-title">
@@ -195,6 +262,17 @@ export function UsersPage() {
                               >
                                 {account.disabled ? 'Reactivate' : 'Deactivate'}
                               </Button>
+                              <Button
+                                leadingVisual={KeyIcon}
+                                disabled={busy || isSelf}
+                                title={isSelf ? 'You cannot reset your own password here.' : undefined}
+                                onClick={() => {
+                                  setResetError(null)
+                                  setPendingReset(account)
+                                }}
+                              >
+                                Reset password
+                              </Button>
                               <IconButton
                                 icon={TrashIcon}
                                 variant="danger"
@@ -240,6 +318,22 @@ export function UsersPage() {
           actions remain in the audit log.
         </p>
         <p>This cannot be undone. Deactivate the account instead if you may need it later.</p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={pendingReset !== null}
+        title={`Reset ${pendingReset?.username ?? 'user'}'s password?`}
+        confirmLabel="Reset password"
+        pending={resetting}
+        error={resetError}
+        onCancel={() => setPendingReset(null)}
+        onConfirm={() => void confirmReset()}
+      >
+        <p>
+          A new password is generated and shown once after the reset. All of {pendingReset?.username}&apos;s sessions
+          are signed out immediately, including any you did not create.
+        </p>
+        <p>Share the new password over a secure channel; the change is recorded in the audit log.</p>
       </ConfirmDialog>
     </main>
   )

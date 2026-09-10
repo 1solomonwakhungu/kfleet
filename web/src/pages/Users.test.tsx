@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAuth } from '../auth/AuthContext'
@@ -12,6 +12,7 @@ vi.mock('../lib/adminApi', () => ({
     createUser: vi.fn(),
     updateUser: vi.fn(),
     deleteUser: vi.fn(),
+    resetUserPassword: vi.fn(),
     listAuditEvents: vi.fn(),
     rotateRegistrationToken: vi.fn(),
   },
@@ -172,5 +173,58 @@ describe('UsersPage', () => {
     await screen.findByText('admin@example.com')
     expect(screen.getByLabelText('Delete admin').hasAttribute('disabled')).toBe(true)
     expect(screen.getByLabelText('Delete viewer').hasAttribute('disabled')).toBe(false)
+  })
+
+  it('resets another user\u2019s password, shows it once, and refreshes the list', async () => {
+    let submittedPassword = ''
+    vi.mocked(adminApi.resetUserPassword).mockImplementation(async (_id, input) => {
+      submittedPassword = input.newPassword
+      return undefined
+    })
+
+    render(<UsersPage />)
+    const viewerRow = (await screen.findByText('viewer@example.com')).closest('tr') as HTMLTableRowElement
+    fireEvent.click(within(viewerRow).getByRole('button', { name: 'Reset password' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.textContent).toContain('shown once')
+    expect(dialog.textContent).toContain('sessions are signed out')
+    expect(adminApi.resetUserPassword).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByText('Cancel'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(adminApi.resetUserPassword).not.toHaveBeenCalled()
+
+    fireEvent.click(within(viewerRow).getByRole('button', { name: 'Reset password' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reset password' }))
+
+    await waitFor(() =>
+      expect(adminApi.resetUserPassword).toHaveBeenCalledWith('viewer-1', { newPassword: submittedPassword }),
+    )
+    expect(submittedPassword.length).toBeGreaterThanOrEqual(12)
+    expect(await screen.findByText('New password for viewer')).toBeTruthy()
+    expect(screen.getByText(submittedPassword)).toBeTruthy()
+    await waitFor(() => expect(vi.mocked(adminApi.listUsers).mock.calls.length).toBeGreaterThan(1))
+  })
+
+  it('disables resetting your own password', async () => {
+    render(<UsersPage />)
+
+    const adminRow = (await screen.findByText('admin@example.com')).closest('tr') as HTMLTableRowElement
+    const viewerRow = (await screen.findByText('viewer@example.com')).closest('tr') as HTMLTableRowElement
+    expect(within(adminRow).getByRole('button', { name: 'Reset password' }).hasAttribute('disabled')).toBe(true)
+    expect(within(viewerRow).getByRole('button', { name: 'Reset password' }).hasAttribute('disabled')).toBe(false)
+  })
+
+  it('keeps the reset dialog open and reports the hub error when a reset is rejected', async () => {
+    vi.mocked(adminApi.resetUserPassword).mockRejectedValue(new Error('session invalidation failed'))
+
+    render(<UsersPage />)
+    const viewerRow = (await screen.findByText('viewer@example.com')).closest('tr') as HTMLTableRowElement
+    fireEvent.click(within(viewerRow).getByRole('button', { name: 'Reset password' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reset password' }))
+
+    expect(await screen.findByText('session invalidation failed')).toBeTruthy()
+    expect(screen.queryByRole('dialog')).not.toBeNull()
   })
 })
