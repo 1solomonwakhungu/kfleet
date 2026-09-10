@@ -44,6 +44,27 @@ describe('useClusterDetail', () => {
     vi.restoreAllMocks();
   });
 
+  it('flags a 404 cluster status as not found', async () => {
+    vi.mocked(api.getClusterStatus).mockRejectedValue(new ApiError(404, 'cluster not found'));
+
+    const { result } = renderHook(() => useClusterDetail('cluster-gone'));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.cluster).toBeNull();
+    expect(result.current.statusNotFound).toBe(true);
+    expect(result.current.statusError).toBe('cluster not found');
+  });
+
+  it('does not flag other status errors as not found', async () => {
+    vi.mocked(api.getClusterStatus).mockRejectedValue(new ApiError(503, 'hub unavailable'));
+
+    const { result } = renderHook(() => useClusterDetail('cluster-a'));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.statusNotFound).toBe(false);
+    expect(result.current.statusError).toBe('hub unavailable');
+  });
+
   it('settles resource loading state and exposes network errors', async () => {
     vi.mocked(api.getPods).mockRejectedValue(new Error('network unavailable'));
     vi.mocked(api.getServices).mockRejectedValue(new Error('network unavailable'));

@@ -3,10 +3,12 @@ import { Button, Flash, FormControl, Heading, Text, TextInput } from '@primer/re
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { BrandLogo } from '../components/brand/BrandLogo'
 import styles from './Login.module.css'
 
 export function Login() {
+  useDocumentTitle('Sign in · kfleet')
   const { user, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()

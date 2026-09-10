@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react'
 import { Blankslate } from '@primer/react/experimental'
 import { Button, Flash, Heading, Text } from '@primer/react'
 import { AlertIcon, SearchIcon, ServerIcon, SyncIcon } from '@primer/octicons-react'
-import { useNavigate } from 'react-router-dom'
 
 import { ClusterCard } from '../components/ClusterCard'
 import { DashboardSkeleton } from '../components/dashboard/DashboardSkeleton'
 import { FleetControls, type FleetSort, type HealthFilter } from '../components/dashboard/FleetControls'
 import { FleetSummary } from '../components/dashboard/FleetSummary'
 import { useClusters } from '../hooks/useClusters'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import type { Cluster, ClusterHealth } from '../types/cluster'
 import layout from '../styles/layout.module.css'
 import styles from './Dashboard.module.css'
@@ -65,7 +65,7 @@ function matchesSearch(cluster: Cluster, query: string) {
 }
 
 export function Dashboard() {
-  const navigate = useNavigate()
+  useDocumentTitle('Dashboard · kfleet')
   const { clusters, loading, error, refresh } = useClusters()
   const [search, setSearch] = useState('')
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('all')
@@ -191,7 +191,7 @@ export function Dashboard() {
                   <ClusterCard
                     key={cluster.id}
                     cluster={cluster}
-                    onClick={() => navigate(`/clusters/${encodeURIComponent(cluster.id)}`)}
+                    to={`/clusters/${encodeURIComponent(cluster.id)}`}
                   />
                 ))}
               </div>

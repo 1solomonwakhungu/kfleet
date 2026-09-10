@@ -15,6 +15,7 @@ import { LogsTab } from '../components/detail/LogsTab'
 import { OperationalTimeline } from '../components/detail/OperationalTimeline'
 import { RemoveClusterCard } from '../components/admin/RemoveClusterCard'
 import { useClusterDetail } from '../hooks/useClusterDetail'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import type { PodInfo } from '../types/resources'
 import layout from '../styles/layout.module.css'
 import styles from './ClusterDetail.module.css'
@@ -24,6 +25,13 @@ type TabKey = 'pods' | 'services' | 'deployments' | 'events' | 'logs' | 'timelin
 export default function ClusterDetail() {
   const { id } = useParams<{ id: string }>()
   const detail = useClusterDetail(id)
+  useDocumentTitle(
+    detail.cluster
+      ? `${detail.cluster.name} · kfleet`
+      : detail.statusNotFound
+        ? 'Cluster not found · kfleet'
+        : 'Loading · kfleet',
+  )
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<TabKey>('pods')
   const [logsPod, setLogsPod] = useState<PodInfo | undefined>(undefined)
@@ -73,11 +81,12 @@ export default function ClusterDetail() {
           Clusters
         </Breadcrumbs.Item>
         <Breadcrumbs.Item selected>
-          {detail.cluster?.name ?? (detail.loading ? 'Loading…' : 'Cluster detail')}
+          {detail.cluster?.name ??
+            (detail.loading ? 'Loading…' : detail.statusNotFound ? 'Cluster not found' : 'Cluster detail')}
         </Breadcrumbs.Item>
       </Breadcrumbs>
 
-      {detail.statusError && (
+      {detail.statusError && !detail.statusNotFound && (
         <Flash variant="danger" className={styles.flash}>
           <div className={styles.flashBody}>
             <AlertIcon size={16} />
@@ -103,10 +112,24 @@ export default function ClusterDetail() {
               <Blankslate.Visual>
                 <AlertIcon size={24} />
               </Blankslate.Visual>
-              <Blankslate.Heading as="h1">Cluster overview unavailable</Blankslate.Heading>
-              <Blankslate.Description>
-                No cluster status was returned. Resource tabs remain available below when their data can be loaded.
-              </Blankslate.Description>
+              {detail.statusNotFound ? (
+                <>
+                  <Blankslate.Heading as="h1">Cluster not found</Blankslate.Heading>
+                  <Blankslate.Description>
+                    No cluster with this id is registered on the hub. It may have been removed or renamed.
+                  </Blankslate.Description>
+                  <Button as={Link} to="/" variant="primary">
+                    Back to clusters
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Blankslate.Heading as="h1">Cluster overview unavailable</Blankslate.Heading>
+                  <Blankslate.Description>
+                    No cluster status was returned. Resource tabs remain available below when their data can be loaded.
+                  </Blankslate.Description>
+                </>
+              )}
             </Blankslate>
           </div>
         )}
