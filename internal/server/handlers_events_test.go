@@ -239,7 +239,7 @@ func TestPolicyFindingRejectsOversizedBody(t *testing.T) {
 func TestStaleAndReconnectEvents(t *testing.T) {
 	httpServer, srv, st := newAgentTestServer(t, time.Second)
 	ctx := context.Background()
-	registered := agentRequest(t, httpServer, http.MethodPost, "/api/v1/agents/register", "", `{"name":"stale"}`)
+	registered := agentRequest(t, httpServer, http.MethodPost, "/api/v1/agents/register", testRegistrationToken, `{"name":"stale"}`)
 	var registration api.RegisterClusterResponse
 	decodeResponse(t, registered, &registration)
 	approveAgent(t, httpServer, registration.ClusterID)

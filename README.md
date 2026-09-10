@@ -290,6 +290,7 @@ KFLEET_SESSION_COOKIE_INSECURE=true \
 KFLEET_BOOTSTRAP_ADMIN_USERNAME=admin \
 KFLEET_BOOTSTRAP_ADMIN_EMAIL=admin@localhost \
 KFLEET_BOOTSTRAP_ADMIN_PASSWORD='local-development-password' \
+KFLEET_REGISTRATION_TOKEN=local-dev-registration-token \
 go run ./cmd/hub
 ```
 

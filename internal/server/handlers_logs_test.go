@@ -24,6 +24,9 @@ import (
 // so log tests can inspect the relay directly.
 func newLogTestServer(t *testing.T, cfg *config.Config) (*httptest.Server, *Server) {
 	t.Helper()
+	if cfg.RegistrationToken == "" {
+		cfg.RegistrationToken = testRegistrationToken
+	}
 	st, err := store.Open(filepath.Join(t.TempDir(), "kfleet.db"))
 	if err != nil {
 		t.Fatalf("store.Open() error = %v", err)
@@ -45,7 +48,7 @@ func newLogTestServer(t *testing.T, cfg *config.Config) (*httptest.Server, *Serv
 // the reverse log channel.
 func registeredLogAgent(t *testing.T, server *httptest.Server) api.RegisterClusterResponse {
 	t.Helper()
-	response := agentRequest(t, server, http.MethodPost, "/api/v1/agents/register", "", `{"name":"production"}`)
+	response := agentRequest(t, server, http.MethodPost, "/api/v1/agents/register", testRegistrationToken, `{"name":"production"}`)
 	if response.StatusCode != http.StatusCreated {
 		t.Fatalf("register agent status = %d, want %d", response.StatusCode, http.StatusCreated)
 	}
@@ -346,7 +349,7 @@ func TestAgentLogChannelRejectsUnauthorizedAgents(t *testing.T) {
 
 func TestAgentLogChannelRejectsPendingAgents(t *testing.T) {
 	server, _ := newLogTestServer(t, &config.Config{ListenAddr: ":0"})
-	response := agentRequest(t, server, http.MethodPost, "/api/v1/agents/register", "", `{"name":"pending"}`)
+	response := agentRequest(t, server, http.MethodPost, "/api/v1/agents/register", testRegistrationToken, `{"name":"pending"}`)
 	var registration api.RegisterClusterResponse
 	decodeResponse(t, response, &registration)
 

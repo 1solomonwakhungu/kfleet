@@ -2,6 +2,7 @@ package registrar
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 func TestRegisterKeepsBootstrapTokenAfterRuntimeTokenRotation(t *testing.T) {
 	requests := 0
+	var existingTokens []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
 		if got := r.Header.Get("Authorization"); got != "Bearer bootstrap-token" {
@@ -21,6 +23,11 @@ func TestRegisterKeepsBootstrapTokenAfterRuntimeTokenRotation(t *testing.T) {
 		if got := r.Header.Get("X-Kfleet-Tenant-ID"); got != "tenant-a" {
 			t.Errorf("registration %d tenant = %q, want tenant-a", requests, got)
 		}
+		var payload RegisterRequest
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode registration %d body: %v", requests, err)
+		}
+		existingTokens = append(existingTokens, payload.ExistingAgentToken)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"clusterId":"cluster-a","token":"runtime-token"}`))
@@ -41,6 +48,12 @@ func TestRegisterKeepsBootstrapTokenAfterRuntimeTokenRotation(t *testing.T) {
 	}
 	if requests != 2 || registrar.Token() != "runtime-token" {
 		t.Fatalf("requests/token = (%d, %q), want (2, runtime-token)", requests, registrar.Token())
+	}
+	if existingTokens[0] != "" {
+		t.Errorf("first registration existingAgentToken = %q, want omitted", existingTokens[0])
+	}
+	if existingTokens[1] != "runtime-token" {
+		t.Errorf("re-registration existingAgentToken = %q, want the current agent token", existingTokens[1])
 	}
 }
 
