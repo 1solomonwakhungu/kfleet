@@ -147,6 +147,25 @@ triggers, and lookup indexes. Existing cluster and agent records remain in
 place. Back up the database before upgrading, and roll back by restoring that
 backup because authentication data is not written to a separate database.
 
+## Agent registration
+
+`POST /api/v1/agents/register` fails closed: when neither a rotated
+registration token nor the static `KFLEET_REGISTRATION_TOKEN` is configured,
+the hub returns `403` with "agent registration is disabled on this hub" and
+logs a warning at startup (`set KFLEET_REGISTRATION_TOKEN to enable it`) while
+continuing to serve every other capability. Set `KFLEET_REGISTRATION_TOKEN`
+(or rotate a token as below) before agents can register.
+
+Registering a cluster name that already exists re-registers that cluster and
+rotates its agent token. The request must prove the caller still holds the
+current agent credential by sending it as `existingAgentToken`; a missing or
+wrong value is rejected with `409` ("cluster already registered; provide the
+current agent token or remove the cluster first"). A correct value proceeds
+with the normal rotation. Bundled agents send their current token on
+re-registration automatically; deployments with third-party agents that
+re-register the same cluster name must either upgrade them or remove the
+cluster first.
+
 ## Agent registration token rotation
 
 `POST /api/v1/admin/registration-token/rotate` returns a new raw registration

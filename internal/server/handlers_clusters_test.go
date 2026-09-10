@@ -292,7 +292,7 @@ func TestClusterSnapshotRejectsMalformedAndOversizedBodies(t *testing.T) {
 func registeredAgent(t *testing.T) (*httptest.Server, api.RegisterClusterResponse) {
 	t.Helper()
 	server := newTestHTTPServer(t)
-	response := agentRequest(t, server, http.MethodPost, "/api/v1/agents/register", "", `{"name":"production"}`)
+	response := agentRequest(t, server, http.MethodPost, "/api/v1/agents/register", testRegistrationToken, `{"name":"production"}`)
 	if response.StatusCode != http.StatusCreated {
 		t.Fatalf("register agent status = %d, want %d", response.StatusCode, http.StatusCreated)
 	}
@@ -358,7 +358,7 @@ func newTestHTTPServerWithStore(t *testing.T) (*httptest.Server, store.Store) {
 		t.Fatalf("store.Open() error = %v", err)
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	srv := New(&config.Config{ListenAddr: ":0"}, logger, st)
+	srv := New(&config.Config{ListenAddr: ":0", RegistrationToken: testRegistrationToken}, logger, st)
 	httpServer := httptest.NewServer(srv.httpServer.Handler)
 	t.Cleanup(func() {
 		httpServer.Close()

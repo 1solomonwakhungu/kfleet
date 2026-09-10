@@ -66,6 +66,9 @@ func main() {
 	}
 
 	srv := server.New(cfg, logger, st)
+	if server.RegistrationDisabled(ctx, st, cfg) {
+		logger.Warn("agent registration is disabled; set KFLEET_REGISTRATION_TOKEN to enable it")
+	}
 	logger.Info("starting hub server", "address", cfg.ListenAddr, "demo_mode", cfg.DemoMode)
 	if err := srv.Start(ctx); err != nil {
 		logger.Error("hub server stopped with an error", "error", err)
