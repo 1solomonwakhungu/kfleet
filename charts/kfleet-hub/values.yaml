@@ -17,6 +17,11 @@ service:
 
 persistence:
   enabled: true
+  # WARNING: setting enabled=false mounts an emptyDir instead of a PVC. The
+  # hub stores its single SQLite database (clusters, agents, users, sessions,
+  # audit log) under mountPath, so every pod restart loses ALL data and there
+  # is nothing to recover. Disable persistence only for throwaway demo or
+  # ephemeral CI environments.
   size: 1Gi
   mountPath: /data
   storageClass: ""
@@ -39,12 +44,24 @@ ingress:
     hosts: []
 
 registration:
+  # Required unless registration.existingSecret points at a Secret that holds
+  # the agent registration token. The chart fails at install time when both
+  # are empty: an empty KFLEET_REGISTRATION_TOKEN would ship agent
+  # registration open.
   token: ""
+  # Name of an existing Secret holding the registration token instead of the
+  # chart-managed Secret. existingSecretKey defaults to "registration-token".
+  existingSecret: ""
+  existingSecretKey: "registration-token"
 
 alerts:
   webhook:
-    # Leave empty to retain alert history without sending notifications.
+    # Leave empty to retain alert history without sending notifications. When
+    # set, the URL is rendered into the chart Secret (alert-webhook-url key)
+    # and injected into the hub through valueFrom.
     url: ""
+    # HMAC signing secret for webhook payloads. Always rendered into the
+    # chart-managed Secret (alert-webhook-secret key).
     secret: ""
   maxAttempts: 5
   retryBase: 5s
@@ -66,6 +83,13 @@ auth:
     username: ""
     email: ""
     password: ""
+    # Name of an existing Secret holding the bootstrap admin credentials
+    # instead of the chart-managed Secret. The *Key values default to the
+    # chart-managed key names above and must match keys in existingSecret.
+    existingSecret: ""
+    existingSecretUsernameKey: "bootstrap-admin-username"
+    existingSecretEmailKey: "bootstrap-admin-email"
+    existingSecretPasswordKey: "bootstrap-admin-password"
 
 resources:
   requests:
