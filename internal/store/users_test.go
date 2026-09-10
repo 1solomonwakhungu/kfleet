@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -393,5 +394,60 @@ func TestSQLiteStoreAuditEventsAreAppendOnly(t *testing.T) {
 	}
 	if len(events) != 1 || events[0].ID != event.ID || events[0].Action != event.Action {
 		t.Fatalf("audit events after mutation attempts = %+v, want original event", events)
+	}
+}
+
+func TestSQLiteStoreDeleteExpiredSessionsRemovesMultipleBatches(t *testing.T) {
+	t.Parallel()
+	st := newTestStore(t)
+	ctx := context.Background()
+
+	user := newTestUserRecord(types.RoleOperator)
+	if err := st.CreateUser(ctx, user); err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+
+	// 1200 expired sessions force the pruner through three full 500-row
+	// batches and a final partial one, proving the loop terminates and
+	// covers every expired session in a single call.
+	const expiredTotal = 1200
+	const retainedTotal = 2
+	now := time.Now().UTC()
+	for i := 0; i < expiredTotal+retainedTotal; i++ {
+		tokenHash := fmt.Sprintf("expired-hash-%d", i)
+		expiresAt := now.Add(-time.Hour)
+		if i >= expiredTotal {
+			tokenHash = fmt.Sprintf("retained-hash-%d", i)
+			expiresAt = now.Add(time.Hour)
+		}
+		if err := st.CreateSession(ctx, tokenHash, user.ID, expiresAt); err != nil {
+			t.Fatalf("CreateSession(%d) error = %v", i, err)
+		}
+	}
+
+	if err := st.DeleteExpiredSessions(ctx, now); err != nil {
+		t.Fatalf("DeleteExpiredSessions() error = %v", err)
+	}
+
+	for i := 0; i < expiredTotal; i++ {
+		if _, err := st.GetSessionUser(ctx, fmt.Sprintf("expired-hash-%d", i), now); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("GetSessionUser(expired-hash-%d) error = %v, want %v", i, err, ErrNotFound)
+		}
+	}
+	for i := 0; i < retainedTotal; i++ {
+		got, err := st.GetSessionUser(ctx, fmt.Sprintf("retained-hash-%d", expiredTotal+i), now)
+		if err != nil {
+			t.Fatalf("GetSessionUser(retained-hash-%d) error = %v", i, err)
+		}
+		if got.ID != user.ID {
+			t.Fatalf("GetSessionUser(retained-hash-%d) = user %q, want %q", i, got.ID, user.ID)
+		}
+	}
+
+	if err := st.DeleteExpiredSessions(ctx, now); err != nil {
+		t.Fatalf("DeleteExpiredSessions() second call error = %v", err)
+	}
+	if _, err := st.GetSessionUser(ctx, fmt.Sprintf("retained-hash-%d", expiredTotal), now); err != nil {
+		t.Fatalf("GetSessionUser(retained-hash-%d) after second prune error = %v, want nil", expiredTotal, err)
 	}
 }
