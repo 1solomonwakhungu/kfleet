@@ -8,8 +8,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
+	"github.com/1solomonwakhungu/kfleet/internal/agent/hubcontact"
 )
 
 func TestRegisterKeepsBootstrapTokenAfterRuntimeTokenRotation(t *testing.T) {
@@ -39,7 +41,7 @@ func TestRegisterKeepsBootstrapTokenAfterRuntimeTokenRotation(t *testing.T) {
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
 		TenantID:    "tenant-a",
-	}, nil)
+	}, nil, nil)
 	if _, err := registrar.Register(context.Background(), "v1.32.3"); err != nil {
 		t.Fatalf("first Register() error = %v", err)
 	}
@@ -95,7 +97,7 @@ func TestHeartbeatSignalsApprovalOnce(t *testing.T) {
 		HubURL:      server.URL,
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
-	}, nil)
+	}, nil, nil)
 
 	first, err := registrar.Register(context.Background(), "v1.32.3")
 	if err != nil {
@@ -175,7 +177,7 @@ func TestHeartbeatAfterApprovedRegistrationNeverSignals(t *testing.T) {
 		HubURL:      server.URL,
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
-	}, nil)
+	}, nil, nil)
 	if _, err := registrar.Register(context.Background(), "v1.32.3"); err != nil {
 		t.Fatalf("Register() error = %v", err)
 	}
@@ -208,7 +210,7 @@ func TestHeartbeatServerErrorReturnsError(t *testing.T) {
 		HubURL:      server.URL,
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
-	}, nil)
+	}, nil, nil)
 	reregister, err := registrar.Heartbeat(context.Background())
 	if err == nil {
 		t.Fatal("Heartbeat() error = nil, want error for server failure")
@@ -232,7 +234,7 @@ func TestRegisterSurfacesHubErrorBody(t *testing.T) {
 		HubURL:      server.URL,
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
-	}, nil)
+	}, nil, nil)
 	_, err := registrar.Register(context.Background(), "v1.32.3")
 	if err == nil {
 		t.Fatal("Register() error = nil, want error for rejected registration")
@@ -257,7 +259,7 @@ func TestRegisterSurfacesNonJSONErrorBody(t *testing.T) {
 		HubURL:      server.URL,
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
-	}, nil)
+	}, nil, nil)
 	_, err := registrar.Register(context.Background(), "v1.32.3")
 	if err == nil {
 		t.Fatal("Register() error = nil, want error for rejected registration")
@@ -281,7 +283,7 @@ func TestRegisterUnauthorizedSurfacesHubErrorBody(t *testing.T) {
 		HubURL:      server.URL,
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
-	}, nil)
+	}, nil, nil)
 	_, err := registrar.Register(context.Background(), "v1.32.3")
 	if err == nil {
 		t.Fatal("Register() error = nil, want error for rejected token")
@@ -308,7 +310,7 @@ func TestHeartbeatSurfacesHubErrorBody(t *testing.T) {
 		HubURL:      server.URL,
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
-	}, nil)
+	}, nil, nil)
 	reregister, err := registrar.Heartbeat(context.Background())
 	if err == nil {
 		t.Fatal("Heartbeat() error = nil, want error for rejected heartbeat")
@@ -336,12 +338,99 @@ func TestHeartbeatTreatsEmptyBodyAsPending(t *testing.T) {
 		HubURL:      server.URL,
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
-	}, nil)
+	}, nil, nil)
 	reregister, err := registrar.Heartbeat(context.Background())
 	if err != nil {
 		t.Fatalf("Heartbeat() error = %v, want nil for an empty response body", err)
 	}
 	if reregister {
 		t.Error("Heartbeat() signaled re-registration for an empty response body")
+	}
+}
+
+// TestSuccessfulHubCallsMarkContact proves a successful registration and a
+// successful heartbeat refresh the readiness tracker while failures leave it
+// untouched, so the readiness probe reflects real hub reachability.
+func TestSuccessfulHubCallsMarkContact(t *testing.T) {
+	tracker := hubcontact.NewTracker(time.Minute)
+	clock := time.Now()
+	tracker.SetClockForTesting(func() time.Time { return clock })
+
+	if tracker.Ready() {
+		t.Fatal("tracker ready before any hub call, want false")
+	}
+
+	registerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"clusterId":"cluster-a","token":"agent-token"}`))
+	}))
+	t.Cleanup(registerServer.Close)
+
+	registrar := New(&config.Config{
+		HubURL:      registerServer.URL,
+		ClusterName: "cluster-a",
+		HubToken:    "bootstrap-token",
+	}, nil, tracker)
+	if _, err := registrar.Register(context.Background(), "v1.32.3"); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	if !tracker.Ready() {
+		t.Fatal("tracker not ready after a successful registration, want ready")
+	}
+
+	clock = clock.Add(2 * time.Minute)
+	if tracker.Ready() {
+		t.Fatal("tracker ready after the contact window passed, want stale")
+	}
+
+	heartbeatServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"clusterId":"cluster-a","approved":true}`))
+	}))
+	t.Cleanup(heartbeatServer.Close)
+
+	failingRegistrar := New(&config.Config{
+		HubURL:      heartbeatServer.URL,
+		ClusterName: "cluster-a",
+		HubToken:    "bootstrap-token",
+	}, nil, tracker)
+	if _, err := failingRegistrar.Heartbeat(context.Background()); err != nil {
+		t.Fatalf("Heartbeat() error = %v", err)
+	}
+	if !tracker.Ready() {
+		t.Fatal("tracker not ready after a successful heartbeat, want ready")
+	}
+}
+
+// TestFailedHubCallsDoNotMarkContact proves failed registration and heartbeat
+// attempts never refresh the readiness tracker.
+func TestFailedHubCallsDoNotMarkContact(t *testing.T) {
+	tracker := hubcontact.NewTracker(time.Minute)
+	clock := time.Now()
+	tracker.SetClockForTesting(func() time.Time { return clock })
+	tracker.MarkRegistered()
+	clock = clock.Add(2 * time.Minute)
+	if tracker.Ready() {
+		t.Fatal("tracker ready before the failure checks, want stale")
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "hub unavailable", http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+
+	registrar := New(&config.Config{
+		HubURL:      server.URL,
+		ClusterName: "cluster-a",
+		HubToken:    "bootstrap-token",
+	}, nil, tracker)
+	if _, err := registrar.Register(context.Background(), "v1.32.3"); err == nil {
+		t.Fatal("Register() error = nil, want error for server failure")
+	}
+	if _, err := registrar.Heartbeat(context.Background()); err == nil {
+		t.Fatal("Heartbeat() error = nil, want error for server failure")
+	}
+	if tracker.Ready() {
+		t.Fatal("tracker ready after failed hub calls, want stale")
 	}
 }

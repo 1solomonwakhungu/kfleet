@@ -32,6 +32,15 @@ cluster:
 reportInterval: 30s
 
 health:
+  # Port the agent serves its probe endpoints on.
+  # /healthz is plain liveness and always answers 200.
+  # /readyz answers 200 only once the agent has registered with the hub and
+  # a registration, heartbeat, or status report succeeded within 3x the
+  # agent heartbeat interval (45s). During a hub outage the pod reports
+  # NotReady until contact resumes; kubelet does not restart it. Keep the
+  # readiness probe's initialDelaySeconds small (5s) so the first contact
+  # gates readiness quickly while the probe's failureThreshold absorbs the
+  # startup registration delay.
   port: 8081
 
 resources:

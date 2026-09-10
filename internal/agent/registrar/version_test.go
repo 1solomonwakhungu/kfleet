@@ -43,7 +43,7 @@ func TestRegisterReportsStampedVersion(t *testing.T) {
 		ClusterName: "cluster-a",
 		HubToken:    "bootstrap-token",
 		TenantID:    "default",
-	}, nil)
+	}, nil, nil)
 	if _, err := registrar.Register(context.Background(), "v1.32.3"); err != nil {
 		t.Fatalf("Register() error = %v", err)
 	}
