@@ -15,6 +15,7 @@ import (
 
 	"github.com/1solomonwakhungu/kfleet/internal/agent/collector"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
+	"github.com/1solomonwakhungu/kfleet/internal/agent/hubcontact"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/huberrors"
 )
 
@@ -27,16 +28,21 @@ type Reporter struct {
 	clusterName string
 	tenantID    string
 	client      *http.Client
+	// contact records successful reports for the readiness probe. It may
+	// be nil, in which case nothing is recorded.
+	contact *hubcontact.Tracker
 }
 
-// New constructs a reporter from agent configuration.
-func New(cfg *config.Config) *Reporter {
+// New constructs a reporter from agent configuration. contact, when
+// non-nil, is marked on every successful report.
+func New(cfg *config.Config, contact *hubcontact.Tracker) *Reporter {
 	return &Reporter{
 		hubURL:      strings.TrimRight(cfg.HubURL, "/"),
 		token:       cfg.HubToken,
 		clusterName: cfg.ClusterName,
 		tenantID:    cfg.TenantID,
 		client:      cfg.HubHTTPClient(requestTimeout),
+		contact:     contact,
 	}
 }
 
@@ -66,5 +72,6 @@ func (r *Reporter) Report(ctx context.Context, state *collector.ClusterState) er
 		return errors.New(huberrors.WithDetail(fmt.Sprintf("hub returned status %s", response.Status), response))
 	}
 	_, _ = io.Copy(io.Discard, response.Body)
+	r.contact.MarkContact()
 	return nil
 }

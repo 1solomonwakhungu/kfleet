@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"github.com/1solomonwakhungu/kfleet/internal/agent/collector"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/health"
+	"github.com/1solomonwakhungu/kfleet/internal/agent/hubcontact"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/logs"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/registrar"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/reporter"
@@ -25,38 +25,37 @@ const (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
-
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Error("invalid agent configuration; the agent cannot start", "error", err)
+		slog.Error("invalid agent configuration; the agent cannot start", "error", err)
 		fmt.Fprintf(os.Stderr, "kfleet agent configuration error: %v\n", err)
 		os.Exit(1)
 	}
-	labels, err := clusterLabels(os.Getenv("KFLEET_CLUSTER_LABELS"))
-	if err != nil {
-		logger.Error("failed to parse cluster labels", "error", err)
-		os.Exit(1)
-	}
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: logLevel(cfg.LogLevel),
+	}))
+	slog.SetDefault(logger)
+
 	clusterCollector, err := collector.New(cfg)
 	if err != nil {
 		logger.Error("failed to create Kubernetes collector", "error", err)
 		os.Exit(1)
 	}
-	agentRegistrar := registrar.New(cfg, labels)
+	hubContact := hubcontact.NewTracker(3 * heartbeatInterval)
+	agentRegistrar := registrar.New(cfg, cfg.ClusterLabels, hubContact)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
 	healthErrors := make(chan error, 1)
 	go func() {
-		healthErrors <- health.Serve(ctx, cfg.HealthAddress)
+		healthErrors <- health.Serve(ctx, cfg.HealthAddress, hubContact)
 	}()
 	agentDone := make(chan struct{})
 	go func() {
 		defer close(agentDone)
-		run(ctx, cfg, clusterCollector, agentRegistrar, logger)
+		run(ctx, cfg, clusterCollector, agentRegistrar, hubContact, logger)
 	}()
 
 	select {
@@ -78,6 +77,7 @@ func run(
 	cfg *config.Config,
 	clusterCollector *collector.Collector,
 	agentRegistrar *registrar.Registrar,
+	hubContact *hubcontact.Tracker,
 	logger *slog.Logger,
 ) {
 	backoff := registrar.NewBackoff()
@@ -114,7 +114,7 @@ func run(
 
 		reportCfg := *cfg
 		reportCfg.HubToken = agentRegistrar.Token()
-		clusterReporter := reporter.New(&reportCfg)
+		clusterReporter := reporter.New(&reportCfg, hubContact)
 
 		// The log channel is scoped to this registration: its token becomes
 		// invalid as soon as the agent re-registers, so it is torn down
@@ -218,13 +218,15 @@ func waitForRetry(ctx context.Context, delay time.Duration) bool {
 	}
 }
 
-func clusterLabels(raw string) (map[string]string, error) {
-	if raw == "" {
-		return map[string]string{}, nil
+func logLevel(level string) slog.Level {
+	switch level {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
-	var labels map[string]string
-	if err := json.Unmarshal([]byte(raw), &labels); err != nil {
-		return nil, fmt.Errorf("decode KFLEET_CLUSTER_LABELS: %w", err)
-	}
-	return labels, nil
 }
