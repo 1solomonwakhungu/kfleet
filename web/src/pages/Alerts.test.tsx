@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 
 import { api } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
@@ -61,7 +62,7 @@ describe('AlertsPage', () => {
   })
 
   it('renders alert history and acknowledges a firing alert', async () => {
-    render(<AlertsPage />)
+    render(<AlertsPage />, { wrapper: MemoryRouter })
 
     expect(await screen.findByText('production is degraded')).toBeTruthy()
     expect(screen.getByText('Retrying')).toBeTruthy()
@@ -71,6 +72,49 @@ describe('AlertsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }))
     await waitFor(() => expect(api.acknowledgeAlert).toHaveBeenCalledWith('alert-1'))
     expect(await screen.findAllByText('Acknowledged')).toHaveLength(3)
+  })
+
+  it('renders the affected cluster as a link to the cluster detail page', async () => {
+    render(<AlertsPage />, { wrapper: MemoryRouter })
+
+    const link = await screen.findByRole('link', { name: 'production' })
+    expect(link.getAttribute('href')).toBe('/clusters/cluster-a')
+  })
+
+  it('polls for alert updates every 15 seconds and stops after unmount', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      const teammateAcknowledged: Alert = {
+        ...alert,
+        status: 'acknowledged',
+        acknowledgedBy: 'teammate',
+      }
+      vi.mocked(api.listAlerts)
+        .mockClear()
+        .mockResolvedValueOnce([alert])
+        .mockResolvedValueOnce([teammateAcknowledged])
+
+      const { unmount } = render(<AlertsPage />, { wrapper: MemoryRouter })
+
+      expect(await screen.findByText('production is degraded')).toBeTruthy()
+      expect(screen.getByRole('link', { name: 'production' })).toBeTruthy()
+
+      await act(async () => {
+        vi.advanceTimersByTime(15_000)
+      })
+
+      expect(api.listAlerts).toHaveBeenCalledTimes(2)
+      expect(await screen.findByText('by teammate')).toBeTruthy()
+
+      unmount()
+      await act(async () => {
+        vi.advanceTimersByTime(30_000)
+      })
+
+      expect(api.listAlerts).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps alert acknowledgements read-only for viewers', async () => {
@@ -89,7 +133,7 @@ describe('AlertsPage', () => {
       logout: vi.fn(),
     })
 
-    render(<AlertsPage />)
+    render(<AlertsPage />, { wrapper: MemoryRouter })
 
     const button = await screen.findByRole('button', { name: 'View only' })
     expect((button as HTMLButtonElement).disabled).toBe(true)
