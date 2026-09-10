@@ -1,3 +1,4 @@
+{{- include "kfleet-hub.validateValues" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -65,11 +66,14 @@ spec:
             - name: KFLEET_REGISTRATION_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kfleet-hub.fullname" . }}
-                  key: registration-token
+                  name: {{ include "kfleet-hub.registration.secretName" . }}
+                  key: {{ include "kfleet-hub.registration.secretKey" . }}
             {{- if .Values.alerts.webhook.url }}
             - name: KFLEET_ALERT_WEBHOOK_URL
-              value: {{ .Values.alerts.webhook.url | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kfleet-hub.fullname" . }}
+                  key: alert-webhook-url
             - name: KFLEET_ALERT_WEBHOOK_SECRET
               valueFrom:
                 secretKeyRef:
@@ -91,18 +95,18 @@ spec:
             - name: KFLEET_BOOTSTRAP_ADMIN_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kfleet-hub.fullname" . }}
-                  key: bootstrap-admin-username
+                  name: {{ include "kfleet-hub.bootstrapAdmin.secretName" . }}
+                  key: {{ include "kfleet-hub.bootstrapAdmin.usernameKey" . }}
             - name: KFLEET_BOOTSTRAP_ADMIN_EMAIL
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kfleet-hub.fullname" . }}
-                  key: bootstrap-admin-email
+                  name: {{ include "kfleet-hub.bootstrapAdmin.secretName" . }}
+                  key: {{ include "kfleet-hub.bootstrapAdmin.emailKey" . }}
             - name: KFLEET_BOOTSTRAP_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kfleet-hub.fullname" . }}
-                  key: bootstrap-admin-password
+                  name: {{ include "kfleet-hub.bootstrapAdmin.secretName" . }}
+                  key: {{ include "kfleet-hub.bootstrapAdmin.passwordKey" . }}
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
