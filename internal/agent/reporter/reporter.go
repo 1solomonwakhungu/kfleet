@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/1solomonwakhungu/kfleet/internal/agent/collector"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
+	"github.com/1solomonwakhungu/kfleet/internal/agent/huberrors"
 )
 
 const requestTimeout = 10 * time.Second
@@ -61,8 +63,7 @@ func (r *Reporter) Report(ctx context.Context, state *collector.ClusterState) er
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		_, _ = io.Copy(io.Discard, response.Body)
-		return fmt.Errorf("hub returned status %s", response.Status)
+		return errors.New(huberrors.WithDetail(fmt.Sprintf("hub returned status %s", response.Status), response))
 	}
 	_, _ = io.Copy(io.Discard, response.Body)
 	return nil

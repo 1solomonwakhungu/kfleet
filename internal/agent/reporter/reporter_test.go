@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/1solomonwakhungu/kfleet/internal/agent/collector"
@@ -48,5 +49,27 @@ func TestReportReturnsStatusError(t *testing.T) {
 	r := New(&config.Config{HubURL: server.URL, ClusterName: "production"})
 	if err := r.Report(context.Background(), &collector.ClusterState{}); err == nil {
 		t.Fatal("Report() error = nil, want status error")
+	}
+}
+
+// TestReportSurfacesHubErrorBody proves a rejected report carries the hub's
+// explanation so operators can diagnose it from agent logs.
+func TestReportSurfacesHubErrorBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":"agent is pending approval","code":403}`))
+	}))
+	defer server.Close()
+	r := New(&config.Config{HubURL: server.URL, ClusterName: "production"})
+	err := r.Report(context.Background(), &collector.ClusterState{})
+	if err == nil {
+		t.Fatal("Report() error = nil, want status error")
+	}
+	if !strings.Contains(err.Error(), "hub returned status 403 Forbidden") {
+		t.Errorf("Report() error = %q, want it to describe the status", err)
+	}
+	if !strings.Contains(err.Error(), "agent is pending approval") {
+		t.Errorf("Report() error = %q, want it to carry the hub's error body", err)
 	}
 }
