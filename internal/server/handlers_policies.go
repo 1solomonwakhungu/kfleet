@@ -20,9 +20,6 @@ var tenantIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
 func (s *Server) registerPolicyRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/policies", s.requireAuth(s.handleListPolicies))
 	mux.HandleFunc("GET /api/v1/policies/results", s.requireAuth(s.handlePolicyResults))
-	mux.HandleFunc("GET /api/v1/policies/summary", s.requireAuth(s.handlePolicyResults))
-	mux.HandleFunc("GET /api/v1/policy-results", s.requireAuth(s.handlePolicyResults))
-	mux.HandleFunc("GET /api/v1/drift", s.requireAuth(s.handlePolicyResults))
 	mux.HandleFunc("GET /api/v1/clusters/{id}/policy-results", s.requireAuth(s.handleClusterPolicyResults))
 }
 
