@@ -66,7 +66,7 @@ func New(cfg *config.Config, labels map[string]string) *Registrar {
 		agentVersion:      version.String(),
 		tenantID:          cfg.TenantID,
 		labels:            labels,
-		client:            &http.Client{Timeout: requestTimeout},
+		client:            cfg.HubHTTPClient(requestTimeout),
 	}
 }
 
