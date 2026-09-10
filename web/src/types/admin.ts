@@ -42,6 +42,12 @@ export interface UpdateUserInput {
   disabled: boolean
 }
 
+/** Mirrors api.UpdateUserPasswordRequest in pkg/api/api.go. */
+export interface UpdateUserPasswordInput {
+  currentPassword?: string
+  newPassword: string
+}
+
 export const roleLabels: Record<Role, string> = {
   admin: 'Admin',
   operator: 'Operator',

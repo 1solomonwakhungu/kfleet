@@ -1152,6 +1152,37 @@ func (s *sqliteStore) DeleteUser(ctx context.Context, id string) error {
 	})
 }
 
+// ResetUserPassword replaces the user's password hash and deletes all of
+// that user's sessions inside a single transaction. Running both together
+// guarantees the password changes and every session that could still be
+// authenticated with the old password dies atomically: a failure leaves the
+// old password and old sessions in force rather than a new password with
+// live sessions.
+func (s *sqliteStore) ResetUserPassword(ctx context.Context, id, passwordHash string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	result, err := tx.ExecContext(ctx, `
+		UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`,
+		passwordHash, time.Now().UTC(), id)
+	if err != nil {
+		return fmt.Errorf("update user password: %w", err)
+	}
+	if err := requireAffectedRow(result); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, id); err != nil {
+		return fmt.Errorf("delete sessions for user: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
 // withLastAdminGuard runs mutate inside a transaction that first checks
 // whether id currently is an enabled admin and, if so, whether newRole and
 // newDisabled would leave it (or removal, when newDisabled is passed as

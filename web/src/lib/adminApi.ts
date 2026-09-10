@@ -1,5 +1,5 @@
 import { request } from './api'
-import type { AuditEvent, CreateUserInput, UpdateUserInput, UserAccount } from '../types/admin'
+import type { AuditEvent, CreateUserInput, UpdateUserInput, UpdateUserPasswordInput, UserAccount } from '../types/admin'
 
 /**
  * Admin-only endpoints. Every route below is registered behind
@@ -19,6 +19,9 @@ export const adminApi = {
   // DELETE /api/v1/users/{id} responds 204, or 409 for self-deletion and last-admin removal.
   deleteUser: (id: string, signal?: AbortSignal) =>
     request<void>('DELETE', `/users/${encodeURIComponent(id)}`, undefined, signal),
+  // PATCH /api/v1/users/{id}/password responds 204 and invalidates all sessions for that user.
+  resetUserPassword: (id: string, input: UpdateUserPasswordInput, signal?: AbortSignal) =>
+    request<void>('PATCH', `/users/${encodeURIComponent(id)}/password`, input, signal),
   // GET /api/v1/audit?limit=N (limit must be 1..1000, newest first).
   listAuditEvents: (limit: number, signal?: AbortSignal) =>
     request<{ events: AuditEvent[] }>('GET', `/audit?limit=${limit}`, undefined, signal).then(
