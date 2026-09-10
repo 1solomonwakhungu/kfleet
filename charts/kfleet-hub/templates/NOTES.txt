@@ -1,0 +1,66 @@
+{{- $fullname := include "kfleet-hub.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{- $port := .Values.service.port -}}
+{{- $hubURL := "" -}}
+{{- if and .Values.ingress.enabled .Values.ingress.hosts -}}
+{{- $host := index (index .Values.ingress.hosts 0) "host" -}}
+{{- if .Values.ingress.tls.enabled -}}
+{{- $hubURL = printf "https://%s" $host -}}
+{{- else -}}
+{{- $hubURL = printf "http://%s" $host -}}
+{{- end -}}
+{{- else -}}
+{{- $hubURL = printf "http://127.0.0.1:%v" $port -}}
+{{- end -}}
+
+The kfleet hub has been installed. Release: {{ .Release.Name }}
+
+1. Access the hub UI:
+{{- if and .Values.ingress.enabled .Values.ingress.hosts }}
+
+    {{ $hubURL }}
+{{- else }}
+
+    kubectl -n {{ $ns }} port-forward svc/{{ $fullname }} {{ $port }}:{{ $port }}
+
+    then open {{ $hubURL }}
+{{- end }}
+
+2. Sign in as the bootstrap administrator:
+{{- if .Values.auth.bootstrapAdmin.existingSecret }}
+
+    Username: stored in Secret {{ include "kfleet-hub.bootstrapAdmin.secretName" . }} (key {{ include "kfleet-hub.bootstrapAdmin.usernameKey" . }})
+{{- else if .Values.auth.bootstrapAdmin.username }}
+
+    Username: {{ .Values.auth.bootstrapAdmin.username }}
+{{- else }}
+
+    No bootstrap administrator was configured; set auth.bootstrapAdmin.username,
+    auth.bootstrapAdmin.email, and auth.bootstrapAdmin.password to create one.
+{{- end }}
+
+3. Retrieve the bootstrap administrator password:
+
+    kubectl -n {{ $ns }} get secret {{ include "kfleet-hub.bootstrapAdmin.secretName" . }} -o jsonpath='{.data.{{ include "kfleet-hub.bootstrapAdmin.passwordKey" . }}}' | base64 -d && echo
+
+{{- $nextStep := 4 }}
+{{- if not .Values.registration.existingSecret }}
+
+4. Retrieve the agent registration token for the agent install below:
+
+    kubectl -n {{ $ns }} get secret {{ $fullname }} -o jsonpath='{.data.registration-token}' | base64 -d && echo
+
+{{- $nextStep = 5 }}
+{{- end }}
+
+{{ $nextStep }}. Install an agent into every cluster you want to manage. hub.url must be
+   reachable from that cluster:
+
+    helm upgrade --install kfleet-agent \
+      oci://ghcr.io/1solomonwakhungu/charts/kfleet-agent \
+      --kube-context my-cluster \
+      --namespace kfleet-system \
+      --create-namespace \
+      --set hub.url={{ $hubURL }} \
+      --set hub.token="$KFLEET_REGISTRATION_TOKEN" \
+      --set cluster.name=my-cluster

@@ -139,6 +139,24 @@ The `audit_events` table is append-only. SQLite triggers reject `UPDATE` and
 operations. Keep the database file on durable storage and include it in backup
 and retention procedures.
 
+### Backup and restore
+
+SQLite keeps recent writes in a `-wal` sidecar file, so copying a live
+`kfleet.db` can capture a torn snapshot. The distroless hub image has no
+shell or `sqlite3`, so run SQLite's consistent-snapshot commands
+(`.backup` or `VACUUM INTO`) from a one-off pod that mounts the PVC:
+
+```bash
+kubectl -n kfleet-system scale deploy/kfleet-hub --replicas=0
+kubectl -n kfleet-system run kfleet-db-backup --rm -it --restart=Never \
+  --image=alpine:3.20 \
+  --overrides '{"spec":{"containers":[{"name":"kfleet-db-backup","command":["sh","-ec","apk add --no-cache sqlite >/dev/null && sqlite3 /data/kfleet.db \".backup /data/kfleet.db.bak\""],"volumeMounts":[{"name":"data","mountPath":"/data"}]}],"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"kfleet-hub"}}]}}'
+kubectl -n kfleet-system scale deploy/kfleet-hub --replicas=1
+```
+
+To restore: stop the hub, replace the database file with the backup, and
+start the hub again.
+
 ## Database migration
 
 The hub applies additive SQLite migrations at startup. Existing databases gain

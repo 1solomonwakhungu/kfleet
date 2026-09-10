@@ -103,7 +103,8 @@ jobs:
         uses: azure/setup-helm@v4
       - name: Lint charts
         run: |
-          helm lint charts/kfleet-hub
+          helm lint charts/kfleet-hub \
+            --set registration.token=ci-validation-token
           helm lint charts/kfleet-agent \
             --set hub.url=https://kfleet.example.com \
             --set hub.token=ci-validation-token \
@@ -111,12 +112,8 @@ jobs:
       - name: Render charts
         run: |
           helm template kfleet-hub charts/kfleet-hub \
-            --namespace kfleet-system > /dev/null
-          helm template kfleet-agent charts/kfleet-agent \
             --namespace kfleet-system \
-            --set hub.url=https://kfleet.example.com \
-            --set hub.token=ci-validation-token \
-            --set cluster.name=ci-validation > /dev/null
+            --set registration.token=ci-validation-token > /dev/null
 
   web:
     runs-on: ubuntu-latest
