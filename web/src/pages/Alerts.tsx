@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Flash, Heading, Label, Spinner, Text } from '@primer/react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link as RouterLink } from 'react-router-dom'
+import { Button, Flash, Heading, Label, Link, Spinner, Text } from '@primer/react'
 import { Blankslate } from '@primer/react/experimental'
 import { AlertIcon, BellIcon, CheckIcon, StopIcon, SyncIcon, type Icon } from '@primer/octicons-react'
 
@@ -49,6 +50,7 @@ export default function AlertsPage() {
   const [loadError, setLoadError] = useState('')
   const [acknowledging, setAcknowledging] = useState<ReadonlySet<string>>(new Set())
   const [actionErrors, setActionErrors] = useState<Readonly<Record<string, string>>>({})
+  const pollControllerRef = useRef<AbortController | null>(null)
 
   const load = useCallback(async (signal?: AbortSignal, background = false) => {
     if (background) setRefreshing(true)
@@ -68,8 +70,18 @@ export default function AlertsPage() {
 
   useEffect(() => {
     const controller = new AbortController()
+    pollControllerRef.current = controller
     void load(controller.signal)
-    return () => controller.abort()
+    const interval = window.setInterval(() => {
+      pollControllerRef.current?.abort()
+      const controller = new AbortController()
+      pollControllerRef.current = controller
+      void load(controller.signal, true)
+    }, 15_000)
+    return () => {
+      window.clearInterval(interval)
+      pollControllerRef.current?.abort()
+    }
   }, [load])
 
   const acknowledge = useCallback(async (alert: Alert) => {
@@ -154,6 +166,7 @@ export default function AlertsPage() {
               <thead>
                 <tr>
                   <th scope="col">Alert</th>
+                  <th scope="col">Cluster</th>
                   <th scope="col">State</th>
                   <th scope="col">Delivery</th>
                   <th scope="col">Triggered</th>
@@ -182,6 +195,11 @@ export default function AlertsPage() {
                             {alert.id}
                           </span>
                         </div>
+                      </td>
+                      <td>
+                        <Link as={RouterLink} to={`/clusters/${alert.clusterId}`}>
+                          {alert.clusterName || alert.clusterId}
+                        </Link>
                       </td>
                       <td>
                         <Label variant={statusVariants[alert.status]}>{statusLabels[alert.status]}</Label>
