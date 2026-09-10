@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/auth"
+	"github.com/1solomonwakhungu/kfleet/internal/config"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
 	"github.com/1solomonwakhungu/kfleet/pkg/api"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
@@ -123,8 +124,16 @@ func hashToken(raw string) string {
 }
 
 func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
-	if !s.validRegistrationToken(r.Context(), r.Header.Get("Authorization")) {
+	switch s.checkRegistrationAuth(r.Context(), r.Header.Get("Authorization")) {
+	case registrationDisabled:
+		s.logger.Warn("agent registration rejected: registration is disabled on this hub")
+		api.WriteError(w, http.StatusForbidden, "agent registration is disabled on this hub")
+		return
+	case registrationBadToken:
 		api.WriteError(w, http.StatusUnauthorized, "invalid registration token")
+		return
+	case registrationStoreError:
+		api.WriteError(w, http.StatusInternalServerError, "failed to register agent")
 		return
 	}
 	var request api.RegisterClusterRequest
@@ -168,6 +177,22 @@ func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("failed to find agent cluster", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "failed to register agent")
 		return
+	} else {
+		// Registration rotates the cluster's agent token, so an existing
+		// cluster name may only be re-registered by the caller that still
+		// holds the current credential. Without this proof, any caller with
+		// the registration token could take over a registered cluster's
+		// identity.
+		valid, err := s.validExistingAgentToken(r.Context(), cluster.ID, request.ExistingAgentToken)
+		if err != nil {
+			s.logger.Error("failed to validate existing agent token", "cluster_id", cluster.ID, "error", err)
+			api.WriteError(w, http.StatusInternalServerError, "failed to register agent")
+			return
+		}
+		if !valid {
+			api.WriteError(w, http.StatusConflict, "cluster already registered; provide the current agent token or remove the cluster first")
+			return
+		}
 	}
 
 	rawToken, tokenHash := generateToken()
@@ -202,34 +227,94 @@ func (s *Server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// validRegistrationToken checks the bearer token against a rotated
-// registration token stored in the settings table, if one has ever been
-// issued via handleRotateRegistrationToken; otherwise it falls back to the
-// static KFLEET_REGISTRATION_TOKEN configured at startup. This preserves
-// the original env-var-based registration flow for installations that
-// never rotate the token.
-func (s *Server) validRegistrationToken(ctx context.Context, authorization string) bool {
+// registrationAuth classifies a registration attempt against the hub's
+// configured credentials.
+type registrationAuth int
+
+const (
+	// registrationDisabled means no registration credential is configured,
+	// so the hub fails closed and rejects the attempt outright.
+	registrationDisabled registrationAuth = iota
+	// registrationBadToken means registration is enabled but the presented
+	// credential is missing or wrong.
+	registrationBadToken
+	// registrationStoreError means the credential state could not be read,
+	// so the hub fails closed with a server error instead of guessing.
+	registrationStoreError
+	// registrationOK means the presented credential is valid.
+	registrationOK
+)
+
+// checkRegistrationAuth classifies an agent registration attempt. It checks
+// the bearer token against a rotated registration token stored in the
+// settings table, if one has ever been issued via
+// handleRotateRegistrationToken; otherwise it falls back to the static
+// KFLEET_REGISTRATION_TOKEN configured at startup. When neither credential
+// exists the hub fails closed: unauthenticated registrations would let any
+// caller mint agent credentials and take over registered clusters, so
+// registration returns 403 instead of being admitted.
+func (s *Server) checkRegistrationAuth(ctx context.Context, authorization string) registrationAuth {
 	rotatedHash, ok, err := s.store.GetSetting(ctx, settingRegistrationTokenHash)
 	if err != nil {
 		s.logger.Error("failed to read rotated registration token setting", "error", err)
-		return false
+		return registrationStoreError
 	}
 	if ok {
 		token, tokenOK := bearerToken(authorization)
 		if !tokenOK {
-			return false
+			return registrationBadToken
 		}
-		return subtle.ConstantTimeCompare([]byte(hashToken(token)), []byte(rotatedHash)) == 1
+		if subtle.ConstantTimeCompare([]byte(hashToken(token)), []byte(rotatedHash)) == 1 {
+			return registrationOK
+		}
+		return registrationBadToken
 	}
 
 	if s.cfg.RegistrationToken == "" {
-		return true
+		return registrationDisabled
 	}
 	token, ok := bearerToken(authorization)
 	if !ok || len(token) != len(s.cfg.RegistrationToken) {
-		return false
+		return registrationBadToken
 	}
-	return subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.RegistrationToken)) == 1
+	if subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.RegistrationToken)) != 1 {
+		return registrationBadToken
+	}
+	return registrationOK
+}
+
+// RegistrationDisabled reports whether agent registration is fail-closed
+// disabled: no rotated registration token has ever been issued and no static
+// KFLEET_REGISTRATION_TOKEN is configured. cmd/hub uses it at startup to log
+// a warning while still serving every other capability. A non-nil error means
+// the setting could not be read and the disabled state is unknown.
+func RegistrationDisabled(ctx context.Context, st store.Store, cfg *config.Config) (bool, error) {
+	if cfg.RegistrationToken != "" {
+		return false, nil
+	}
+	_, ok, err := st.GetSetting(ctx, settingRegistrationTokenHash)
+	if err != nil {
+		return false, err
+	}
+	return !ok, nil
+}
+
+// validExistingAgentToken verifies proof of a cluster's current agent
+// credential during re-registration. It hashes the presented token and lets
+// the store compare it against the stored hash, the same path that
+// authenticates agent bearer tokens. A store failure other than a credential
+// mismatch is returned so callers fail closed with a server error instead of
+// reporting a wrong token.
+func (s *Server) validExistingAgentToken(ctx context.Context, clusterID, existingToken string) (bool, error) {
+	existingToken = strings.TrimSpace(existingToken)
+	if existingToken == "" {
+		return false, nil
+	}
+	_, err := s.store.ValidateAgentToken(ctx, clusterID, hashToken(existingToken))
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return false, err
+	}
+	return err == nil, nil
 }
 
 func (s *Server) findClusterByName(r *http.Request, name string) (types.Cluster, error) {

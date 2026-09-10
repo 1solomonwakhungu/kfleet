@@ -41,6 +41,11 @@ type RegisterRequest struct {
 	Labels       map[string]string `json:"labels"`
 	AgentVersion string            `json:"agentVersion"`
 	K8sVersion   string            `json:"k8sVersion"`
+	// ExistingAgentToken proves this agent still holds the cluster's
+	// current agent credential when re-registering an already registered
+	// cluster name. It is omitted on a cluster's first registration, which
+	// has no per-agent token to present yet.
+	ExistingAgentToken string `json:"existingAgentToken,omitempty"`
 }
 
 // RegisterResponse describes the hub's registration decision and the
@@ -71,6 +76,13 @@ func (r *Registrar) Register(ctx context.Context, k8sVersion string) (*RegisterR
 		Labels:       r.labels,
 		AgentVersion: r.agentVersion,
 		K8sVersion:   k8sVersion,
+	}
+	// Re-registration must prove the cluster's current agent credential.
+	// The token differs from the registration token only after a successful
+	// registration handed out a per-agent token, so the first registration
+	// omits the field.
+	if r.token != r.registrationToken {
+		payload.ExistingAgentToken = r.token
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

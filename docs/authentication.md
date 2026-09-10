@@ -151,6 +151,34 @@ hub runs SQLite in WAL journal mode, so the database directory also contains
 'kfleet-backup.db'"` or while the hub is stopped, because copying the bare
 file can miss committed writes.
 
+## Agent registration
+
+`POST /api/v1/agents/register` fails closed: when neither a rotated
+registration token nor the static `KFLEET_REGISTRATION_TOKEN` is configured,
+the hub returns `403` with "agent registration is disabled on this hub" and
+logs a warning at startup (`set KFLEET_REGISTRATION_TOKEN to enable it`) while
+continuing to serve every other capability. Set `KFLEET_REGISTRATION_TOKEN`
+(or rotate a token as below) before agents can register.
+
+Registering a cluster name that already exists re-registers that cluster and
+rotates its agent token. The request must prove the caller still holds the
+current agent credential by sending it as `existingAgentToken`; a missing or
+wrong value is rejected with `409` ("cluster already registered; provide the
+current agent token or remove the cluster first"). A correct value proceeds
+with the normal rotation.
+
+The bundled agent keeps its registration-issued token in memory for the
+lifetime of the process, so the re-registrations it makes while running —
+retrying while pending approval, and re-registering once an operator approves
+it — carry that token and rotate normally without operator action. An agent
+process that restarts loses that in-memory token and the hub never hands out
+a stored token again, so its re-registration receives `409` until an admin
+removes the cluster and lets the agent register fresh. There is no
+operator-facing agent-token reset endpoint today; removing and re-registering
+the cluster is the supported recovery. Third-party agents that re-register a
+still-registered cluster name need the same current-token proof or the same
+admin recovery.
+
 ## Agent registration token rotation
 
 `POST /api/v1/admin/registration-token/rotate` returns a new raw registration

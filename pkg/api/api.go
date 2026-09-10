@@ -27,6 +27,11 @@ type RegisterClusterRequest struct {
 	Labels       map[string]string `json:"labels"`
 	AgentVersion string            `json:"agentVersion,omitempty"`
 	K8sVersion   string            `json:"k8sVersion,omitempty"`
+	// ExistingAgentToken proves the caller still holds the cluster's
+	// current agent credential when re-registering an already registered
+	// cluster name. Re-registration rotates the stored token, so a missing
+	// or wrong value is rejected with 409 instead of rotating it.
+	ExistingAgentToken string `json:"existingAgentToken,omitempty"`
 }
 
 // RegisterClusterResponse contains the registered cluster identity and token.
