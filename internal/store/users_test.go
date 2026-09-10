@@ -249,6 +249,61 @@ func TestSQLiteStoreSessionLifecycle(t *testing.T) {
 	}
 }
 
+func TestSQLiteStoreUpdateUserPasswordAndDeleteSessionsForUser(t *testing.T) {
+	t.Parallel()
+	st := newTestStore(t)
+	ctx := context.Background()
+
+	user := newTestUserRecord(types.RoleOperator)
+	if err := st.CreateUser(ctx, user); err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+
+	now := time.Now().UTC()
+	for _, hash := range []string{"session-hash-1", "session-hash-2"} {
+		if err := st.CreateSession(ctx, hash, user.ID, now.Add(time.Hour)); err != nil {
+			t.Fatalf("CreateSession(%s) error = %v", hash, err)
+		}
+	}
+	other := newTestUserRecord(types.RoleAdmin)
+	if err := st.CreateUser(ctx, other); err != nil {
+		t.Fatalf("CreateUser(other) error = %v", err)
+	}
+	if err := st.CreateSession(ctx, "other-hash", other.ID, now.Add(time.Hour)); err != nil {
+		t.Fatalf("CreateSession(other) error = %v", err)
+	}
+
+	if err := st.UpdateUserPassword(ctx, user.ID, "new-hash"); err != nil {
+		t.Fatalf("UpdateUserPassword() error = %v", err)
+	}
+	updated, err := st.GetUserByID(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID() error = %v", err)
+	}
+	if updated.PasswordHash != "new-hash" {
+		t.Fatalf("PasswordHash = %q, want %q", updated.PasswordHash, "new-hash")
+	}
+	if err := st.UpdateUserPassword(ctx, "missing", "new-hash"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpdateUserPassword() for missing user error = %v, want %v", err, ErrNotFound)
+	}
+
+	if err := st.DeleteSessionsForUser(ctx, user.ID); err != nil {
+		t.Fatalf("DeleteSessionsForUser() error = %v", err)
+	}
+	for _, hash := range []string{"session-hash-1", "session-hash-2"} {
+		if _, err := st.GetSessionUser(ctx, hash, now); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("GetSessionUser(%s) after delete error = %v, want %v", hash, err, ErrNotFound)
+		}
+	}
+	if _, err := st.GetSessionUser(ctx, "other-hash", now); err != nil {
+		t.Fatalf("GetSessionUser(other) error = %v, want nil; other users' sessions must survive", err)
+	}
+
+	if err := st.DeleteSessionsForUser(ctx, user.ID); err != nil {
+		t.Fatalf("DeleteSessionsForUser() with no sessions error = %v", err)
+	}
+}
+
 func TestSQLiteStoreSettings(t *testing.T) {
 	t.Parallel()
 	st := newTestStore(t)

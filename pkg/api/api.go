@@ -221,6 +221,14 @@ type UpdateUserRequest struct {
 	Disabled bool       `json:"disabled"`
 }
 
+// UpdateUserPasswordRequest changes a user's password. A user changing their
+// own password must supply CurrentPassword; an admin resetting another user's
+// password omits it.
+type UpdateUserPasswordRequest struct {
+	CurrentPassword string `json:"currentPassword,omitempty"`
+	NewPassword     string `json:"newPassword"`
+}
+
 // ListAuditEventsResponse contains recent audit log entries, newest first.
 type ListAuditEventsResponse struct {
 	Events []types.AuditEvent `json:"events"`
