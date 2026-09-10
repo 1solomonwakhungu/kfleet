@@ -15,6 +15,7 @@ import (
 	kfleetmcp "github.com/1solomonwakhungu/kfleet/internal/mcp"
 	"github.com/1solomonwakhungu/kfleet/internal/server"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
+	"github.com/1solomonwakhungu/kfleet/internal/version"
 )
 
 func main() {
@@ -71,7 +72,7 @@ func main() {
 	} else if disabled {
 		logger.Warn("agent registration is disabled; set KFLEET_REGISTRATION_TOKEN to enable it")
 	}
-	logger.Info("starting hub server", "address", cfg.ListenAddr, "demo_mode", cfg.DemoMode)
+	logger.Info("starting hub server", "version", version.String(), "address", cfg.ListenAddr, "demo_mode", cfg.DemoMode)
 	if err := srv.Start(ctx); err != nil {
 		logger.Error("hub server stopped with an error", "error", err)
 		os.Exit(1)

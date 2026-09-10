@@ -146,3 +146,57 @@ func TestLogRelayOpenOnClosedConnection(t *testing.T) {
 		t.Fatalf("open() error = %v, want errNoAgentConnected", err)
 	}
 }
+
+func TestLogRelayCountsForMetrics(t *testing.T) {
+	relay := newTestRelay()
+	if relay.ConnectedAgents() != 0 {
+		t.Fatal("ConnectedAgents() != 0 on an empty relay")
+	}
+	if relay.ActiveStreams() != 0 {
+		t.Fatal("ActiveStreams() != 0 on an empty relay")
+	}
+
+	conn := newAgentLogConn("cluster-1")
+	relay.register(conn)
+	other := newAgentLogConn("cluster-2")
+	relay.register(other)
+
+	if relay.ConnectedAgents() != 2 {
+		t.Fatalf("ConnectedAgents() = %d, want 2", relay.ConnectedAgents())
+	}
+	if relay.ActiveStreams() != 0 {
+		t.Fatalf("ActiveStreams() = %d, want 0 before any stream opens", relay.ActiveStreams())
+	}
+
+	first, err := relay.open("cluster-1", logStreamRequest{Namespace: "apps", Pod: "api"})
+	if err != nil {
+		t.Fatalf("open() error = %v", err)
+	}
+	second, err := relay.open("cluster-1", logStreamRequest{Namespace: "apps", Pod: "worker"})
+	if err != nil {
+		t.Fatalf("open() error = %v", err)
+	}
+	third, err := relay.open("cluster-2", logStreamRequest{Namespace: "apps", Pod: "db"})
+	if err != nil {
+		t.Fatalf("open() error = %v", err)
+	}
+	if got := relay.ActiveStreams(); got != 3 {
+		t.Fatalf("ActiveStreams() = %d, want 3", got)
+	}
+
+	first.Close()
+	third.Close()
+	if got := relay.ActiveStreams(); got != 1 {
+		t.Fatalf("ActiveStreams() after two closes = %d, want 1", got)
+	}
+
+	// Losing an agent connection drops all of its streams from the count.
+	relay.unregister(conn)
+	if got := relay.ConnectedAgents(); got != 1 {
+		t.Fatalf("ConnectedAgents() after unregister = %d, want 1", got)
+	}
+	if got := relay.ActiveStreams(); got != 0 {
+		t.Fatalf("ActiveStreams() after unregister = %d, want 0", got)
+	}
+	second.Close()
+}
