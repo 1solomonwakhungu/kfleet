@@ -289,6 +289,107 @@ func TestSQLiteStorePruneEventsBefore(t *testing.T) {
 	}
 }
 
+func TestSQLiteStorePruneEventsBeforeRemovesMultipleBatches(t *testing.T) {
+	t.Parallel()
+
+	st, _ := newEventTestStore(t)
+	ctx := context.Background()
+
+	cluster := types.Cluster{ID: "cluster-1", Name: "production", RegisteredAt: time.Now().UTC(), Labels: map[string]string{}}
+	if err := st.CreateCluster(ctx, cluster); err != nil {
+		t.Fatalf("CreateCluster() error = %v", err)
+	}
+
+	// 1200 expired rows force the pruner through three full 500-row batches
+	// and a final partial one, proving the loop terminates and covers every
+	// expired row in a single call.
+	const expiredTotal = 1200
+	const retainedTotal = 3
+	base := time.Date(2026, time.July, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < expiredTotal+retainedTotal; i++ {
+		event := types.OperationalEvent{
+			ClusterID: cluster.ID,
+			Kind:      types.EventHeartbeatStateChange,
+			Message:   fmt.Sprintf("event-%d", i),
+			DedupeKey: fmt.Sprintf("event-%d", i),
+		}
+		if i < expiredTotal {
+			event.OccurredAt = base
+		} else {
+			event.OccurredAt = base.Add(48 * time.Hour)
+		}
+		inserted, err := st.AppendEvent(ctx, event)
+		if err != nil {
+			t.Fatalf("AppendEvent(%d) error = %v", i, err)
+		}
+		if !inserted {
+			t.Fatalf("AppendEvent(%d) inserted = false, want true", i)
+		}
+	}
+
+	cutoff := base.Add(24 * time.Hour)
+	removed, err := st.PruneEventsBefore(ctx, cutoff)
+	if err != nil {
+		t.Fatalf("PruneEventsBefore() error = %v", err)
+	}
+	if removed != expiredTotal {
+		t.Fatalf("PruneEventsBefore() removed = %d, want %d", removed, expiredTotal)
+	}
+
+	remaining := 0
+	var cursor int64
+	for pageIndex := 0; ; pageIndex++ {
+		if pageIndex > expiredTotal+retainedTotal {
+			t.Fatal("pagination did not terminate")
+		}
+		page, err := st.ListTimelineEvents(ctx, EventFilter{ClusterID: cluster.ID, Before: cursor})
+		if err != nil {
+			t.Fatalf("ListTimelineEvents(page %d) error = %v", pageIndex, err)
+		}
+		remaining += len(page.Events)
+		if page.NextCursor == 0 {
+			break
+		}
+		cursor = page.NextCursor
+	}
+	if remaining != retainedTotal {
+		t.Fatalf("remaining events after prune = %d, want %d", remaining, retainedTotal)
+	}
+
+	removed, err = st.PruneEventsBefore(ctx, cutoff)
+	if err != nil {
+		t.Fatalf("PruneEventsBefore() second call error = %v", err)
+	}
+	if removed != 0 {
+		t.Fatalf("PruneEventsBefore() second call removed = %d, want 0", removed)
+	}
+}
+
+func TestSQLiteStorePruneIndexAndJournalMode(t *testing.T) {
+	t.Parallel()
+
+	st, _ := newEventTestStore(t)
+	sqlite, ok := st.(*sqliteStore)
+	if !ok {
+		t.Fatalf("store type = %T, want *sqliteStore", st)
+	}
+
+	var indexName string
+	err := sqlite.db.QueryRow(`
+		SELECT name FROM sqlite_master
+		WHERE type = 'index' AND name = 'idx_operational_events_occurred_at'`).Scan(&indexName)
+	if err != nil {
+		t.Fatalf("prune index lookup error = %v, want the index created by migration", err)
+	}
+	var journalMode string
+	if err := sqlite.db.QueryRow("PRAGMA journal_mode").Scan(&journalMode); err != nil {
+		t.Fatalf("PRAGMA journal_mode error = %v", err)
+	}
+	if journalMode != "wal" {
+		t.Fatalf("journal_mode = %q, want wal", journalMode)
+	}
+}
+
 func TestSQLiteStoreEventsPersistAcrossRestart(t *testing.T) {
 	t.Parallel()
 
