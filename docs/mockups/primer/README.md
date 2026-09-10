@@ -39,5 +39,4 @@ choice is remembered in `localStorage`.
 - **`assets/shell.js`** renders the shared sidebar, breadcrumb topbar, and Octicon set, and handles the theme toggle.
   Pages declare their state with `data-page`, `data-breadcrumb`, and `data-shell="none"` for full-bleed screens.
 
-To turn a mockup into real UI, the equivalent production path is `@primer/react` plus `@primer/primitives`, replacing the
-current Tailwind + shadcn setup in `web/`.
+To turn a mockup into real UI, the equivalent production path is `@primer/react` plus `@primer/primitives`, which is the same Primer stack already used by the shipped app in `web/`.

@@ -336,6 +336,14 @@ action rather than reconnecting in a loop. The agent chart grants
 [Pod log streaming](docs/pod-logs.md) for the wire protocol, limits, and
 lifecycle guarantees.
 
+## Documentation
+
+The full documentation index lives at [docs/README.md](docs/README.md): the
+[REST API reference](docs/api.md), the [operations runbook](docs/operations.md)
+(environment variables, health probes, upgrades, troubleshooting), plus
+guides for authentication, alerts, pod logs, policy drift, and the public
+demo.
+
 ## Contributing
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the pull request flow, Conventional Commit format, DCO sign-off requirement, and local test/lint commands.
