@@ -249,7 +249,12 @@ func TestSQLiteStoreSessionLifecycle(t *testing.T) {
 	}
 }
 
-func TestSQLiteStoreUpdateUserPasswordAndDeleteSessionsForUser(t *testing.T) {
+// TestSQLiteStoreResetUserPassword proves ResetUserPassword applies both
+// halves of a password reset together: the hash is replaced and every
+// session for that user is gone in the same committed transaction, while
+// other users' sessions survive. A missing user leaves every session and
+// the stored hash untouched.
+func TestSQLiteStoreResetUserPassword(t *testing.T) {
 	t.Parallel()
 	st := newTestStore(t)
 	ctx := context.Background()
@@ -273,8 +278,8 @@ func TestSQLiteStoreUpdateUserPasswordAndDeleteSessionsForUser(t *testing.T) {
 		t.Fatalf("CreateSession(other) error = %v", err)
 	}
 
-	if err := st.UpdateUserPassword(ctx, user.ID, "new-hash"); err != nil {
-		t.Fatalf("UpdateUserPassword() error = %v", err)
+	if err := st.ResetUserPassword(ctx, user.ID, "new-hash"); err != nil {
+		t.Fatalf("ResetUserPassword() error = %v", err)
 	}
 	updated, err := st.GetUserByID(ctx, user.ID)
 	if err != nil {
@@ -283,24 +288,47 @@ func TestSQLiteStoreUpdateUserPasswordAndDeleteSessionsForUser(t *testing.T) {
 	if updated.PasswordHash != "new-hash" {
 		t.Fatalf("PasswordHash = %q, want %q", updated.PasswordHash, "new-hash")
 	}
-	if err := st.UpdateUserPassword(ctx, "missing", "new-hash"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("UpdateUserPassword() for missing user error = %v, want %v", err, ErrNotFound)
-	}
-
-	if err := st.DeleteSessionsForUser(ctx, user.ID); err != nil {
-		t.Fatalf("DeleteSessionsForUser() error = %v", err)
-	}
 	for _, hash := range []string{"session-hash-1", "session-hash-2"} {
 		if _, err := st.GetSessionUser(ctx, hash, now); !errors.Is(err, ErrNotFound) {
-			t.Fatalf("GetSessionUser(%s) after delete error = %v, want %v", hash, err, ErrNotFound)
+			t.Fatalf("GetSessionUser(%s) after reset error = %v, want %v", hash, err, ErrNotFound)
 		}
 	}
 	if _, err := st.GetSessionUser(ctx, "other-hash", now); err != nil {
 		t.Fatalf("GetSessionUser(other) error = %v, want nil; other users' sessions must survive", err)
 	}
 
-	if err := st.DeleteSessionsForUser(ctx, user.ID); err != nil {
-		t.Fatalf("DeleteSessionsForUser() with no sessions error = %v", err)
+	// A reset that matches no user returns ErrNotFound and must leave other
+	// users' hashes and sessions exactly as they were.
+	if err := st.ResetUserPassword(ctx, "missing", "unused-hash"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ResetUserPassword() for missing user error = %v, want %v", err, ErrNotFound)
+	}
+	updated, err = st.GetUserByID(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID() after failed reset error = %v", err)
+	}
+	if updated.PasswordHash != "new-hash" {
+		t.Fatalf("PasswordHash after failed reset = %q, want %q", updated.PasswordHash, "new-hash")
+	}
+	if err := st.CreateSession(ctx, "session-hash-3", user.ID, now.Add(time.Hour)); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	if err := st.ResetUserPassword(ctx, "missing", "unused-hash"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ResetUserPassword() for missing user with live sessions error = %v, want %v", err, ErrNotFound)
+	}
+	if _, err := st.GetSessionUser(ctx, "session-hash-3", now); err != nil {
+		t.Fatalf("GetSessionUser(session-hash-3) after failed reset error = %v, want nil; failed resets must not delete sessions", err)
+	}
+
+	// A second reset succeeds even when the user has no sessions left.
+	if err := st.ResetUserPassword(ctx, user.ID, "final-hash"); err != nil {
+		t.Fatalf("ResetUserPassword() with no sessions error = %v", err)
+	}
+	updated, err = st.GetUserByID(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID() after second reset error = %v", err)
+	}
+	if updated.PasswordHash != "final-hash" {
+		t.Fatalf("PasswordHash after second reset = %q, want %q", updated.PasswordHash, "final-hash")
 	}
 }
 
