@@ -17,6 +17,7 @@ probes, upgrades, and troubleshooting. API details live in
 | `KFLEET_HEARTBEAT_INTERVAL` | `30s` | Expected agent heartbeat cadence. Three missed intervals mark a cluster stale. Also paces the staleness monitor. |
 | `KFLEET_REGISTRATION_TOKEN` | empty | Static agent registration token. When unset and no token has ever been rotated, agent registration fails closed with `403`. |
 | `KFLEET_DEMO_MODE` | `false` | Read-only synthetic demo: in-memory fixture database, mutations rejected with `405`, background workers disabled. See [public-demo.md](public-demo.md). |
+| `KFLEET_METRICS_ENABLED` | `true` | Set to `false` to disable the unauthenticated `/metrics` endpoint (it then answers `404`). Must be a boolean. The Helm chart exposes this as `metrics.enabled`. |
 | `KFLEET_EVENT_RETENTION` | `2160h` (90 days) | How long operational timeline events are kept. Must be a positive Go duration. |
 | `KFLEET_SESSION_DURATION` | `24h` | Login session lifetime. |
 | `KFLEET_SESSION_COOKIE_INSECURE` | unset | Set to `true` to drop the `Secure` flag on the session cookie. Local plain-HTTP development only. |
@@ -32,8 +33,8 @@ probes, upgrades, and troubleshooting. API details live in
 ### Agent (`cmd/agent`)
 
 `KFLEET_HUB_URL`, `KFLEET_HUB_TOKEN`, and `KFLEET_CLUSTER_NAME` are required;
-the agent exits non-zero naming any missing variable instead of retrying
-forever.
+the agent exits non-zero naming the missing variable instead of retrying
+registration forever.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -44,6 +45,8 @@ forever.
 | `KFLEET_TENANT_ID` | `default` | Tenant identifier sent with agent traffic. Lowercase letters, numbers, dots, underscores, and hyphens. |
 | `KFLEET_CLUSTER_LABELS` | empty | JSON object of labels stored on the cluster record, e.g. `{"environment":"prod","owner":"platform"}`. |
 | `KFLEET_HEALTH_ADDR` | `:8081` | Listen address for the agent's `/healthz` and `/readyz` probes. |
+| `KFLEET_LOG_LEVEL` | `info` | Agent log level: `debug`, `info`, `warn`, or `error`. |
+| `KFLEET_HUB_CA` | unset | PEM-encoded CA bundle (one or more certificates) used to verify the hub's TLS certificate. Unset means system roots, which is correct for publicly trusted certificates. Must contain at least one valid PEM certificate. |
 | `KUBECONFIG` | inherited | Kubernetes credentials for the in-cluster or kubeconfig-based collector. |
 
 ### MCP server (`cmd/mcp`, or `cmd/hub mcp`)
@@ -77,9 +80,13 @@ A loopback-only development receiver for signed alert webhooks.
 
 The Helm charts set most of these through values (`registration.token`,
 `auth.bootstrapAdmin`, `auth.sessionCookieInsecure`, `alerts.*`,
-`timeline.retention`, `tenant.id`); see each chart's `values.yaml`. The hub
-chart also supports `auth.existingSecret` for bootstrap credentials injected
-from your own Secret.
+`timeline.retention`, `tenant.id`); see each chart's `values.yaml`. Secrets
+can come from your own Kubernetes Secrets instead of chart-managed ones:
+the hub chart supports `registration.existingSecret` (key
+`registration-token`) and `auth.existingSecret` for bootstrap credentials,
+and the agent chart supports `hub.existingSecret` with `hub.existingSecretKey`
+(default `hub-token`). For a hub behind a private CA, set the agent chart's
+`hub.caBundle` to the PEM bundle, which becomes the agent's `KFLEET_HUB_CA`.
 
 ## Health and monitoring
 
@@ -91,27 +98,43 @@ from your own Secret.
   answers a query within 2 seconds; otherwise `503` with
   `{"status":"unavailable","reason":"store unavailable"}`. Use it for the
   readiness probe so traffic drains while the database is wedged.
+- `GET /metrics` — unauthenticated Prometheus scrape target (text exposition
+  format 0.0.4). Serves aggregate gauges only; see
+  [api.md — /metrics](api.md#metrics). Disable with `KFLEET_METRICS_ENABLED=false`.
 - `GET /api/v1/meta` — public runtime metadata; verifies the hub is serving
-  and reports demo mode.
+  and reports the build version and demo mode.
 
-There is no `/metrics` endpoint. Alert on:
+Alert on:
 
 - `readyz` failing (store unavailable — check disk space and I/O on the PVC)
 - `healthz` failing (process down — the rollout should restart it)
+- `kfleet_alerts_dead_letter` above zero on `/metrics` (webhook receiver failing)
 - cluster `unreachable` alerts, which the hub raises after three missed
   heartbeat intervals, via the [alerts](alerts.md) webhook
 - repeated `401`s from agents in hub logs (rotated or wrong tokens)
-- `dead_letter` alerts in the alert history (webhook receiver failing)
 
 ### Agent
 
 The agent serves `/healthz` and `/readyz` on `KFLEET_HEALTH_ADDR`
-(`:8081` by default). Both always return `200 ok`: they are honest
-process-level probes and deliberately do not claim hub connectivity or
-registration state. An agent whose hub is unreachable still reports healthy
-while it retries registration with backoff — do not use them as a
-fleet-connectivity signal. Watch agent logs for `agent registration failed`
-or `agent heartbeat failed; re-registering` instead.
+(`:8081` by default).
+
+- `GET /healthz` — liveness. Always `200 ok` while the process can serve.
+- `GET /readyz` — readiness, now honest about hub reachability. It answers
+  `200 ok` only when the agent has completed a registration call with the
+  hub **and** the last successful hub contact (registration, heartbeat, or
+  status report) is within the staleness window: three times the agent's
+  fixed 15-second heartbeat interval, so 45 seconds. Otherwise it answers
+  `503` with `{"error":"no successful hub contact"}`. Registration counts as
+  contact even while the agent is still pending approval; until that first
+  registration succeeds, the agent reports not-ready.
+
+This makes agent `/readyz` a usable fleet-connectivity signal: an agent cut
+off from the hub goes unready within 45 seconds instead of reporting healthy
+while it retries. Transient unready during registration backoff is expected;
+persistent unready means the hub is unreachable, the token is wrong, or the
+agent cannot reach the API server for its first collection. Watch agent logs
+for `agent registration failed` or `agent heartbeat failed; re-registering`
+to distinguish them.
 
 ## Upgrades
 

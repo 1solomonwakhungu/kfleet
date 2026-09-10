@@ -12,8 +12,10 @@ methods and `server.New`), so it matches the code on `main`.
   scoping (see [Policy and configuration drift](policy-drift.md#tenant-isolation)).
   A missing header means the `default` tenant. Invalid values return `400`.
 - Agent-facing routes authenticate with bearer tokens, never user sessions.
-- There is no `/metrics` endpoint. Scraping targets are limited to the
-  health probes described in [Operations](operations.md#health-and-monitoring).
+- The hub stamps every response with an `X-Request-ID` header: an incoming
+  well-formed header (128 bytes max) is honored, otherwise a UUID is
+  generated. The same ID appears in the hub's log lines for the request, so
+  clients and operators can correlate failures.
 
 ## Authentication classes
 
@@ -50,13 +52,35 @@ is rejected with "public demo is read-only".
 | --- | --- | --- | --- | --- |
 | `GET` | `/healthz` | Public | `200` `ok` | Liveness probe; pure process check. |
 | `GET` | `/readyz` | Public | `200` `ready`, or `503` `{"status":"unavailable","reason":"store unavailable"}` | Readiness probe; pings the SQLite store with a 2s timeout. |
+| `GET` | `/metrics` | Public | `200` Prometheus text format, or `404` when disabled | Operational metrics for Prometheus-compatible scrapers. See below. |
 
 | Method | Path | Auth | Response | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/v1/meta` | Public | `RuntimeInfo` | Reports the runtime safety posture. |
+| `GET` | `/api/v1/meta` | Public | `RuntimeInfo` | Reports the runtime safety posture and build version. |
 
-`RuntimeInfo` returns `demoMode`, `readOnly`, `syntheticData`, and
-`dataPolicy`; all three booleans are `true` only in demo mode.
+`RuntimeInfo` returns `demoMode`, `readOnly`, `syntheticData`, `dataPolicy`,
+and `version` (the hub build version; `dev` in source builds).
+
+### /metrics
+
+`GET /metrics` serves gauges in the Prometheus text exposition format
+(`Content-Type: text/plain; version=0.0.4; charset=utf-8`):
+
+| Metric | Meaning |
+| --- | --- |
+| `kfleet_agents_registered` | Clusters with a registered agent. |
+| `kfleet_alerts_dead_letter` | Alerts in the dead-letter delivery state. |
+| `kfleet_log_relay_connected` | Agents with a live log relay reverse channel. |
+| `kfleet_ws_clients` | Connected WebSocket dashboard clients. |
+| `kfleet_log_streams_active` | In-flight pod log streams relayed from agents. |
+| `kfleet_db_size_bytes` | Hub SQLite database file size; `0` in demo mode. |
+
+The endpoint is deliberately unauthenticated so scrapers need no session:
+every value is a non-sensitive aggregate count or file size — no cluster
+names, IDs, tenants, or credentials. Store-backed counts are cached for 30
+seconds so scrape traffic does not load the database, and a count whose
+query fails is omitted rather than misreported as zero. Set
+`KFLEET_METRICS_ENABLED=false` to disable it; the route then answers `404`.
 
 ## Real-time streams
 
