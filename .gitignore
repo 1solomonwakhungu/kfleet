@@ -27,6 +27,10 @@ internal/hub/web/dist/*
 .env
 *.db
 
+# AI tooling and agent session files
+.hallmark/
+STATUS.md
+
 # Editors and operating systems
 .DS_Store
 .idea/
