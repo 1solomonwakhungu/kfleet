@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -44,7 +43,7 @@ func (s *Server) handleAgentLiveness(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.UpdateHealth(r.Context(), cluster.ID, cluster.Health, time.Now().UTC()); err != nil {
-		handleHeartbeatStoreError(w, err)
+		s.handleHeartbeatStoreError(w, err)
 		return
 	}
 	if err := api.WriteJSON(w, http.StatusOK, api.AgentRegistrationStatus{
@@ -62,7 +61,7 @@ func (s *Server) handleAgentDeregister(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UTC()
 	if err := s.store.UpdateHealth(r.Context(), cluster.ID, types.HealthUnreachable, now); err != nil {
-		handleHeartbeatStoreError(w, err)
+		s.handleHeartbeatStoreError(w, err)
 		return
 	}
 	previousHealth := cluster.Health
@@ -336,7 +335,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 	previous, err := s.store.GetCluster(r.Context(), request.ClusterID)
 	if err != nil {
-		handleHeartbeatStoreError(w, err)
+		s.handleHeartbeatStoreError(w, err)
 		return
 	}
 
@@ -346,16 +345,16 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UTC()
 	if err := s.store.UpdateSnapshot(r.Context(), request.ClusterID, request.NodeCount, request.PodCount, request.Version); err != nil {
-		handleHeartbeatStoreError(w, err)
+		s.handleHeartbeatStoreError(w, err)
 		return
 	}
 	if err := s.store.UpdateHealth(r.Context(), request.ClusterID, health, now); err != nil {
-		handleHeartbeatStoreError(w, err)
+		s.handleHeartbeatStoreError(w, err)
 		return
 	}
 	cluster, err := s.store.GetCluster(r.Context(), request.ClusterID)
 	if err != nil {
-		handleHeartbeatStoreError(w, err)
+		s.handleHeartbeatStoreError(w, err)
 		return
 	}
 	s.alerts.Evaluate(r.Context(), cluster)
@@ -376,10 +375,11 @@ func bearerToken(authorization string) (string, bool) {
 	return strings.TrimSpace(token), true
 }
 
-func handleHeartbeatStoreError(w http.ResponseWriter, err error) {
+func (s *Server) handleHeartbeatStoreError(w http.ResponseWriter, err error) {
 	if errors.Is(err, store.ErrNotFound) {
 		api.WriteError(w, http.StatusUnauthorized, "invalid agent token")
 		return
 	}
-	api.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("failed to update heartbeat: %v", err))
+	s.logger.Error("failed to update heartbeat", "error", err)
+	api.WriteError(w, http.StatusInternalServerError, "failed to update heartbeat")
 }

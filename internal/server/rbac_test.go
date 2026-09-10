@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/1solomonwakhungu/kfleet/pkg/api"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
 )
 
@@ -171,6 +172,57 @@ func TestRBACAdminRoleCanManageUsersAndAudit(t *testing.T) {
 	rotateResp.Body.Close()
 	if rotateResp.StatusCode != http.StatusOK {
 		t.Errorf("rotate registration token as admin status = %d, want %d", rotateResp.StatusCode, http.StatusOK)
+	}
+}
+
+// TestRBACForbiddenResponseNamesRequiredRole proves a 403 body tells the
+// caller which role the action requires, using the same read_only/operator/
+// admin names as the role table in docs/authentication.md.
+func TestRBACForbiddenResponseNamesRequiredRole(t *testing.T) {
+	server := newTestHTTPServer(t)
+	st := serverStoreForTest(t, server)
+	readOnly := sessionCookieFor(t, st, types.RoleReadOnly)
+	operator := sessionCookieFor(t, st, types.RoleOperator)
+
+	cases := []struct {
+		name, method, path, body, session, want string
+	}{
+		{
+			name:    "operator route as read_only",
+			method:  http.MethodPost,
+			path:    "/api/v1/clusters/register",
+			body:    `{"name":"blocked"}`,
+			session: readOnly,
+			want:    "this action requires the operator role",
+		},
+		{
+			name:    "admin route as read_only",
+			method:  http.MethodGet,
+			path:    "/api/v1/users",
+			session: readOnly,
+			want:    "this action requires the admin role",
+		},
+		{
+			name:    "admin route as operator",
+			method:  http.MethodPost,
+			path:    "/api/v1/admin/registration-token/rotate",
+			session: operator,
+			want:    "this action requires the admin role",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := requestWithSession(t, server, tc.method, tc.path, tc.session, tc.body)
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusForbidden {
+				t.Fatalf("%s %s status = %d, want %d", tc.method, tc.path, resp.StatusCode, http.StatusForbidden)
+			}
+			var body api.ErrorResponse
+			decodeResponse(t, resp, &body)
+			if body.Error != tc.want {
+				t.Errorf("403 error body = %q, want %q", body.Error, tc.want)
+			}
+		})
 	}
 }
 
