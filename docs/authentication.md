@@ -49,7 +49,9 @@ hub.
 | View clusters, resources, timeline, policies, and live updates | Yes | Yes | Yes |
 | Register or remove clusters | No | Yes | Yes |
 | Approve pending agents | No | Yes | Yes |
+| Change their own password | Yes | Yes | Yes |
 | Create, update, disable, or delete users | No | No | Yes |
+| Reset another user's password | No | No | Yes |
 | Read the audit log | No | No | Yes |
 | Rotate the agent registration token | No | No | Yes |
 
@@ -73,10 +75,29 @@ Authentication endpoints:
 | `GET` | `/api/v1/auth/me` | Authenticated |
 | `GET`, `POST` | `/api/v1/users` | Admin |
 | `PATCH`, `DELETE` | `/api/v1/users/{id}` | Admin |
+| `PATCH` | `/api/v1/users/{id}/password` | Self, or admin for other users |
 | `GET` | `/api/v1/audit?limit=100` | Admin |
 | `POST` | `/api/v1/admin/registration-token/rotate` | Admin |
 
 `KFLEET_SESSION_DURATION` controls session lifetime and defaults to `24h`.
+
+## Password changes and resets
+
+`PATCH /api/v1/users/{id}/password` accepts `{"currentPassword": "...", "newPassword": "..."}` and returns `204`.
+Every authenticated user may change their own password, and must supply their
+current password, which is verified against the stored bcrypt hash before the
+change is applied. Admins may reset any other user's password without the
+current password; non-admins are rejected with `403`. The new password must be
+12–72 bytes, the same rule enforced at user creation.
+
+Changing or resetting a password invalidates **all** sessions for the target
+account, including the session used for a self-change, so the user signs in
+again with the new password. This also covers a lost bootstrap-admin password:
+another admin can reset it, or the account can be reached by resetting through
+the API, without editing the SQLite database. Every change is recorded in the
+audit log as `user.password_update`; passwords themselves never appear in audit
+records. The admin UI exposes resets on the Users page and displays the new
+password exactly once, mirroring registration-token rotation.
 
 ## Admin web UI
 
@@ -86,7 +107,7 @@ see actions the API would reject.
 
 | Surface | Route | Required role |
 | --- | --- | --- |
-| Users: list accounts, invite a user, change roles, deactivate or delete | `/admin/users` | Admin |
+| Users: list accounts, invite a user, change roles, reset passwords, deactivate or delete | `/admin/users` | Admin |
 | Audit log: filter by actor, action, target, and outcome | `/admin/audit` | Admin |
 | Agent registration token rotation | `/agents` | Admin |
 | Remove cluster | `/clusters/{id}` | Operator or admin |

@@ -93,3 +93,27 @@
   gap: var(--base-size-12, 12px);
   padding: var(--base-size-20, 20px);
 }
+
+.passwordReveal {
+  padding: var(--base-size-16, 16px);
+  margin-top: var(--base-size-16, 16px);
+  background-color: var(--bgColor-inset);
+  border: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium, 6px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8, 8px);
+}
+
+.passwordRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-12, 12px);
+  align-items: center;
+}
+
+.passwordValue {
+  font-family: var(--fontStack-mono, ui-monospace, monospace);
+  font-size: var(--text-body-size-medium, 14px);
+  word-break: break-all;
+}

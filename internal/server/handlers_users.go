@@ -18,6 +18,7 @@ func (s *Server) registerUserRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/users", s.requireRole(types.RoleAdmin, s.handleListUsers))
 	mux.HandleFunc("POST /api/v1/users", s.requireRole(types.RoleAdmin, s.handleCreateUser))
 	mux.HandleFunc("PATCH /api/v1/users/{id}", s.requireRole(types.RoleAdmin, s.handleUpdateUser))
+	mux.HandleFunc("PATCH /api/v1/users/{id}/password", s.requireAuth(s.handleUpdateUserPassword))
 	mux.HandleFunc("DELETE /api/v1/users/{id}", s.requireRole(types.RoleAdmin, s.handleDeleteUser))
 }
 
@@ -132,6 +133,80 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	if err := api.WriteJSON(w, http.StatusOK, toUserResponse(updated)); err != nil {
 		s.logger.Error("failed to write updated user", "error", err)
 	}
+}
+
+// handleUpdateUserPassword changes a user's password. Any authenticated user
+// may change their own password and must verify the current one first; only
+// admins may change another user's password, without the current password.
+// The hash update and the deletion of every session belonging to the target
+// user run in one store transaction so the change is all-or-nothing.
+func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request) {
+	actor, _ := authenticatedUser(r.Context())
+	targetID := r.PathValue("id")
+	selfChange := targetID == actor.ID
+	isAdmin := auth.HasAtLeast(actor.Role, types.RoleAdmin)
+
+	var request api.UpdateUserPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		api.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if !selfChange && !isAdmin {
+		s.recordAudit(r.Context(), r, auditActorFromUser(actor), "user.password_update", "user", targetID, types.AuditFailure, "not permitted to change another user's password")
+		api.WriteError(w, http.StatusForbidden, "you can only change your own password")
+		return
+	}
+	if len(request.NewPassword) < minBootstrapPasswordLength || len(request.NewPassword) > maxPasswordLength {
+		api.WriteError(w, http.StatusBadRequest, "password must be between 12 and 72 bytes")
+		return
+	}
+	if selfChange && request.CurrentPassword == "" {
+		api.WriteError(w, http.StatusBadRequest, "current password is required")
+		return
+	}
+
+	target, err := s.store.GetUserByID(r.Context(), targetID)
+	if errors.Is(err, store.ErrNotFound) {
+		api.WriteError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	if err != nil {
+		s.logger.Error("failed to look up user for password update", "error", err)
+		api.WriteError(w, http.StatusInternalServerError, "failed to update password")
+		return
+	}
+
+	if selfChange {
+		if err := auth.VerifyPassword(target.PasswordHash, request.CurrentPassword); err != nil {
+			s.recordAudit(r.Context(), r, auditActorFromUser(actor), "user.password_update", "user", targetID, types.AuditFailure, "incorrect current password")
+			api.WriteError(w, http.StatusUnauthorized, "current password is incorrect")
+			return
+		}
+	}
+
+	passwordHash, err := auth.HashPassword(request.NewPassword)
+	if err != nil {
+		s.logger.Error("failed to hash new password", "error", err)
+		api.WriteError(w, http.StatusInternalServerError, "failed to update password")
+		return
+	}
+	if err := s.store.ResetUserPassword(r.Context(), targetID, passwordHash); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			api.WriteError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		s.logger.Error("failed to update password", "error", err)
+		api.WriteError(w, http.StatusInternalServerError, "failed to update password")
+		return
+	}
+
+	details := "reset_by_admin"
+	if selfChange {
+		details = "self"
+	}
+	s.recordAudit(r.Context(), r, auditActorFromUser(actor), "user.password_update", "user", targetID, types.AuditSuccess, details)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {

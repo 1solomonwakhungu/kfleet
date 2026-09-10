@@ -2,11 +2,15 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/1solomonwakhungu/kfleet/internal/auth"
+	"github.com/1solomonwakhungu/kfleet/internal/store"
 	"github.com/1solomonwakhungu/kfleet/pkg/api"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
 )
@@ -223,4 +227,139 @@ func defaultAdminIDForTest(t *testing.T, server *httptest.Server) string {
 		t.Fatal("defaultAdminIDForTest: /api/v1/auth/me returned no user ID")
 	}
 	return got.ID
+}
+
+func TestHandleUpdateUserPasswordSelfChange(t *testing.T) {
+	server := newTestHTTPServer(t)
+	st := serverStoreForTest(t, server)
+	adminID := defaultAdminIDForTest(t, server)
+
+	resp := requestWithSession(t, server, http.MethodPatch, "/api/v1/users/"+adminID+"/password", defaultSessionFor(server),
+		`{"currentPassword":"`+testUserPassword+`","newPassword":"brand-new-password-42"}`)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("self-change status = %d, want %d", resp.StatusCode, http.StatusNoContent)
+	}
+
+	target, err := st.GetUserByID(context.Background(), adminID)
+	if err != nil {
+		t.Fatalf("GetUserByID() error = %v", err)
+	}
+	if err := auth.VerifyPassword(target.PasswordHash, "brand-new-password-42"); err != nil {
+		t.Fatalf("new password does not verify: %v", err)
+	}
+	if err := auth.VerifyPassword(target.PasswordHash, testUserPassword); !errors.Is(err, auth.ErrInvalidCredentials) {
+		t.Fatalf("old password still verifies after change: %v", err)
+	}
+
+	// Every session for the account is invalidated, including the one used
+	// for the change itself.
+	after := requestWithSession(t, server, http.MethodGet, "/api/v1/auth/me", defaultSessionFor(server), "")
+	after.Body.Close()
+	if after.StatusCode != http.StatusUnauthorized {
+		t.Errorf("request with pre-change session status = %d, want %d", after.StatusCode, http.StatusUnauthorized)
+	}
+}
+
+func TestHandleUpdateUserPasswordSelfChangeRejectsWrongCurrentPassword(t *testing.T) {
+	server := newTestHTTPServer(t)
+	adminID := defaultAdminIDForTest(t, server)
+
+	resp := requestWithSession(t, server, http.MethodPatch, "/api/v1/users/"+adminID+"/password", defaultSessionFor(server),
+		`{"currentPassword":"not-my-password","newPassword":"brand-new-password-42"}`)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong current password status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
+	}
+
+	missing := requestWithSession(t, server, http.MethodPatch, "/api/v1/users/"+adminID+"/password", defaultSessionFor(server),
+		`{"newPassword":"brand-new-password-42"}`)
+	missing.Body.Close()
+	if missing.StatusCode != http.StatusBadRequest {
+		t.Errorf("missing current password status = %d, want %d", missing.StatusCode, http.StatusBadRequest)
+	}
+}
+
+func TestHandleUpdateUserPasswordAdminResetsAnotherUser(t *testing.T) {
+	server := newTestHTTPServer(t)
+	st := serverStoreForTest(t, server)
+	admin := defaultSessionFor(server)
+	target := createTestUser(t, st, types.RoleReadOnly)
+	targetSession := createTestSession(t, st, target)
+
+	resp := requestWithSession(t, server, http.MethodPatch, "/api/v1/users/"+target.ID+"/password", admin,
+		`{"newPassword":"reset-password-99"}`)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("admin reset status = %d, want %d", resp.StatusCode, http.StatusNoContent)
+	}
+
+	updated, err := st.GetUserByID(context.Background(), target.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID() error = %v", err)
+	}
+	if err := auth.VerifyPassword(updated.PasswordHash, "reset-password-99"); err != nil {
+		t.Fatalf("new password does not verify: %v", err)
+	}
+	if err := auth.VerifyPassword(updated.PasswordHash, testUserPassword); !errors.Is(err, auth.ErrInvalidCredentials) {
+		t.Fatalf("old password still verifies after reset: %v", err)
+	}
+	if _, err := st.GetSessionUser(context.Background(), auth.HashToken(targetSession), time.Now().UTC()); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("target session survived password reset: err = %v, want %v", err, store.ErrNotFound)
+	}
+}
+
+func TestHandleUpdateUserPasswordNonAdminCannotChangeOthers(t *testing.T) {
+	server := newTestHTTPServer(t)
+	st := serverStoreForTest(t, server)
+	target := createTestUser(t, st, types.RoleOperator)
+	operator := createTestSession(t, st, createTestUser(t, st, types.RoleReadOnly))
+
+	resp := requestWithSession(t, server, http.MethodPatch, "/api/v1/users/"+target.ID+"/password", operator,
+		`{"newPassword":"hijacked-password-1"}`)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("non-admin changing another user status = %d, want %d", resp.StatusCode, http.StatusForbidden)
+	}
+
+	// The route itself stays open to non-admins for self-service changes.
+	me := requestWithSession(t, server, http.MethodGet, "/api/v1/auth/me", operator, "")
+	var meResp api.UserResponse
+	decodeResponse(t, me, &meResp)
+	self := requestWithSession(t, server, http.MethodPatch, "/api/v1/users/"+meResp.ID+"/password", operator,
+		`{"currentPassword":"`+testUserPassword+`","newPassword":"own-new-password-77"}`)
+	self.Body.Close()
+	if self.StatusCode != http.StatusNoContent {
+		t.Errorf("non-admin self-change status = %d, want %d", self.StatusCode, http.StatusNoContent)
+	}
+}
+
+func TestHandleUpdateUserPasswordValidatesInput(t *testing.T) {
+	server := newTestHTTPServer(t)
+	st := serverStoreForTest(t, server)
+	admin := defaultSessionFor(server)
+	target := createTestUser(t, st, types.RoleReadOnly)
+
+	cases := []struct {
+		name string
+		body string
+		want int
+	}{
+		{"short password", `{"newPassword":"short"}`, http.StatusBadRequest},
+		{"missing password", `{"currentPassword":"x"}`, http.StatusBadRequest},
+		{"unknown user", `{"newPassword":"reset-password-99"}`, http.StatusNotFound},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := "/api/v1/users/" + target.ID + "/password"
+			if tc.want == http.StatusNotFound {
+				path = "/api/v1/users/does-not-exist/password"
+			}
+			resp := requestWithSession(t, server, http.MethodPatch, path, admin, tc.body)
+			resp.Body.Close()
+			if resp.StatusCode != tc.want {
+				t.Errorf("status = %d, want %d", resp.StatusCode, tc.want)
+			}
+		})
+	}
 }
