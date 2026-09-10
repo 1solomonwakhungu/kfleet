@@ -3,6 +3,7 @@ package logs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/1solomonwakhungu/kfleet/internal/agent/huberrors"
 	"github.com/1solomonwakhungu/kfleet/pkg/api"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
@@ -100,11 +102,16 @@ func (c *Client) connect(ctx context.Context) error {
 		headers.Set("X-Kfleet-Tenant-ID", c.tenantID)
 	}
 	conn, response, err := c.dial(ctx, c.endpoint, &websocket.DialOptions{HTTPHeader: headers})
+	if err != nil {
+		// A rejected handshake arrives as a plain HTTP response whose body
+		// explains the rejection, e.g. "agent is pending approval".
+		if detail := huberrors.Detail(response); detail != "" {
+			err = fmt.Errorf("%w: %s", err, detail)
+		}
+		return err
+	}
 	if response != nil && response.Body != nil {
 		_ = response.Body.Close()
-	}
-	if err != nil {
-		return err
 	}
 	defer func() {
 		_ = conn.Close(websocket.StatusNormalClosure, "")

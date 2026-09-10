@@ -104,6 +104,27 @@ func TestClientStreamsLogsBackToHub(t *testing.T) {
 	}
 }
 
+func TestClientHandshakeErrorIncludesResponseBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":"agent is pending approval","code":403}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "prod", "agent-token", "", NewStreamerWithOpener(&stubOpener{}), testLogger())
+	err := client.connect(context.Background())
+	if err == nil {
+		t.Fatal("connect() error = nil, want error for rejected handshake")
+	}
+	if !strings.Contains(err.Error(), "agent is pending approval") {
+		t.Errorf("connect() error = %q, want it to carry the hub's error body", err)
+	}
+	if !strings.Contains(err.Error(), "403") {
+		t.Errorf("connect() error = %q, want it to mention the rejected status", err)
+	}
+}
+
 func TestClientStopsStreamOnStopFrame(t *testing.T) {
 	reader := newBlockingReader()
 	stopped := make(chan struct{})
