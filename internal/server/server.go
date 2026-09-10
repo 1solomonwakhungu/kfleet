@@ -61,26 +61,39 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 		_, _ = w.Write([]byte("ok"))
 	})
 	mux.HandleFunc("GET /readyz", server.handleReadyz)
-	mux.HandleFunc("GET /api/v1/meta", func(w http.ResponseWriter, _ *http.Request) {
-		if err := api.WriteJSON(w, http.StatusOK, api.RuntimeInfo{
-			DemoMode:      cfg.DemoMode,
-			ReadOnly:      cfg.DemoMode,
-			SyntheticData: cfg.DemoMode,
-			DataPolicy:    runtimeDataPolicy(cfg.DemoMode),
-		}); err != nil {
-			server.logger.Error("failed to write runtime metadata", "error", err)
-		}
-	})
-	server.registerAuthRoutes(mux)
-	server.registerUserRoutes(mux)
-	server.registerAuditRoutes(mux)
-	server.registerAdminRoutes(mux)
-	server.registerAgentRoutes(mux)
-	server.registerClusterRoutes(mux)
-	server.registerAlertRoutes(mux)
-	server.registerEventRoutes(mux)
-	server.registerPolicyRoutes(mux)
 	mux.HandleFunc("GET /ws/clusters", server.requireAuth(server.handleWSClusters))
+
+	// registerAPIRoutes declares every /api/v1 route. It runs twice: once
+	// against the public mux and once against the fallback's shadow mux, which
+	// answers unmatched /api requests with JSON 404/405 errors. New API routes
+	// must be added here (or in a register*Routes method referenced below) so
+	// the fallback can compute correct 405 Allow headers.
+	registerAPIRoutes := func(m *http.ServeMux) {
+		m.HandleFunc("GET /api/v1/meta", func(w http.ResponseWriter, _ *http.Request) {
+			if err := api.WriteJSON(w, http.StatusOK, api.RuntimeInfo{
+				DemoMode:      cfg.DemoMode,
+				ReadOnly:      cfg.DemoMode,
+				SyntheticData: cfg.DemoMode,
+				DataPolicy:    runtimeDataPolicy(cfg.DemoMode),
+			}); err != nil {
+				server.logger.Error("failed to write runtime metadata", "error", err)
+			}
+		})
+		server.registerAuthRoutes(m)
+		server.registerUserRoutes(m)
+		server.registerAuditRoutes(m)
+		server.registerAdminRoutes(m)
+		server.registerAgentRoutes(m)
+		server.registerClusterRoutes(m)
+		server.registerAlertRoutes(m)
+		server.registerEventRoutes(m)
+		server.registerPolicyRoutes(m)
+	}
+	registerAPIRoutes(mux)
+
+	fallback := apiJSONFallback(registerAPIRoutes)
+	mux.Handle("/api/", fallback)
+	mux.Handle("/api", fallback)
 	mux.Handle("/", hubweb.Handler())
 
 	handler := http.Handler(mux)
@@ -191,7 +204,7 @@ func (s *Server) withSecurityHeaders(next http.Handler) http.Handler {
 		headers.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		headers.Set("X-Content-Type-Options", "nosniff")
 		headers.Set("X-Frame-Options", "DENY")
-		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || strings.HasPrefix(r.URL.Path, "/api/") {
+		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
 			headers.Set("Cache-Control", "no-store")
 		}
 		next.ServeHTTP(w, r)

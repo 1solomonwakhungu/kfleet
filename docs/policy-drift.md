@@ -40,11 +40,8 @@ All endpoints are GET-only:
 ```text
 GET /api/v1/policies
 GET /api/v1/policies/results
-GET /api/v1/policies/summary
 GET /api/v1/clusters/{id}/policy-results
 ```
-
-`GET /api/v1/policy-results` and `GET /api/v1/drift` are compatibility aliases for the results endpoint.
 
 Results accept optional exact-match filters:
 
