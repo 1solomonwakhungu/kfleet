@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
+	"github.com/1solomonwakhungu/kfleet/internal/agent/hubcontact"
 	"github.com/1solomonwakhungu/kfleet/internal/agent/huberrors"
 	"github.com/1solomonwakhungu/kfleet/internal/version"
 )
@@ -31,6 +32,9 @@ type Registrar struct {
 	tenantID          string
 	labels            map[string]string
 	client            *http.Client
+	// contact records successful hub calls for the readiness probe. It may
+	// be nil, in which case nothing is recorded.
+	contact *hubcontact.Tracker
 
 	mu       sync.Mutex // guards approved; lifecycle calls otherwise run on the single run-loop goroutine
 	approved bool
@@ -56,8 +60,9 @@ type RegisterResponse struct {
 	Approved  bool   `json:"approved"`
 }
 
-// New constructs a registrar from agent configuration.
-func New(cfg *config.Config, labels map[string]string) *Registrar {
+// New constructs a registrar from agent configuration. contact, when
+// non-nil, is marked on every successful registration and heartbeat.
+func New(cfg *config.Config, labels map[string]string, contact *hubcontact.Tracker) *Registrar {
 	return &Registrar{
 		hubURL:            strings.TrimRight(cfg.HubURL, "/"),
 		registrationToken: cfg.HubToken,
@@ -67,6 +72,7 @@ func New(cfg *config.Config, labels map[string]string) *Registrar {
 		tenantID:          cfg.TenantID,
 		labels:            labels,
 		client:            cfg.HubHTTPClient(requestTimeout),
+		contact:           contact,
 	}
 }
 
@@ -121,6 +127,7 @@ func (r *Registrar) Register(ctx context.Context, k8sVersion string) (*RegisterR
 	}
 	result.Approved = response.StatusCode == http.StatusOK
 	r.setApproved(result.Approved)
+	r.contact.MarkRegistered()
 	return &result.RegisterResponse, nil
 }
 
@@ -133,6 +140,7 @@ func (r *Registrar) Heartbeat(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	r.contact.MarkContact()
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	reregister := approved && !r.approved
