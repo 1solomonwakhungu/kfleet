@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
@@ -29,6 +30,9 @@ type Registrar struct {
 	tenantID          string
 	labels            map[string]string
 	client            *http.Client
+
+	mu       sync.Mutex // guards approved; lifecycle calls otherwise run on the single run-loop goroutine
+	approved bool
 }
 
 // RegisterRequest is sent to register or re-register an agent.
@@ -39,7 +43,8 @@ type RegisterRequest struct {
 	K8sVersion   string            `json:"k8sVersion"`
 }
 
-// RegisterResponse describes the hub's registration decision.
+// RegisterResponse describes the hub's registration decision and the
+// approval status carried by the heartbeat response.
 type RegisterResponse struct {
 	ClusterID string `json:"clusterId"`
 	Approved  bool   `json:"approved"`
@@ -104,17 +109,32 @@ func (r *Registrar) Register(ctx context.Context, k8sVersion string) (*RegisterR
 		r.token = result.Token
 	}
 	result.Approved = response.StatusCode == http.StatusOK
+	r.setApproved(result.Approved)
 	return &result.RegisterResponse, nil
 }
 
-// Heartbeat tells the hub that the agent process remains reachable.
-func (r *Registrar) Heartbeat(ctx context.Context) error {
-	return r.postLifecycle(ctx, "heartbeat")
+// Heartbeat tells the hub that the agent process remains reachable. It
+// reports whether the hub approved the agent since the last registration,
+// so a pending agent can re-register as soon as an operator approves it.
+// The signal fires at most once per approval transition.
+func (r *Registrar) Heartbeat(ctx context.Context) (bool, error) {
+	approved, err := r.postLifecycle(ctx, "heartbeat")
+	if err != nil {
+		return false, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	reregister := approved && !r.approved
+	if approved {
+		r.approved = true
+	}
+	return reregister, nil
 }
 
 // Deregister marks the agent unreachable during graceful shutdown.
 func (r *Registrar) Deregister(ctx context.Context) error {
-	return r.postLifecycle(ctx, "deregister")
+	_, err := r.postLifecycle(ctx, "deregister")
+	return err
 }
 
 // Token returns the current agent token, including one rotated during registration.
@@ -122,23 +142,40 @@ func (r *Registrar) Token() string {
 	return r.token
 }
 
-func (r *Registrar) postLifecycle(ctx context.Context, action string) error {
+func (r *Registrar) setApproved(approved bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.approved = approved
+}
+
+// postLifecycle posts a lifecycle action and reports whether the hub's
+// response marks the agent approved. Only the heartbeat response carries
+// that status; other actions always report false.
+func (r *Registrar) postLifecycle(ctx context.Context, action string) (bool, error) {
 	endpoint := r.hubURL + "/api/v1/agents/" + url.PathEscape(r.clusterName) + "/" + action
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
 	if err != nil {
-		return fmt.Errorf("create agent %s request: %w", action, err)
+		return false, fmt.Errorf("create agent %s request: %w", action, err)
 	}
 	r.setHeaders(request, false, r.token)
 	response, err := r.client.Do(request)
 	if err != nil {
-		return fmt.Errorf("send agent %s: %w", action, err)
+		return false, fmt.Errorf("send agent %s: %w", action, err)
 	}
 	defer func() { _ = response.Body.Close() }()
-	_, _ = io.Copy(io.Discard, response.Body)
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("hub returned %s status %s", action, response.Status)
+		_, _ = io.Copy(io.Discard, response.Body)
+		return false, fmt.Errorf("hub returned %s status %s", action, response.Status)
 	}
-	return nil
+	if action != "heartbeat" {
+		_, _ = io.Copy(io.Discard, response.Body)
+		return false, nil
+	}
+	var status RegisterResponse
+	if err := json.NewDecoder(response.Body).Decode(&status); err != nil && !errors.Is(err, io.EOF) {
+		return false, fmt.Errorf("decode agent heartbeat response: %w", err)
+	}
+	return status.Approved, nil
 }
 
 func (r *Registrar) setHeaders(request *http.Request, jsonBody bool, token string) {
