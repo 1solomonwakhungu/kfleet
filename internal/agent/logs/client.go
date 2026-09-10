@@ -37,24 +37,29 @@ type Dialer func(ctx context.Context, endpoint string, options *websocket.DialOp
 
 // Client maintains the agent's outbound log channel to the hub.
 type Client struct {
-	endpoint string
-	token    string
-	tenantID string
-	streamer *Streamer
-	logger   *slog.Logger
-	dial     Dialer
+	endpoint   string
+	token      string
+	tenantID   string
+	streamer   *Streamer
+	logger     *slog.Logger
+	dial       Dialer
+	httpClient *http.Client
 }
 
 // NewClient builds a log channel client. hubURL is the hub base URL (http or
-// https); it is rewritten to the matching WebSocket scheme.
-func NewClient(hubURL, clusterName, token, tenantID string, streamer *Streamer, logger *slog.Logger) *Client {
+// https); it is rewritten to the matching WebSocket scheme. httpClient is
+// used to dial the WebSocket so a private hub CA bundle can be trusted; it
+// must not carry a Timeout, which would bound the long-lived channel. Pass
+// nil for the default dialing behavior.
+func NewClient(hubURL, clusterName, token, tenantID string, streamer *Streamer, logger *slog.Logger, httpClient *http.Client) *Client {
 	return &Client{
-		endpoint: logChannelEndpoint(hubURL, clusterName),
-		token:    token,
-		tenantID: tenantID,
-		streamer: streamer,
-		logger:   logger,
-		dial:     websocket.Dial,
+		endpoint:   logChannelEndpoint(hubURL, clusterName),
+		token:      token,
+		tenantID:   tenantID,
+		streamer:   streamer,
+		logger:     logger,
+		dial:       websocket.Dial,
+		httpClient: httpClient,
 	}
 }
 
@@ -101,7 +106,7 @@ func (c *Client) connect(ctx context.Context) error {
 	if c.tenantID != "" {
 		headers.Set("X-Kfleet-Tenant-ID", c.tenantID)
 	}
-	conn, response, err := c.dial(ctx, c.endpoint, &websocket.DialOptions{HTTPHeader: headers})
+	conn, response, err := c.dial(ctx, c.endpoint, &websocket.DialOptions{HTTPHeader: headers, HTTPClient: c.httpClient})
 	if err != nil {
 		// A rejected handshake arrives as a plain HTTP response whose body
 		// explains the rejection, e.g. "agent is pending approval".

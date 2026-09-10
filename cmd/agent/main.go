@@ -89,6 +89,9 @@ func run(
 	}
 
 	delayBeforeRegister := false
+	// The log channel is long-lived, so its dialer gets no request timeout;
+	// it still trusts the configured hub CA bundle.
+	logChannelClient := cfg.HubHTTPClient(0)
 	for ctx.Err() == nil {
 		if delayBeforeRegister && !waitForRetry(ctx, backoff.Next()) {
 			break
@@ -127,6 +130,7 @@ func run(
 				cfg.TenantID,
 				logs.NewStreamer(clusterCollector.Clientset()),
 				logger,
+				logChannelClient,
 			).Run(logCtx)
 		}()
 

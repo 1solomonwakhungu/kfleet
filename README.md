@@ -191,7 +191,10 @@ Important values include `hub.url`, `hub.token`, `cluster.name`, `cluster.labels
 `hub.url`, `hub.token`, and `cluster.name` are required for the agent chart; they
 become `KFLEET_HUB_URL`, `KFLEET_HUB_TOKEN`, and `KFLEET_CLUSTER_NAME`. The agent
 validates all three at startup and exits non-zero with the missing variable named
-rather than retrying registration forever.
+rather than retrying registration forever. GitOps users can instead set
+`hub.existingSecret` (and `hub.existingSecretKey`, default `hub-token`) to a
+pre-created Secret so the token never appears in values, and `hub.caBundle`
+with a PEM-encoded CA when the hub serves a private-CA or self-signed certificate.
 
 Each `v*` release publishes matching OCI charts to GHCR. Pin an installation
 with `--version 1.2.3`; that chart deploys the tool image tagged `v1.2.3`.
