@@ -86,6 +86,12 @@ func (c *agentLogConn) closeAll() {
 	}
 }
 
+func (c *agentLogConn) streamCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.streams)
+}
+
 func (c *agentLogConn) addStream(id string) (chan api.LogStreamMessage, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -200,6 +206,26 @@ func (r *LogRelay) Connected(clusterID string) bool {
 	defer r.mu.RUnlock()
 	_, ok := r.agents[clusterID]
 	return ok
+}
+
+// ConnectedAgents returns the number of clusters with a live agent reverse
+// channel. One agent serves one cluster, so this is the connected agent count.
+func (r *LogRelay) ConnectedAgents() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return len(r.agents)
+}
+
+// ActiveStreams returns the number of in-flight log streams across all agent
+// connections.
+func (r *LogRelay) ActiveStreams() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	total := 0
+	for _, conn := range r.agents {
+		total += conn.streamCount()
+	}
+	return total
 }
 
 func (r *LogRelay) connection(clusterID string) (*agentLogConn, bool) {

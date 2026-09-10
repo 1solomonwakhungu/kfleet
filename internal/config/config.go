@@ -36,6 +36,12 @@ type Config struct {
 	AlertPollInterval  time.Duration
 	EventRetention     time.Duration
 
+	// MetricsDisabled turns off the unauthenticated /metrics endpoint, which
+	// exposes non-sensitive operational counters for Prometheus scraping. The
+	// zero value keeps metrics enabled: installs scrape by default and opt
+	// out with KFLEET_METRICS_ENABLED=false.
+	MetricsDisabled bool
+
 	// SessionDuration controls how long a login session remains valid.
 	SessionDuration time.Duration
 	// SessionCookieSecure controls the Secure flag on the session cookie.
@@ -110,6 +116,15 @@ func Load() (*Config, error) {
 		sessionDuration = parsed
 	}
 
+	metricsDisabled := false
+	if value := os.Getenv("KFLEET_METRICS_ENABLED"); value != "" {
+		enabled, err := strconv.ParseBool(value)
+		if err != nil {
+			return nil, fmt.Errorf("KFLEET_METRICS_ENABLED must be a boolean")
+		}
+		metricsDisabled = !enabled
+	}
+
 	return &Config{
 		ListenAddr:             envOrDefault("KFLEET_LISTEN_ADDR", defaultListenAddr),
 		DBPath:                 envOrDefault("KFLEET_DB_PATH", defaultDBPath),
@@ -123,6 +138,7 @@ func Load() (*Config, error) {
 		AlertRetryBase:         retryBase,
 		AlertPollInterval:      pollInterval,
 		EventRetention:         eventRetention,
+		MetricsDisabled:        metricsDisabled,
 		SessionDuration:        sessionDuration,
 		SessionCookieSecure:    os.Getenv("KFLEET_SESSION_COOKIE_INSECURE") != "true",
 		BootstrapAdminUsername: os.Getenv("KFLEET_BOOTSTRAP_ADMIN_USERNAME"),
