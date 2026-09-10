@@ -72,12 +72,6 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.hub.caBundle }}
-          volumeMounts:
-            - name: hub-ca
-              mountPath: /etc/kfleet/hub-ca
-              readOnly: true
-          {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -101,10 +95,4 @@ spec:
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- if .Values.hub.caBundle }}
-      volumes:
-        - name: hub-ca
-          secret:
-            secretName: {{ include "kfleet-agent.fullname" . }}-hub-ca
       {{- end }}
