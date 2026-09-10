@@ -11,6 +11,7 @@ import (
 
 	"github.com/1solomonwakhungu/kfleet/internal/config"
 	"github.com/1solomonwakhungu/kfleet/internal/demo"
+	"github.com/1solomonwakhungu/kfleet/internal/hub/web"
 	kfleetmcp "github.com/1solomonwakhungu/kfleet/internal/mcp"
 	"github.com/1solomonwakhungu/kfleet/internal/server"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
@@ -35,6 +36,9 @@ func main() {
 		Level: logLevel(cfg.LogLevel),
 	}))
 	slog.SetDefault(logger)
+	if web.Empty() {
+		logger.Warn("embedded web UI is missing; run make web-build and rebuild the binary")
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

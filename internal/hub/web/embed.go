@@ -14,6 +14,14 @@ import (
 //go:embed all:dist
 var dist embed.FS
 
+// Empty reports whether the embedded frontend bundle has no index.html, which
+// happens when the web UI was not built before the binary was compiled. The
+// hub still serves API and MCP clients in that state.
+func Empty() bool {
+	_, err := fs.ReadFile(dist, "dist/index.html")
+	return err != nil
+}
+
 // Handler returns an HTTP handler for static frontend assets with an index.html
 // fallback for client-side routes. API and WebSocket paths never use the SPA fallback.
 func Handler() http.Handler {

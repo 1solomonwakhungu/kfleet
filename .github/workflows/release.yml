@@ -116,6 +116,25 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build web UI
+        shell: bash
+        working-directory: web
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+      - name: Embed web UI into hub binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf internal/hub/web/dist
+          cp -R web/dist internal/hub/web/dist
       - name: Set up Helm
         uses: azure/setup-helm@v4
       - name: Package release charts
