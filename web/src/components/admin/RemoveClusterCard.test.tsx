@@ -90,14 +90,14 @@ describe('RemoveClusterCard', () => {
   })
 
   it('shows the hub error message when removal fails', async () => {
-    vi.mocked(api.deleteCluster).mockRejectedValue(new Error('this action requires a higher role'))
+    vi.mocked(api.deleteCluster).mockRejectedValue(new Error('this action requires the operator role'))
 
     renderCard()
     fireEvent.click(screen.getByRole('button', { name: 'Remove cluster' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove cluster' }))
 
-    expect(await screen.findByText('this action requires a higher role')).toBeTruthy()
+    expect(await screen.findByText('this action requires the operator role')).toBeTruthy()
     expect(navigate).not.toHaveBeenCalled()
   })
 })
