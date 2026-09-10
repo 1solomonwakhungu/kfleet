@@ -24,7 +24,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v1.64
 
   test:
     runs-on: ubuntu-latest
@@ -37,7 +37,7 @@ jobs:
           go-version: "1.23"
           cache: true
       - name: Test
-        run: go test ./... -race -coverprofile=coverage.out
+        run: go test ./... -race -timeout 10m -coverprofile=coverage.out
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
@@ -67,12 +67,8 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: v2
           args: check
-      - name: Lint Helm charts
-        uses: azure/setup-helm@v4
-      - name: Validate Helm charts
-        run: helm lint charts/kfleet-hub charts/kfleet-agent
 
   docker:
     runs-on: ubuntu-latest
@@ -87,12 +83,16 @@ jobs:
           context: .
           file: Dockerfile.hub
           push: false
+          cache-from: type=gha,scope=ci-hub
+          cache-to: type=gha,mode=max,scope=ci-hub
       - name: Build agent image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.agent
           push: false
+          cache-from: type=gha,scope=ci-agent
+          cache-to: type=gha,mode=max,scope=ci-agent
 
   helm:
     runs-on: ubuntu-latest
@@ -134,7 +134,24 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Test
+        run: npm run test:run
       - name: Type check
         run: npx tsc --noEmit
       - name: Build
         run: npm run build
+
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: false
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+      - name: Run govulncheck
+        run: govulncheck ./...
