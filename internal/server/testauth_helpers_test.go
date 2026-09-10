@@ -17,6 +17,12 @@ import (
 // never needs to be memorable or environment-specific.
 const testUserPassword = "Sup3rSecretPassw0rd!"
 
+// testRegistrationToken is the registration token configured on test hubs
+// whose tests exercise agent registration. Hubs built without a registration
+// token reject registrations (the register endpoint fails closed), so tests
+// that register agents opt in explicitly.
+const testRegistrationToken = "test-registration-token"
+
 // createTestUser persists a user with the given role and returns it,
 // including its bcrypt hash. Tests use this to exercise RBAC without going
 // through the HTTP login flow.
