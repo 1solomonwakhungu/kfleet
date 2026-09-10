@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useCallback, useMemo, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Breadcrumbs, Button, Flash, Heading, UnderlineNav } from '@primer/react'
 import { Blankslate } from '@primer/react/experimental'
 import { AlertIcon, SyncIcon } from '@primer/octicons-react'
@@ -22,6 +22,8 @@ import styles from './ClusterDetail.module.css'
 
 type TabKey = 'pods' | 'services' | 'deployments' | 'events' | 'logs' | 'timeline'
 
+const TAB_KEYS: TabKey[] = ['pods', 'services', 'deployments', 'events', 'logs', 'timeline']
+
 export default function ClusterDetail() {
   const { id } = useParams<{ id: string }>()
   const detail = useClusterDetail(id)
@@ -32,9 +34,69 @@ export default function ClusterDetail() {
         ? 'Cluster not found · kfleet'
         : 'Loading · kfleet',
   )
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState<TabKey>('pods')
-  const [logsPod, setLogsPod] = useState<PodInfo | undefined>(undefined)
+
+  const tabParam = searchParams.get('tab')
+  const tab: TabKey = tabParam && (TAB_KEYS as string[]).includes(tabParam) ? (tabParam as TabKey) : 'pods'
+  const podParam = searchParams.get('pod') ?? undefined
+
+  // The active tab, namespace filter, and logs pod live in the URL so cluster
+  // views can be shared and refreshed. Only non-default values are written:
+  // the pods tab, all namespaces, and no pod selection leave the query empty.
+  const updateParams = useCallback(
+    (mutate: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams)
+      mutate(params)
+      setSearchParams(params, { replace: true })
+    },
+    [searchParams, setSearchParams],
+  )
+
+  const selectTab = useCallback(
+    (next: TabKey) => {
+      updateParams((params) => {
+        if (next === 'pods') {
+          params.delete('tab')
+        } else {
+          params.set('tab', next)
+        }
+        if (tab === 'logs' && next !== 'logs') {
+          params.delete('pod')
+        }
+      })
+    },
+    [tab, updateParams],
+  )
+
+  const openLogs = useCallback(
+    (pod: PodInfo) => {
+      updateParams((params) => {
+        params.set('tab', 'logs')
+        params.set('pod', pod.name)
+      })
+    },
+    [updateParams],
+  )
+
+  const selectLogsPod = useCallback(
+    (pod: PodInfo | undefined) => {
+      updateParams((params) => {
+        if (pod) {
+          params.set('pod', pod.name)
+        } else {
+          params.delete('pod')
+        }
+      })
+    },
+    [updateParams],
+  )
+
+  const logsPod = useMemo(() => {
+    if (!podParam) return undefined
+    const named = detail.pods.data.filter((pod) => pod.name === podParam)
+    return named.find((pod) => pod.namespace === detail.namespace) ?? named[0]
+  }, [podParam, detail.pods.data, detail.namespace])
 
   const namespaceFilteredPods = useMemo(
     () => (detail.namespace ? detail.pods.data.filter((p) => p.namespace === detail.namespace) : detail.pods.data),
@@ -146,40 +208,40 @@ export default function ClusterDetail() {
               <UnderlineNav.Item
                 aria-current={tab === 'pods' ? 'page' : undefined}
                 counter={tabCounter(detail.pods.data.length, detail.pods.loading, detail.pods.error)}
-                onSelect={selectTab(() => setTab('pods'))}
+                onSelect={selectNavTab(() => selectTab('pods'))}
               >
                 Pods
               </UnderlineNav.Item>
               <UnderlineNav.Item
                 aria-current={tab === 'services' ? 'page' : undefined}
                 counter={tabCounter(detail.services.data.length, detail.services.loading, detail.services.error)}
-                onSelect={selectTab(() => setTab('services'))}
+                onSelect={selectNavTab(() => selectTab('services'))}
               >
                 Services
               </UnderlineNav.Item>
               <UnderlineNav.Item
                 aria-current={tab === 'deployments' ? 'page' : undefined}
                 counter={tabCounter(detail.deployments.data.length, detail.deployments.loading, detail.deployments.error)}
-                onSelect={selectTab(() => setTab('deployments'))}
+                onSelect={selectNavTab(() => selectTab('deployments'))}
               >
                 Deployments
               </UnderlineNav.Item>
               <UnderlineNav.Item
                 aria-current={tab === 'events' ? 'page' : undefined}
                 counter={tabCounter(detail.events.data.length, detail.events.loading, detail.events.error)}
-                onSelect={selectTab(() => setTab('events'))}
+                onSelect={selectNavTab(() => selectTab('events'))}
               >
                 Events
               </UnderlineNav.Item>
               <UnderlineNav.Item
                 aria-current={tab === 'logs' ? 'page' : undefined}
-                onSelect={selectTab(() => setTab('logs'))}
+                onSelect={selectNavTab(() => selectTab('logs'))}
               >
                 Logs
               </UnderlineNav.Item>
               <UnderlineNav.Item
                 aria-current={tab === 'timeline' ? 'page' : undefined}
-                onSelect={selectTab(() => setTab('timeline'))}
+                onSelect={selectNavTab(() => selectTab('timeline'))}
               >
                 Timeline
               </UnderlineNav.Item>
@@ -205,10 +267,7 @@ export default function ClusterDetail() {
               loading={detail.pods.loading}
               error={detail.pods.error}
               search={search}
-              onSelectPod={(pod) => {
-                setLogsPod(pod)
-                setTab('logs')
-              }}
+              onSelectPod={openLogs}
             />
           )}
           {tab === 'services' && (
@@ -236,7 +295,7 @@ export default function ClusterDetail() {
             />
           )}
           {tab === 'logs' && (
-            <LogsTab clusterId={id} pods={detail.pods.data} selectedPod={logsPod} onSelectPod={setLogsPod} />
+            <LogsTab clusterId={id} pods={detail.pods.data} selectedPod={logsPod} onSelectPod={selectLogsPod} />
           )}
           {tab === 'timeline' && <OperationalTimeline clusterId={id} />}
         </div>
@@ -253,7 +312,7 @@ function tabCounter(count: number, loading: boolean, error: string | null): numb
   return loading || error ? undefined : count
 }
 
-function selectTab(activate: () => void) {
+function selectNavTab(activate: () => void) {
   return (event: React.MouseEvent<HTMLAnchorElement> | React.KeyboardEvent<HTMLAnchorElement>) => {
     event.preventDefault()
     activate()
