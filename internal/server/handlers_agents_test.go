@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -296,5 +297,106 @@ func TestGenerateToken(t *testing.T) {
 	}
 	if _, err := json.Marshal(raw); err != nil {
 		t.Fatalf("generated token is not JSON-safe: %v", err)
+	}
+}
+
+func TestAgentReRegistrationRejectsCrossTenantToken(t *testing.T) {
+	httpServer, _, st := newAgentTestServerWithConfig(t, &config.Config{
+		ListenAddr:        ":0",
+		RegistrationToken: testRegistrationToken,
+	})
+
+	registerInTenant := func(tenant string) api.RegisterClusterResponse {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/api/v1/agents/register", bytes.NewBufferString(`{"name":"shared"}`))
+		if err != nil {
+			t.Fatalf("http.NewRequest() error = %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+testRegistrationToken)
+		req.Header.Set(tenantHeader, tenant)
+		response, err := httpServer.Client().Do(req)
+		if err != nil {
+			t.Fatalf("register request error = %v", err)
+		}
+		defer response.Body.Close()
+		if response.StatusCode != http.StatusCreated {
+			t.Fatalf("register in %s status = %d, want %d", tenant, response.StatusCode, http.StatusCreated)
+		}
+		var registration api.RegisterClusterResponse
+		decodeResponse(t, response, &registration)
+		return registration
+	}
+
+	tenantA := registerInTenant("tenant-a")
+	tenantB := registerInTenant("tenant-b")
+
+	// Tenant A's credential must not re-register tenant B's same-named cluster.
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/api/v1/agents/register",
+		bytes.NewBufferString(`{"name":"shared","existingAgentToken":"`+tenantA.Token+`"}`))
+	if err != nil {
+		t.Fatalf("http.NewRequest() error = %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+testRegistrationToken)
+	req.Header.Set(tenantHeader, "tenant-b")
+	response, err := httpServer.Client().Do(req)
+	if err != nil {
+		t.Fatalf("cross-tenant re-registration request error = %v", err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusConflict {
+		t.Fatalf("cross-tenant re-registration status = %d, want %d", response.StatusCode, http.StatusConflict)
+	}
+
+	// Tenant B's own credential still holds; tenant A's never did.
+	if err := st.ApproveAgent(context.Background(), tenantB.ClusterID); err != nil {
+		t.Fatalf("ApproveAgent() error = %v", err)
+	}
+	heartbeatBody := `{"clusterId":"` + tenantB.ClusterID + `","nodeCount":1,"healthyNodes":1}`
+	own := agentRequest(t, httpServer, http.MethodPost, "/api/v1/agents/heartbeat", tenantB.Token, heartbeatBody)
+	own.Body.Close()
+	if own.StatusCode != http.StatusOK {
+		t.Fatalf("heartbeat with tenant B token status = %d, want %d", own.StatusCode, http.StatusOK)
+	}
+	foreign := agentRequest(t, httpServer, http.MethodPost, "/api/v1/agents/heartbeat", tenantA.Token, heartbeatBody)
+	foreign.Body.Close()
+	if foreign.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("heartbeat with tenant A token status = %d, want %d", foreign.StatusCode, http.StatusUnauthorized)
+	}
+}
+
+// erroringSettingsStore fails setting reads while delegating everything else,
+// so tests can exercise the registration path's fail-closed store handling.
+type erroringSettingsStore struct {
+	store.Store
+	getSettingErr error
+}
+
+func (s erroringSettingsStore) GetSetting(context.Context, string) (string, bool, error) {
+	return "", false, s.getSettingErr
+}
+
+func TestAgentRegistrationFailsClosedOnStoreError(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "kfleet.db"))
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	srv := New(&config.Config{ListenAddr: ":0"}, logger, erroringSettingsStore{Store: st, getSettingErr: errors.New("settings unavailable")})
+	httpServer := httptest.NewServer(srv.httpServer.Handler)
+	t.Cleanup(httpServer.Close)
+
+	// A settings store failure is a server error, not "registration disabled".
+	response := agentRequest(t, httpServer, http.MethodPost, "/api/v1/agents/register", "some-token", `{"name":"boom"}`)
+	if response.StatusCode != http.StatusInternalServerError {
+		response.Body.Close()
+		t.Fatalf("registration on store error status = %d, want %d", response.StatusCode, http.StatusInternalServerError)
+	}
+	var errResponse api.ErrorResponse
+	decodeResponse(t, response, &errResponse)
+	if errResponse.Error != "failed to register agent" {
+		t.Fatalf("error = %q, want a generic failure message", errResponse.Error)
 	}
 }
