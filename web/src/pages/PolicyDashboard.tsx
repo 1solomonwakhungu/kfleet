@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Flash, FormControl, Heading, Label, Select, Text } from '@primer/react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link as RouterLink } from 'react-router-dom'
+import { Button, Flash, FormControl, Heading, Label, Link, Select, Text } from '@primer/react'
 import { Blankslate, SkeletonText } from '@primer/react/experimental'
 import {
   AlertIcon,
@@ -39,6 +40,7 @@ export default function PolicyDashboard() {
   const [error, setError] = useState<Error | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all')
+  const pollControllerRef = useRef<AbortController | null>(null)
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
@@ -56,7 +58,16 @@ export default function PolicyDashboard() {
   useEffect(() => {
     const controller = new AbortController()
     void refresh(controller.signal)
-    return () => controller.abort()
+    const interval = window.setInterval(() => {
+      pollControllerRef.current?.abort()
+      const controller = new AbortController()
+      pollControllerRef.current = controller
+      void refresh(controller.signal)
+    }, 15_000)
+    return () => {
+      window.clearInterval(interval)
+      pollControllerRef.current?.abort()
+    }
   }, [refresh])
 
   const visibleResults = useMemo(() => {
@@ -228,6 +239,12 @@ function PolicyResultCard({ result }: { result: PolicyResult }) {
   ].filter(([, value]) => value !== '')
   const presentation = STATUS_PRESENTATION[result.status]
   const StatusGlyph = presentation.icon
+  const clusterId = result.subject.clusterId
+  const clusterLabel = result.subject.clusterName || clusterId || 'fleet'
+  const subjectRest = [
+    result.subject.namespace,
+    result.subject.kind && result.subject.name ? `${result.subject.kind}/${result.subject.name}` : result.subject.name,
+  ].filter(Boolean).join(' / ')
 
   return (
     <article className={`${layout.box} ${layout.boxBody}`}>
@@ -240,7 +257,18 @@ function PolicyResultCard({ result }: { result: PolicyResult }) {
             <Label variant="secondary">{result.category}</Label>
           </div>
           <Text className={layout.pageDescription}>{result.message}</Text>
-          <span className={`${layout.mono} ${layout.muted} ${styles.subject}`}>{subjectLabel(result)}</span>
+          <span className={`${layout.mono} ${layout.muted} ${styles.subject}`}>
+            {clusterId ? (
+              <>
+                <Link as={RouterLink} to={`/clusters/${clusterId}`}>
+                  {clusterLabel}
+                </Link>
+                {subjectRest ? ` / ${subjectRest}` : null}
+              </>
+            ) : (
+              [clusterLabel, subjectRest].filter(Boolean).join(' / ')
+            )}
+          </span>
         </div>
         <Label variant={STATUS_VARIANTS[result.status]}>{result.status.toUpperCase()}</Label>
       </div>
@@ -269,13 +297,4 @@ function splitLabel(value: string) {
 function subjectKey(result: PolicyResult) {
   const subject = result.subject
   return [subject.clusterId, subject.namespace, subject.kind, subject.name].filter(Boolean).join('/')
-}
-
-function subjectLabel(result: PolicyResult) {
-  const subject = result.subject
-  return [
-    subject.clusterName || subject.clusterId || 'fleet',
-    subject.namespace,
-    subject.kind && subject.name ? `${subject.kind}/${subject.name}` : subject.name,
-  ].filter(Boolean).join(' / ')
 }
