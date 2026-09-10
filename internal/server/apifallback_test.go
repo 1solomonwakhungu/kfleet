@@ -34,6 +34,9 @@ func TestBareAPIPathReturnsJSONNotFound(t *testing.T) {
 	if response.StatusCode != http.StatusNotFound {
 		t.Fatalf("bare /api status = %d, want 404", response.StatusCode)
 	}
+	if cc := response.Header.Get("Cache-Control"); cc != "no-store" {
+		t.Fatalf("bare /api cache control = %q, want no-store", cc)
+	}
 	assertJSONErrorBody(t, response, http.StatusNotFound)
 }
 
@@ -50,6 +53,7 @@ func TestWrongMethodOnKnownAPIRouteReturnsJSONNotAllowed(t *testing.T) {
 		{"DELETE on results", http.MethodDelete, "/api/v1/policies/results", "GET, HEAD"},
 		{"GET on POST-only login", http.MethodGet, "/api/v1/auth/login", "POST"},
 		{"GET on POST-only heartbeat", http.MethodGet, "/api/v1/agents/heartbeat", "POST"},
+		{"DELETE on GET-only wildcard pods", http.MethodDelete, "/api/v1/clusters/some-cluster/pods", "GET, HEAD"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

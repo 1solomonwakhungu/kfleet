@@ -204,7 +204,7 @@ func (s *Server) withSecurityHeaders(next http.Handler) http.Handler {
 		headers.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		headers.Set("X-Content-Type-Options", "nosniff")
 		headers.Set("X-Frame-Options", "DENY")
-		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || strings.HasPrefix(r.URL.Path, "/api/") {
+		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
 			headers.Set("Cache-Control", "no-store")
 		}
 		next.ServeHTTP(w, r)
