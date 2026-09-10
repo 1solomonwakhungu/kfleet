@@ -116,7 +116,7 @@ func (s *Server) requireRole(minimum types.Role, next http.HandlerFunc) http.Han
 					"required_role="+string(minimum),
 				)
 			}
-			api.WriteError(w, http.StatusForbidden, "this action requires a higher role")
+			api.WriteError(w, http.StatusForbidden, "this action requires the "+string(minimum)+" role")
 			return
 		}
 		next(w, r)
