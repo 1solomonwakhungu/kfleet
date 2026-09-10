@@ -1,8 +1,11 @@
+import { Button } from '@primer/react'
 import { Blankslate } from '@primer/react/experimental'
 import { AlertIcon } from '@primer/octicons-react'
+import { Link } from 'react-router-dom'
 
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import layout from '../styles/layout.module.css'
+import styles from './NotFound.module.css'
 
 export default function NotFound() {
   useDocumentTitle('Page not found · kfleet')
@@ -18,7 +21,11 @@ export default function NotFound() {
           <Blankslate.Description>
             This address does not match any kfleet page. It may have been moved or mistyped.
           </Blankslate.Description>
-          <Blankslate.PrimaryAction href="/">Back to dashboard</Blankslate.PrimaryAction>
+          <div className={styles.action}>
+            <Button as={Link} to="/" variant="primary">
+              Back to dashboard
+            </Button>
+          </div>
         </Blankslate>
       </div>
     </main>
