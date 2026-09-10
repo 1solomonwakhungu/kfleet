@@ -2,6 +2,7 @@
 package config
 
 import (
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net/url"
@@ -20,9 +21,12 @@ const (
 
 // Config contains the agent runtime configuration.
 type Config struct {
-	HubURL         string
-	ClusterName    string
-	HubToken       string
+	HubURL      string
+	ClusterName string
+	HubToken    string
+	// HubCAPool trusts a custom CA for the hub's TLS certificate. It is nil
+	// when KFLEET_HUB_CA is unset, in which case system roots are used.
+	HubCAPool      *x509.CertPool
 	TenantID       string
 	ReportInterval time.Duration
 	Kubeconfig     string
@@ -51,6 +55,14 @@ func Load() (*Config, error) {
 		return nil, errors.New("KFLEET_HUB_TOKEN is required")
 	}
 
+	// A private CA or self-signed hub certificate is common on-prem; when the
+	// bundle is set but unreadable, fail fast instead of retrying TLS
+	// handshakes that can never succeed.
+	hubCAPool, err := parseHubCA(os.Getenv("KFLEET_HUB_CA"))
+	if err != nil {
+		return nil, err
+	}
+
 	interval := defaultReportInterval
 	if raw := os.Getenv("KFLEET_REPORT_INTERVAL"); raw != "" {
 		parsed, err := time.ParseDuration(raw)
@@ -72,6 +84,7 @@ func Load() (*Config, error) {
 		HubURL:         hubURL,
 		ClusterName:    clusterName,
 		HubToken:       hubToken,
+		HubCAPool:      hubCAPool,
 		TenantID:       tenantID,
 		ReportInterval: interval,
 		Kubeconfig:     os.Getenv("KUBECONFIG"),

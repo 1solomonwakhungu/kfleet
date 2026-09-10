@@ -55,8 +55,15 @@ spec:
             - name: KFLEET_HUB_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kfleet-agent.fullname" . }}
-                  key: hub-token
+                  name: {{ .Values.hub.existingSecret | default (include "kfleet-agent.fullname" .) }}
+                  key: {{ .Values.hub.existingSecretKey | default "hub-token" }}
+            {{- if .Values.hub.caBundle }}
+            - name: KFLEET_HUB_CA
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kfleet-agent.fullname" . }}-hub-ca
+                  key: ca.crt
+            {{- end }}
             - name: KFLEET_TENANT_ID
               value: {{ .Values.tenant.id | quote }}
             {{- if .Values.cluster.labels }}
@@ -65,6 +72,12 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.hub.caBundle }}
+          volumeMounts:
+            - name: hub-ca
+              mountPath: /etc/kfleet/hub-ca
+              readOnly: true
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -88,4 +101,10 @@ spec:
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.hub.caBundle }}
+      volumes:
+        - name: hub-ca
+          secret:
+            secretName: {{ include "kfleet-agent.fullname" . }}-hub-ca
       {{- end }}
