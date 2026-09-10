@@ -218,6 +218,112 @@ func TestHeartbeatServerErrorReturnsError(t *testing.T) {
 	}
 }
 
+// TestRegisterSurfacesHubErrorBody proves a rejected registration carries the
+// hub's explanation so operators can diagnose the failure from agent logs.
+func TestRegisterSurfacesHubErrorBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":"agent is pending approval","code":403}`))
+	}))
+	t.Cleanup(server.Close)
+
+	registrar := New(&config.Config{
+		HubURL:      server.URL,
+		ClusterName: "cluster-a",
+		HubToken:    "bootstrap-token",
+	}, nil)
+	_, err := registrar.Register(context.Background(), "v1.32.3")
+	if err == nil {
+		t.Fatal("Register() error = nil, want error for rejected registration")
+	}
+	if !strings.Contains(err.Error(), "hub returned registration status 403 Forbidden") {
+		t.Errorf("Register() error = %q, want it to describe the registration status", err)
+	}
+	if !strings.Contains(err.Error(), "agent is pending approval") {
+		t.Errorf("Register() error = %q, want it to carry the hub's error body", err)
+	}
+}
+
+// TestRegisterSurfacesNonJSONErrorBody proves a hub that replies with a plain
+// body still lands in the error message instead of being discarded.
+func TestRegisterSurfacesNonJSONErrorBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "rate limited", http.StatusTooManyRequests)
+	}))
+	t.Cleanup(server.Close)
+
+	registrar := New(&config.Config{
+		HubURL:      server.URL,
+		ClusterName: "cluster-a",
+		HubToken:    "bootstrap-token",
+	}, nil)
+	_, err := registrar.Register(context.Background(), "v1.32.3")
+	if err == nil {
+		t.Fatal("Register() error = nil, want error for rejected registration")
+	}
+	if !strings.Contains(err.Error(), "rate limited") {
+		t.Errorf("Register() error = %q, want it to carry the raw body snippet", err)
+	}
+}
+
+// TestRegisterUnauthorizedSurfacesHubErrorBody proves the 401 special case
+// keeps its message and gains the hub's explanation.
+func TestRegisterUnauthorizedSurfacesHubErrorBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"invalid registration token","code":401}`))
+	}))
+	t.Cleanup(server.Close)
+
+	registrar := New(&config.Config{
+		HubURL:      server.URL,
+		ClusterName: "cluster-a",
+		HubToken:    "bootstrap-token",
+	}, nil)
+	_, err := registrar.Register(context.Background(), "v1.32.3")
+	if err == nil {
+		t.Fatal("Register() error = nil, want error for rejected token")
+	}
+	if !strings.Contains(err.Error(), "hub rejected agent token") {
+		t.Errorf("Register() error = %q, want the token rejection message", err)
+	}
+	if !strings.Contains(err.Error(), "invalid registration token") {
+		t.Errorf("Register() error = %q, want it to carry the hub's error body", err)
+	}
+}
+
+// TestHeartbeatSurfacesHubErrorBody proves a failed heartbeat carries the
+// hub's explanation instead of only the status code.
+func TestHeartbeatSurfacesHubErrorBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":"agent is pending approval","code":403}`))
+	}))
+	t.Cleanup(server.Close)
+
+	registrar := New(&config.Config{
+		HubURL:      server.URL,
+		ClusterName: "cluster-a",
+		HubToken:    "bootstrap-token",
+	}, nil)
+	reregister, err := registrar.Heartbeat(context.Background())
+	if err == nil {
+		t.Fatal("Heartbeat() error = nil, want error for rejected heartbeat")
+	}
+	if reregister {
+		t.Error("Heartbeat() signaled re-registration on server failure")
+	}
+	if !strings.Contains(err.Error(), "hub returned heartbeat status 403 Forbidden") {
+		t.Errorf("Heartbeat() error = %q, want it to describe the heartbeat status", err)
+	}
+	if !strings.Contains(err.Error(), "agent is pending approval") {
+		t.Errorf("Heartbeat() error = %q, want it to carry the hub's error body", err)
+	}
+}
+
 // TestHeartbeatTreatsEmptyBodyAsPending proves an opaque 2xx heartbeat
 // response keeps the agent pending instead of failing the heartbeat.
 func TestHeartbeatTreatsEmptyBodyAsPending(t *testing.T) {
