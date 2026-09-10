@@ -4,7 +4,7 @@ import type { AuditEvent, CreateUserInput, UpdateUserInput, UserAccount } from '
 /**
  * Admin-only endpoints. Every route below is registered behind
  * `s.requireRole(types.RoleAdmin, ...)` in internal/server, so the hub answers
- * 403 "this action requires a higher role" for operators and read-only users.
+ * 403 "this action requires the admin role" for operators and read-only users.
  */
 export const adminApi = {
   // GET /api/v1/users (internal/server/handlers_users.go).
