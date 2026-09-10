@@ -57,6 +57,7 @@ export default function PolicyDashboard() {
 
   useEffect(() => {
     const controller = new AbortController()
+    pollControllerRef.current = controller
     void refresh(controller.signal)
     const interval = window.setInterval(() => {
       pollControllerRef.current?.abort()
@@ -99,7 +100,7 @@ export default function PolicyDashboard() {
         </Button>
       </header>
 
-      {error ? (
+      {error && !data ? (
         <Flash variant="danger" role="alert">
           <Text weight="semibold">Policy evaluation unavailable</Text>
           <Text className={layout.pageDescription}>{error.message}</Text>
@@ -111,6 +112,18 @@ export default function PolicyDashboard() {
         </Flash>
       ) : (
         <>
+          {error && (
+            <Flash variant="danger" role="alert" className={styles.flash}>
+              <Text weight="semibold">Policy results could not be refreshed</Text>
+              <Text className={layout.pageDescription}>{error.message}</Text>
+              <div className={styles.flashAction}>
+                <Button leadingVisual={SyncIcon} onClick={() => void refresh()}>
+                  Retry
+                </Button>
+              </div>
+            </Flash>
+          )}
+
           <PolicySummaryStrip data={data} loading={loading} />
 
           <section className={styles.results} aria-labelledby="policy-findings-heading">

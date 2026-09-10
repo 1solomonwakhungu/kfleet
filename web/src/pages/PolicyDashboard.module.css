@@ -2,6 +2,10 @@
   margin-top: var(--base-size-12, 12px);
 }
 
+.flash {
+  margin-bottom: var(--base-size-16, 16px);
+}
+
 .summaryHead {
   display: flex;
   gap: var(--base-size-8, 8px);
