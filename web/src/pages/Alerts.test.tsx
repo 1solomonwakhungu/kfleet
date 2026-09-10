@@ -81,6 +81,15 @@ describe('AlertsPage', () => {
     expect(link.getAttribute('href')).toBe('/clusters/cluster-a')
   })
 
+  it('falls back to the cluster id as the link label when cluster name is empty', async () => {
+    vi.mocked(api.listAlerts).mockResolvedValueOnce([{ ...alert, clusterName: '' }])
+
+    render(<AlertsPage />, { wrapper: MemoryRouter })
+
+    const link = await screen.findByRole('link', { name: 'cluster-a' })
+    expect(link.getAttribute('href')).toBe('/clusters/cluster-a')
+  })
+
   it('polls for alert updates every 15 seconds and stops after unmount', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     try {

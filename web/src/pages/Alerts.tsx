@@ -70,6 +70,7 @@ export default function AlertsPage() {
 
   useEffect(() => {
     const controller = new AbortController()
+    pollControllerRef.current = controller
     void load(controller.signal)
     const interval = window.setInterval(() => {
       pollControllerRef.current?.abort()
@@ -197,7 +198,7 @@ export default function AlertsPage() {
                       </td>
                       <td>
                         <Link as={RouterLink} to={`/clusters/${alert.clusterId}`}>
-                          {alert.clusterName}
+                          {alert.clusterName || alert.clusterId}
                         </Link>
                       </td>
                       <td>

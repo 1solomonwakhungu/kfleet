@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -104,6 +104,38 @@ describe('PolicyDashboard', () => {
 
       expect(fetchMock).toHaveBeenCalledTimes(2)
       expect(await screen.findByText('Pod security baseline')).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps previously loaded results when a poll fails and recovers on the next poll', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      render(<PolicyDashboard />, { wrapper: MemoryRouter })
+
+      expect(await screen.findByText('Pod security baseline')).toBeTruthy()
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'evaluation failed' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      await act(async () => {
+        vi.advanceTimersByTime(15_000)
+      })
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(await screen.findByText('evaluation failed')).toBeTruthy()
+      expect(screen.getByText('Pod security baseline')).toBeTruthy()
+
+      await act(async () => {
+        vi.advanceTimersByTime(15_000)
+      })
+
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+      await waitFor(() => expect(screen.queryByText('evaluation failed')).toBeNull())
+      expect(screen.getByText('Pod security baseline')).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }
