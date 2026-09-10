@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/1solomonwakhungu/kfleet/internal/agent/config"
+	"github.com/1solomonwakhungu/kfleet/internal/agent/huberrors"
 	"github.com/1solomonwakhungu/kfleet/internal/version"
 )
 
@@ -87,12 +88,10 @@ func (r *Registrar) Register(ctx context.Context, k8sVersion string) (*RegisterR
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode == http.StatusUnauthorized {
-		_, _ = io.Copy(io.Discard, response.Body)
-		return nil, errors.New("hub rejected agent token")
+		return nil, errors.New(huberrors.WithDetail("hub rejected agent token", response))
 	}
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusAccepted && response.StatusCode != http.StatusCreated {
-		_, _ = io.Copy(io.Discard, response.Body)
-		return nil, fmt.Errorf("hub returned registration status %s", response.Status)
+		return nil, errors.New(huberrors.WithDetail(fmt.Sprintf("hub returned registration status %s", response.Status), response))
 	}
 
 	var result struct {
@@ -164,8 +163,7 @@ func (r *Registrar) postLifecycle(ctx context.Context, action string) (bool, err
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		_, _ = io.Copy(io.Discard, response.Body)
-		return false, fmt.Errorf("hub returned %s status %s", action, response.Status)
+		return false, errors.New(huberrors.WithDetail(fmt.Sprintf("hub returned %s status %s", action, response.Status), response))
 	}
 	if action != "heartbeat" {
 		_, _ = io.Copy(io.Discard, response.Body)
