@@ -1152,6 +1152,16 @@ func (s *sqliteStore) DeleteUser(ctx context.Context, id string) error {
 	})
 }
 
+func (s *sqliteStore) UpdateUserPassword(ctx context.Context, id, passwordHash string) error {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`,
+		passwordHash, time.Now().UTC(), id)
+	if err != nil {
+		return fmt.Errorf("update user password: %w", err)
+	}
+	return requireAffectedRow(result)
+}
+
 // withLastAdminGuard runs mutate inside a transaction that first checks
 // whether id currently is an enabled admin and, if so, whether newRole and
 // newDisabled would leave it (or removal, when newDisabled is passed as
@@ -1237,6 +1247,14 @@ func (s *sqliteStore) DeleteExpiredSessions(ctx context.Context, now time.Time) 
 	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at <= ?`, now)
 	if err != nil {
 		return fmt.Errorf("delete expired sessions: %w", err)
+	}
+	return nil
+}
+
+func (s *sqliteStore) DeleteSessionsForUser(ctx context.Context, userID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
+	if err != nil {
+		return fmt.Errorf("delete sessions for user: %w", err)
 	}
 	return nil
 }

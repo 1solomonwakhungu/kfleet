@@ -80,12 +80,18 @@ type Store interface {
 	// change that would leave the hub with zero enabled admins.
 	UpdateUser(ctx context.Context, id string, role types.Role, disabled bool) error
 	DeleteUser(ctx context.Context, id string) error
+	// UpdateUserPassword replaces the stored password hash for id and
+	// returns ErrNotFound when the user does not exist.
+	UpdateUserPassword(ctx context.Context, id, passwordHash string) error
 
 	// Sessions.
 	CreateSession(ctx context.Context, tokenHash, userID string, expiresAt time.Time) error
 	GetSessionUser(ctx context.Context, tokenHash string, now time.Time) (types.User, error)
 	DeleteSession(ctx context.Context, tokenHash string) error
 	DeleteExpiredSessions(ctx context.Context, now time.Time) error
+	// DeleteSessionsForUser invalidates every session belonging to userID,
+	// used after a password change so stale sessions cannot keep access.
+	DeleteSessionsForUser(ctx context.Context, userID string) error
 
 	// Append-only audit log.
 	RecordAuditEvent(ctx context.Context, event types.AuditEvent) error
