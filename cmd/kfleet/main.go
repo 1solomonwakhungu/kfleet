@@ -184,7 +184,7 @@ func (a app) quickstart(ctx context.Context, args []string) error {
 		}
 	}
 	if err := a.runner.Run(ctx, "docker", "info"); err != nil {
-		return errors.New("Docker is installed but is not running")
+		return errors.New("docker is installed but is not running")
 	}
 
 	previous, _ := a.readState()
