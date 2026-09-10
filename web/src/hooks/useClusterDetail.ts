@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '@/lib/api';
 import type { Cluster, ClusterNode } from '@/types/cluster';
 import type { PodInfo, ServiceInfo, DeploymentInfo, EventInfo } from '@/types/resources';
@@ -25,6 +26,21 @@ function errorMessage(error: unknown): string {
 }
 
 export function useClusterDetail(clusterId: string | undefined) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const namespaceParam = searchParams.get('namespace');
+  const namespace = namespaceParam ?? undefined;
+  const setNamespace = useCallback(
+    (next: string | undefined) => {
+      const params = new URLSearchParams(searchParams);
+      if (next) {
+        params.set('namespace', next);
+      } else {
+        params.delete('namespace');
+      }
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
   const [cluster, setCluster] = useState<Cluster | null>(null);
   const [nodes, setNodes] = useState<ClusterNode[]>([]);
   const [pods, setPods] = useState<ResourceState<PodInfo[]>>(idle([]));
@@ -32,7 +48,6 @@ export function useClusterDetail(clusterId: string | undefined) {
   const [deployments, setDeployments] = useState<ResourceState<DeploymentInfo[]>>(idle([]));
   const [events, setEvents] = useState<ResourceState<EventInfo[]>>(idle([]));
   const [namespaces, setNamespaces] = useState<string[]>([]);
-  const [namespace, setNamespace] = useState<string | undefined>(undefined);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [statusNotFound, setStatusNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
