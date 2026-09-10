@@ -3,6 +3,7 @@ package config
 
 import (
 	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -17,6 +18,7 @@ var tenantIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
 const (
 	defaultReportInterval = 30 * time.Second
 	defaultHealthAddress  = ":8081"
+	defaultLogLevel       = "info"
 )
 
 // Config contains the agent runtime configuration.
@@ -31,6 +33,8 @@ type Config struct {
 	ReportInterval time.Duration
 	Kubeconfig     string
 	HealthAddress  string
+	LogLevel       string
+	ClusterLabels  map[string]string
 }
 
 // Load reads agent configuration from environment variables.
@@ -80,6 +84,20 @@ func Load() (*Config, error) {
 		return nil, errors.New("KFLEET_TENANT_ID must be a lowercase tenant identifier")
 	}
 
+	logLevel := envOrDefault("KFLEET_LOG_LEVEL", defaultLogLevel)
+	switch logLevel {
+	case "debug", "info", "warn", "error":
+	default:
+		return nil, errors.New("KFLEET_LOG_LEVEL must be one of debug, info, warn, or error")
+	}
+
+	labels := map[string]string{}
+	if raw := os.Getenv("KFLEET_CLUSTER_LABELS"); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &labels); err != nil {
+			return nil, fmt.Errorf("decode KFLEET_CLUSTER_LABELS: %w", err)
+		}
+	}
+
 	return &Config{
 		HubURL:         hubURL,
 		ClusterName:    clusterName,
@@ -89,6 +107,8 @@ func Load() (*Config, error) {
 		ReportInterval: interval,
 		Kubeconfig:     os.Getenv("KUBECONFIG"),
 		HealthAddress:  envOrDefault("KFLEET_HEALTH_ADDR", defaultHealthAddress),
+		LogLevel:       logLevel,
+		ClusterLabels:  labels,
 	}, nil
 }
 

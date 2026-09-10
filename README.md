@@ -200,6 +200,12 @@ rather than retrying registration forever. GitOps users can instead set
 pre-created Secret so the token never appears in values, and `hub.caBundle`
 with a PEM-encoded CA when the hub serves a private-CA or self-signed certificate.
 
+The agent pod's readiness probe reflects real hub contact: `/readyz` answers 200
+only after a successful registration and stays ready only while a heartbeat or
+status report succeeds within three heartbeat intervals. During a hub outage the
+pod reports NotReady (kubelet does not restart it) and becomes ready again once
+contact resumes.
+
 Each `v*` release publishes matching OCI charts to GHCR. Pin an installation
 with `--version 1.2.3`; that chart deploys the tool image tagged `v1.2.3`.
 For local chart development, replace the OCI URL with `./charts/kfleet-hub` or
