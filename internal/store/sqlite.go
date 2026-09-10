@@ -423,6 +423,16 @@ func (s *sqliteStore) GetClusterForTenant(ctx context.Context, tenantID, id stri
 	return cluster, nil
 }
 
+// CountClusters returns the number of registered clusters. Every cluster has
+// exactly one agent, so this is the registered agent count.
+func (s *sqliteStore) CountClusters(ctx context.Context) (int64, error) {
+	var count int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM clusters`).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count clusters: %w", err)
+	}
+	return count, nil
+}
+
 func (s *sqliteStore) ListClusters(ctx context.Context) ([]types.Cluster, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, tenant_id, name, health, version, agent_version, node_count, pod_count,

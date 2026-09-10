@@ -65,6 +65,11 @@ type Store interface {
 	RecordAlertDelivered(ctx context.Context, id string, attempts int, deliveredAt time.Time) error
 	RecordAlertDeliveryFailure(ctx context.Context, id string, attempts int, nextAttemptAt *time.Time, deliveryError string, failedAt time.Time) error
 
+	// Cheap COUNT queries backing the hub's /metrics endpoint. Callers cache
+	// the results; the store performs no caching itself.
+	CountClusters(ctx context.Context) (int64, error)
+	CountDeadLetteredAlerts(ctx context.Context) (int64, error)
+
 	// AppendEvent durably records an operational timeline event and suppresses
 	// retries with the same cluster, kind, and dedupe key.
 	AppendEvent(ctx context.Context, event types.OperationalEvent) (inserted bool, err error)

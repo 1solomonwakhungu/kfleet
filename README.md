@@ -109,6 +109,10 @@ curl -X POST \
 
 The cluster detail page exposes the same retained history in its Timeline tab with 24-hour, 7-day, 30-day, 90-day, and all-retained filters plus cursor pagination.
 
+## Metrics
+
+The hub serves operational metrics at `GET /metrics` in the Prometheus text exposition format. Every value is a non-sensitive aggregate: registered agents, agents with a live log relay channel, connected WebSocket dashboard clients, active pod log streams, dead-lettered alerts, and the SQLite database file size. No cluster names, tenant identifiers, or credentials are exposed, and the endpoint is read-only, so it is served without authentication for in-cluster scraping. Set `KFLEET_METRICS_ENABLED=false` (or Helm value `metrics.enabled=false`) to disable it. Each `X-Request-ID` on a request is echoed back; otherwise the hub generates one and includes it with the status code and duration in every request log line.
+
 ## How it compares
 
 This table compares native, bundled capabilities; integrations and third-party extensions may add more.

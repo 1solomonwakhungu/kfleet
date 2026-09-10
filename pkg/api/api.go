@@ -14,6 +14,8 @@ const APIVersion = "v1"
 
 // RuntimeInfo describes the safety posture of the running hub.
 type RuntimeInfo struct {
+	// Version is the hub build version stamped via internal/version.
+	Version       string `json:"version"`
 	DemoMode      bool   `json:"demoMode"`
 	ReadOnly      bool   `json:"readOnly"`
 	SyntheticData bool   `json:"syntheticData"`

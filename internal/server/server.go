@@ -2,9 +2,11 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -14,8 +16,10 @@ import (
 	hubweb "github.com/1solomonwakhungu/kfleet/internal/hub/web"
 	"github.com/1solomonwakhungu/kfleet/internal/policy"
 	"github.com/1solomonwakhungu/kfleet/internal/store"
+	"github.com/1solomonwakhungu/kfleet/internal/version"
 	"github.com/1solomonwakhungu/kfleet/pkg/api"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
+	"github.com/google/uuid"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -27,14 +31,15 @@ const defaultEventRetention = 90 * 24 * time.Hour
 
 // Server is the kfleet hub HTTP server.
 type Server struct {
-	cfg        *config.Config
-	logger     *slog.Logger
-	store      store.Store
-	alerts     *alerts.Manager
-	policies   *policy.Engine
-	broadcast  *BroadcastHub
-	logs       *LogRelay
-	httpServer *http.Server
+	cfg          *config.Config
+	logger       *slog.Logger
+	store        store.Store
+	alerts       *alerts.Manager
+	policies     *policy.Engine
+	broadcast    *BroadcastHub
+	logs         *LogRelay
+	storeMetrics *storeMetrics
+	httpServer   *http.Server
 }
 
 // New constructs a hub server with its routes configured.
@@ -53,6 +58,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 		broadcast: NewBroadcastHub(logger),
 		logs:      NewLogRelay(logger),
 	}
+	server.storeMetrics = &storeMetrics{}
 	server.policies = policy.NewEngine(st, 3*server.heartbeatInterval())
 
 	mux := http.NewServeMux()
@@ -61,6 +67,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 		_, _ = w.Write([]byte("ok"))
 	})
 	mux.HandleFunc("GET /readyz", server.handleReadyz)
+	mux.HandleFunc("GET /metrics", server.handleMetrics)
 	mux.HandleFunc("GET /ws/clusters", server.requireAuth(server.handleWSClusters))
 
 	// registerAPIRoutes declares every /api/v1 route. It runs twice: once
@@ -71,6 +78,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	registerAPIRoutes := func(m *http.ServeMux) {
 		m.HandleFunc("GET /api/v1/meta", func(w http.ResponseWriter, _ *http.Request) {
 			if err := api.WriteJSON(w, http.StatusOK, api.RuntimeInfo{
+				Version:       version.String(),
 				DemoMode:      cfg.DemoMode,
 				ReadOnly:      cfg.DemoMode,
 				SyntheticData: cfg.DemoMode,
@@ -102,6 +110,7 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	}
 	handler = server.withSecurityHeaders(handler)
 	handler = server.withLogging(handler)
+	handler = server.withRequestID(handler)
 	server.httpServer = &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           handler,
@@ -204,7 +213,7 @@ func (s *Server) withSecurityHeaders(next http.Handler) http.Handler {
 		headers.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		headers.Set("X-Content-Type-Options", "nosniff")
 		headers.Set("X-Frame-Options", "DENY")
-		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
+		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || r.URL.Path == "/metrics" || r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
 			headers.Set("Cache-Control", "no-store")
 		}
 		next.ServeHTTP(w, r)
@@ -306,15 +315,112 @@ func (s *Server) pruneExpiredEvents(ctx context.Context, now time.Time) {
 	}
 }
 
-// withLogging logs the method, path, and duration of every HTTP request.
+// requestIDHeader carries the per-request correlation ID both ways.
+const requestIDHeader = "X-Request-ID"
+
+// maxRequestIDLength bounds honored incoming IDs so a caller cannot plant an
+// unbounded value into response headers and logs.
+const maxRequestIDLength = 128
+
+type requestIDContextKey struct{}
+
+// withRequestID gives every request a correlation ID: an incoming
+// X-Request-ID header is honored when well-formed, otherwise a UUID is
+// generated. The ID is echoed in the X-Request-ID response header, placed in
+// the request context for handlers and withLogging, and can therefore appear
+// in every log line for the request. It must wrap withLogging so the log
+// middleware can read the ID from the context.
+func (s *Server) withRequestID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := sanitizeRequestID(r.Header.Get(requestIDHeader))
+		w.Header().Set(requestIDHeader, id)
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestIDContextKey{}, id)))
+	})
+}
+
+// requestIDFromContext returns the request ID assigned by withRequestID.
+func requestIDFromContext(ctx context.Context) (string, bool) {
+	id, ok := ctx.Value(requestIDContextKey{}).(string)
+	return id, ok && id != ""
+}
+
+// isValidRequestID accepts printable ASCII IDs without whitespace, the only
+// shape safe to echo back into response headers and structured logs.
+func isValidRequestID(id string) bool {
+	if id == "" || len(id) > maxRequestIDLength {
+		return false
+	}
+	for i := 0; i < len(id); i++ {
+		if id[i] < 0x21 || id[i] > 0x7e {
+			return false
+		}
+	}
+	return true
+}
+
+// sanitizeRequestID honors a well-formed incoming ID, otherwise it generates
+// a fresh UUID.
+func sanitizeRequestID(incoming string) string {
+	if isValidRequestID(incoming) {
+		return incoming
+	}
+	return uuid.NewString()
+}
+
+// statusWriter captures the response status for request logging while
+// delegating everything else, including the flush and hijack upgrades the
+// WebSocket and SSE handlers rely on.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(status int) {
+	if w.status == 0 {
+		w.status = status
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *statusWriter) Write(p []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.ResponseWriter.Write(p)
+}
+
+func (w *statusWriter) Flush() {
+	_ = http.NewResponseController(w.ResponseWriter).Flush()
+}
+
+func (w *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	// A hijacked connection has already answered with 101 Switching
+	// Protocols, written directly over the raw connection.
+	w.status = http.StatusSwitchingProtocols
+	return http.NewResponseController(w.ResponseWriter).Hijack()
+}
+
+// withLogging logs the method, path, status, duration, and request ID of
+// every HTTP request. Liveness and readiness probes log at Debug instead of
+// Info so routine probe traffic never floods the operational log.
 func (s *Server) withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
-		next.ServeHTTP(w, r)
-		s.logger.Info("http request",
+		recorder := &statusWriter{ResponseWriter: w}
+		next.ServeHTTP(recorder, r)
+		attrs := []any{
 			"method", r.Method,
 			"path", r.URL.Path,
+			"status", recorder.status,
 			"duration", time.Since(started),
-		)
+		}
+		if id, ok := requestIDFromContext(r.Context()); ok {
+			attrs = append(attrs, "request_id", id)
+		}
+		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" {
+			s.logger.Debug("http request", attrs...)
+			return
+		}
+		s.logger.Info("http request", attrs...)
 	})
 }
