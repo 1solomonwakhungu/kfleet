@@ -148,7 +148,8 @@ func run(
 }
 
 // runAgentLoop returns true when the root context is cancelled and false when
-// registration should be retried after a heartbeat failure.
+// registration should be retried after a heartbeat failure or once the hub
+// reports a pending agent approved.
 func runAgentLoop(
 	ctx context.Context,
 	reportInterval time.Duration,
@@ -166,11 +167,16 @@ func runAgentLoop(
 		case <-ctx.Done():
 			return true
 		case <-heartbeats.C:
-			if err := agentRegistrar.Heartbeat(ctx); err != nil {
+			reregister, err := agentRegistrar.Heartbeat(ctx)
+			if err != nil {
 				if ctx.Err() != nil {
 					return true
 				}
 				logger.Error("agent heartbeat failed; re-registering", "error", err)
+				return false
+			}
+			if reregister {
+				logger.Info("agent approved by hub; re-registering")
 				return false
 			}
 		case <-reports.C:
