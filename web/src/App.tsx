@@ -10,6 +10,7 @@ import Alerts from './pages/Alerts'
 import PolicyDashboard from './pages/PolicyDashboard'
 import Users from './pages/Users'
 import AuditLog from './pages/AuditLog'
+import NotFound from './pages/NotFound'
 
 export function App() {
   return (
@@ -24,9 +25,9 @@ export function App() {
           <Route path="policies" element={<PolicyDashboard />} />
           <Route path="admin/users" element={<Users />} />
           <Route path="admin/audit" element={<AuditLog />} />
+          <Route path="*" element={<NotFound />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

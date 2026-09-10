@@ -1,5 +1,6 @@
 import { Label, Text } from '@primer/react'
 import { ArrowUpRightIcon, ClockIcon } from '@primer/octicons-react'
+import { Link } from 'react-router-dom'
 
 import { HealthLabel } from './HealthLabel'
 import { StatusDot } from './StatusDot'
@@ -9,7 +10,7 @@ import styles from './ClusterCard.module.css'
 
 interface ClusterCardProps {
   cluster: Cluster
-  onClick: () => void
+  to: string
 }
 
 function heartbeatDetails(value: string) {
@@ -32,18 +33,17 @@ function heartbeatDetails(value: string) {
   }
 }
 
-export function ClusterCard({ cluster, onClick }: ClusterCardProps) {
+export function ClusterCard({ cluster, to }: ClusterCardProps) {
   const labels = Object.entries(cluster.labels).sort(([left], [right]) => left.localeCompare(right))
   const visibleLabels = labels.slice(0, 3)
   const hiddenLabelCount = labels.length - visibleLabels.length
   const heartbeat = heartbeatDetails(cluster.lastHeartbeat)
 
   return (
-    <button
-      type="button"
+    <Link
+      to={to}
       className={`${styles.card} ${styles[cluster.health]}`}
       aria-label={`Open ${cluster.name} cluster, health ${cluster.health}`}
-      onClick={onClick}
     >
       <div className={styles.body}>
         <div>
@@ -102,7 +102,7 @@ export function ClusterCard({ cluster, onClick }: ClusterCardProps) {
           <ArrowUpRightIcon size={16} className={styles.arrow} />
         </div>
       </div>
-    </button>
+    </Link>
   )
 }
 

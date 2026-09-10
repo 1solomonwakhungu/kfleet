@@ -69,6 +69,32 @@ describe('App routing', () => {
     expect(screen.getByRole('link', { name: /^Fleet/ }).getAttribute('aria-current')).toBeNull()
   })
 
+  it('renders the fleet dashboard at /', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Fleet dashboard' })).toBeTruthy()
+  })
+
+  it('renders a not-found page for unknown routes instead of redirecting home', async () => {
+    render(
+      <MemoryRouter initialEntries={['/definitely-not-a-route']}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Back to dashboard' }).getAttribute('href')).toBe('/')
+    expect(screen.queryByRole('heading', { name: 'Fleet dashboard' })).toBeNull()
+  })
+
   it('redirects an unauthenticated protected route to sign in', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })))
 

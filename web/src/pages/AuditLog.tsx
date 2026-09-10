@@ -4,6 +4,7 @@ import { Blankslate, SkeletonText } from '@primer/react/experimental'
 import { LogIcon, SearchIcon, SyncIcon } from '@primer/octicons-react'
 
 import { useAuth } from '../auth/AuthContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PermissionNotice } from '../components/admin/PermissionNotice'
 import { useAuditEvents } from '../hooks/useAuditEvents'
 import type { AuditEvent, AuditOutcome } from '../types/admin'
@@ -26,6 +27,7 @@ function matches(event: AuditEvent, query: string): boolean {
 }
 
 export function AuditLogPage() {
+  useDocumentTitle('Audit log · kfleet')
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const { events, loading, error, hasMore, reload, loadMore } = useAuditEvents(isAdmin)
