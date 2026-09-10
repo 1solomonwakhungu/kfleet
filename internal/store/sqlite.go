@@ -153,6 +153,12 @@ const createOperationalEventsOccurredIndex = `
 CREATE INDEX IF NOT EXISTS idx_operational_events_time
 	ON operational_events (tenant_id, occurred_at, id)`
 
+// idx_operational_events_occurred_at serves the retention pruner, which
+// filters on occurred_at alone; the tenant-led composite indexes cannot.
+const createOperationalEventsOccurredAtIndex = `
+CREATE INDEX IF NOT EXISTS idx_operational_events_occurred_at
+	ON operational_events (occurred_at)`
+
 const (
 	defaultEventPageLimit = 50
 	maxEventPageLimit     = 500
@@ -252,6 +258,30 @@ func Open(dbPath string) (Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("enable sqlite foreign keys: %w", err)
 	}
+	// WAL keeps readers unblocked while the single writer commits,
+	// synchronous=NORMAL drops the rollback-journal fsync per commit, and
+	// busy_timeout lets a contended statement wait instead of failing.
+	// journal_mode is persistent but is set on every open for safety; it is
+	// skipped for in-memory databases, which cannot use WAL.
+	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("set sqlite busy timeout: %w", err)
+	}
+	if !isInMemoryPath(dbPath) {
+		var journalMode string
+		if err := db.QueryRow("PRAGMA journal_mode = WAL").Scan(&journalMode); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("enable sqlite WAL journal mode: %w", err)
+		}
+		if journalMode != "wal" {
+			_ = db.Close()
+			return nil, fmt.Errorf("sqlite journal mode = %q, want wal", journalMode)
+		}
+	}
+	if _, err := db.Exec("PRAGMA synchronous = NORMAL"); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("set sqlite synchronous mode: %w", err)
+	}
 	for _, migration := range []struct {
 		name string
 		sql  string
@@ -271,6 +301,7 @@ func Open(dbPath string) (Store, error) {
 		{name: "operational events", sql: createOperationalEventsTable},
 		{name: "operational events cluster index", sql: createOperationalEventsClusterIndex},
 		{name: "operational events occurred index", sql: createOperationalEventsOccurredIndex},
+		{name: "operational events occurred-at index", sql: createOperationalEventsOccurredAtIndex},
 		{name: "users", sql: createUsersTable},
 		{name: "sessions", sql: createSessionsTable},
 		{name: "sessions user index", sql: createSessionsUserIndex},
@@ -322,6 +353,12 @@ func Open(dbPath string) (Store, error) {
 	}
 
 	return &sqliteStore{db: db}, nil
+}
+
+// isInMemoryPath reports whether the database lives in memory, where WAL
+// journaling is unsupported.
+func isInMemoryPath(dbPath string) bool {
+	return dbPath == ":memory:" || strings.HasPrefix(dbPath, "file::memory:") || strings.Contains(dbPath, "mode=memory")
 }
 
 func (s *sqliteStore) CreateCluster(ctx context.Context, cluster types.Cluster) error {
@@ -1059,16 +1096,33 @@ func (s *sqliteStore) ListTimelineEvents(ctx context.Context, filter EventFilter
 	return EventPage{Events: events, NextCursor: nextCursor}, nil
 }
 
+// pruneBatchSize bounds every DELETE issued by the retention pruners so a
+// first-run backlog cannot hold the single SQLite connection — and every API
+// read queued behind it — for the duration of one unbounded delete.
+const pruneBatchSize = 500
+
 func (s *sqliteStore) PruneEventsBefore(ctx context.Context, cutoff time.Time) (int64, error) {
-	result, err := s.db.ExecContext(ctx, `DELETE FROM operational_events WHERE occurred_at < ?`, cutoff.UTC())
-	if err != nil {
-		return 0, fmt.Errorf("prune events: %w", err)
+	var removed int64
+	for {
+		result, err := s.db.ExecContext(ctx, `
+			DELETE FROM operational_events
+			WHERE id IN (
+				SELECT id FROM operational_events
+				WHERE occurred_at < ?
+				LIMIT ?
+			)`, cutoff.UTC(), pruneBatchSize)
+		if err != nil {
+			return removed, fmt.Errorf("prune events: %w", err)
+		}
+		batch, err := result.RowsAffected()
+		if err != nil {
+			return removed, fmt.Errorf("read affected rows: %w", err)
+		}
+		removed += batch
+		if batch < pruneBatchSize {
+			return removed, nil
+		}
 	}
-	removed, err := result.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("read affected rows: %w", err)
-	}
-	return removed, nil
 }
 
 func (s *sqliteStore) CreateUser(ctx context.Context, user types.User) error {
@@ -1265,11 +1319,25 @@ func (s *sqliteStore) DeleteSession(ctx context.Context, tokenHash string) error
 }
 
 func (s *sqliteStore) DeleteExpiredSessions(ctx context.Context, now time.Time) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at <= ?`, now)
-	if err != nil {
-		return fmt.Errorf("delete expired sessions: %w", err)
+	for {
+		result, err := s.db.ExecContext(ctx, `
+			DELETE FROM sessions
+			WHERE token_hash IN (
+				SELECT token_hash FROM sessions
+				WHERE expires_at <= ?
+				LIMIT ?
+			)`, now, pruneBatchSize)
+		if err != nil {
+			return fmt.Errorf("delete expired sessions: %w", err)
+		}
+		removed, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("read affected rows: %w", err)
+		}
+		if removed < pruneBatchSize {
+			return nil
+		}
 	}
-	return nil
 }
 
 func (s *sqliteStore) RecordAuditEvent(ctx context.Context, event types.AuditEvent) error {

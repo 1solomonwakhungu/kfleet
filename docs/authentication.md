@@ -145,7 +145,11 @@ The hub applies additive SQLite migrations at startup. Existing databases gain
 the `users`, `sessions`, `audit_events`, and `settings` tables, append-only audit
 triggers, and lookup indexes. Existing cluster and agent records remain in
 place. Back up the database before upgrading, and roll back by restoring that
-backup because authentication data is not written to a separate database.
+backup because authentication data is not written to a separate database. The
+hub runs SQLite in WAL journal mode, so the database directory also contains
+`-wal` and `-shm` sidecar files; back up with `sqlite3 kfleet.db ".backup
+'kfleet-backup.db'"` or while the hub is stopped, because copying the bare
+file can miss committed writes.
 
 ## Agent registration token rotation
 
