@@ -25,7 +25,13 @@ type TabKey = 'pods' | 'services' | 'deployments' | 'events' | 'logs' | 'timelin
 export default function ClusterDetail() {
   const { id } = useParams<{ id: string }>()
   const detail = useClusterDetail(id)
-  useDocumentTitle(detail.cluster ? `${detail.cluster.name} · kfleet` : 'Loading · kfleet')
+  useDocumentTitle(
+    detail.cluster
+      ? `${detail.cluster.name} · kfleet`
+      : detail.statusNotFound
+        ? 'Cluster not found · kfleet'
+        : 'Loading · kfleet',
+  )
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<TabKey>('pods')
   const [logsPod, setLogsPod] = useState<PodInfo | undefined>(undefined)
@@ -80,7 +86,7 @@ export default function ClusterDetail() {
         </Breadcrumbs.Item>
       </Breadcrumbs>
 
-      {detail.statusError && (
+      {detail.statusError && !detail.statusNotFound && (
         <Flash variant="danger" className={styles.flash}>
           <div className={styles.flashBody}>
             <AlertIcon size={16} />
@@ -112,7 +118,9 @@ export default function ClusterDetail() {
                   <Blankslate.Description>
                     No cluster with this id is registered on the hub. It may have been removed or renamed.
                   </Blankslate.Description>
-                  <Blankslate.PrimaryAction href="/">Back to clusters</Blankslate.PrimaryAction>
+                  <Button as={Link} to="/" variant="primary">
+                    Back to clusters
+                  </Button>
                 </>
               ) : (
                 <>
