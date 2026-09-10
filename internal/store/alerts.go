@@ -368,6 +368,20 @@ func (s *sqliteStore) acknowledgeAlert(
 	return ErrInvalidState
 }
 
+// CountDeadLetteredAlerts returns the number of alerts that exhausted their
+// delivery attempts and sit in the dead-letter state.
+func (s *sqliteStore) CountDeadLetteredAlerts(ctx context.Context) (int64, error) {
+	var count int64
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM alerts
+		WHERE delivery_status = ?`, types.AlertDeliveryDeadLetter,
+	).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count dead-lettered alerts: %w", err)
+	}
+	return count, nil
+}
+
 func (s *sqliteStore) ListDueAlertDeliveries(
 	ctx context.Context,
 	now time.Time,

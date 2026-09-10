@@ -284,3 +284,37 @@ func TestBroadcastHubScopesUpdatesToTenant(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 	}
 }
+
+func TestBroadcastHubClientCountTracksRegistrations(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := NewBroadcastHub(logger)
+	ctx, cancel := context.WithCancel(context.Background())
+	go hub.Run(ctx)
+	defer cancel()
+
+	if got := hub.ClientCount(); got != 0 {
+		t.Fatalf("ClientCount() = %d, want 0 on an empty hub", got)
+	}
+
+	client := &wsClient{
+		send:       make(chan ClusterUpdate, 1),
+		registered: make(chan struct{}),
+		closed:     make(chan struct{}),
+	}
+	if !hub.registerClient(client) {
+		t.Fatal("registerClient() = false, want true")
+	}
+	if got := hub.ClientCount(); got != 1 {
+		t.Fatalf("ClientCount() = %d, want 1 after registration", got)
+	}
+
+	hub.unregisterClient(client)
+	select {
+	case <-client.closed:
+	case <-time.After(time.Second):
+		t.Fatal("unregistered client was not closed")
+	}
+	if got := hub.ClientCount(); got != 0 {
+		t.Fatalf("ClientCount() = %d, want 0 after unregistration", got)
+	}
+}

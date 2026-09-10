@@ -63,6 +63,8 @@ spec:
               value: {{ printf "%s/kfleet.db" .Values.persistence.mountPath | quote }}
             - name: KFLEET_EVENT_RETENTION
               value: {{ .Values.timeline.retention | quote }}
+            - name: KFLEET_METRICS_ENABLED
+              value: {{ .Values.metrics.enabled | quote }}
             - name: KFLEET_REGISTRATION_TOKEN
               valueFrom:
                 secretKeyRef:

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/1solomonwakhungu/kfleet/internal/store"
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
@@ -36,6 +37,9 @@ type BroadcastHub struct {
 	unregister chan *wsClient
 	broadcast  chan ClusterUpdate
 	done       chan struct{}
+	// clientCount mirrors len(clients) for readers outside the Run loop,
+	// which owns the map and must stay its only writer.
+	clientCount atomic.Int64
 }
 
 // NewBroadcastHub creates an empty broadcast hub.
@@ -62,6 +66,7 @@ func (h *BroadcastHub) Run(ctx context.Context) {
 			return
 		case client := <-h.register:
 			h.clients[client] = struct{}{}
+			h.clientCount.Add(1)
 			close(client.registered)
 		case client := <-h.unregister:
 			h.removeClient(client, false)
@@ -119,11 +124,18 @@ func (h *BroadcastHub) unregisterClient(client *wsClient) {
 	}
 }
 
+// ClientCount reports the number of currently connected WebSocket clients.
+// It is safe to call from any goroutine while Run is active.
+func (h *BroadcastHub) ClientCount() int {
+	return int(h.clientCount.Load())
+}
+
 func (h *BroadcastHub) removeClient(client *wsClient, closeConnection bool) {
 	if _, ok := h.clients[client]; !ok {
 		return
 	}
 	delete(h.clients, client)
+	h.clientCount.Add(-1)
 	close(client.send)
 	close(client.closed)
 	if closeConnection && client.conn != nil {
