@@ -138,8 +138,8 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 // handleUpdateUserPassword changes a user's password. Any authenticated user
 // may change their own password and must verify the current one first; only
 // admins may change another user's password, without the current password.
-// Every session belonging to the target user is invalidated afterwards so a
-// compromised password cannot keep an attacker signed in.
+// The hash update and the deletion of every session belonging to the target
+// user run in one store transaction so the change is all-or-nothing.
 func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request) {
 	actor, _ := authenticatedUser(r.Context())
 	targetID := r.PathValue("id")
@@ -191,17 +191,12 @@ func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request
 		api.WriteError(w, http.StatusInternalServerError, "failed to update password")
 		return
 	}
-	if err := s.store.UpdateUserPassword(r.Context(), targetID, passwordHash); err != nil {
+	if err := s.store.ResetUserPassword(r.Context(), targetID, passwordHash); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			api.WriteError(w, http.StatusNotFound, "user not found")
 			return
 		}
 		s.logger.Error("failed to update password", "error", err)
-		api.WriteError(w, http.StatusInternalServerError, "failed to update password")
-		return
-	}
-	if err := s.store.DeleteSessionsForUser(r.Context(), targetID); err != nil {
-		s.logger.Error("failed to invalidate sessions after password update", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, "failed to update password")
 		return
 	}
