@@ -186,7 +186,7 @@ func TestHeartbeatAfterApprovedRegistrationNeverSignals(t *testing.T) {
 // TestHeartbeatServerErrorReturnsError proves a failed heartbeat is reported
 // as an error without signaling approval.
 func TestHeartbeatServerErrorReturnsError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "hub unavailable", http.StatusInternalServerError)
 	}))
 	t.Cleanup(server.Close)
@@ -202,5 +202,27 @@ func TestHeartbeatServerErrorReturnsError(t *testing.T) {
 	}
 	if reregister {
 		t.Error("Heartbeat() signaled re-registration on server failure")
+	}
+}
+
+// TestHeartbeatTreatsEmptyBodyAsPending proves an opaque 2xx heartbeat
+// response keeps the agent pending instead of failing the heartbeat.
+func TestHeartbeatTreatsEmptyBodyAsPending(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	registrar := New(&config.Config{
+		HubURL:      server.URL,
+		ClusterName: "cluster-a",
+		HubToken:    "bootstrap-token",
+	}, nil)
+	reregister, err := registrar.Heartbeat(context.Background())
+	if err != nil {
+		t.Fatalf("Heartbeat() error = %v, want nil for an empty response body", err)
+	}
+	if reregister {
+		t.Error("Heartbeat() signaled re-registration for an empty response body")
 	}
 }

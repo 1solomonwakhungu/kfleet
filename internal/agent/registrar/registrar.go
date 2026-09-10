@@ -31,7 +31,7 @@ type Registrar struct {
 	labels            map[string]string
 	client            *http.Client
 
-	mu       sync.Mutex
+	mu       sync.Mutex // guards approved; lifecycle calls otherwise run on the single run-loop goroutine
 	approved bool
 }
 
@@ -172,7 +172,7 @@ func (r *Registrar) postLifecycle(ctx context.Context, action string) (bool, err
 		return false, nil
 	}
 	var status RegisterResponse
-	if err := json.NewDecoder(response.Body).Decode(&status); err != nil {
+	if err := json.NewDecoder(response.Body).Decode(&status); err != nil && !errors.Is(err, io.EOF) {
 		return false, fmt.Errorf("decode agent heartbeat response: %w", err)
 	}
 	return status.Approved, nil
