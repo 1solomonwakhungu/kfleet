@@ -21,15 +21,17 @@ const generatedPasswordLength = 24
 
 /**
  * Generates the random password handed to the hub on reset. The plaintext is
- * only ever held in component state and shown once.
+ * only ever held in component state and shown once. Requires a CSP and
+ * browser that expose crypto.getRandomValues; without it the page cannot
+ * generate a password worth trusting, so it refuses rather than falling
+ * back to a weak source.
  */
 function generatePassword(): string {
-  const bytes = new Uint8Array(generatedPasswordLength)
-  if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(bytes)
-  } else {
-    for (let index = 0; index < bytes.length; index++) bytes[index] = Math.floor(Math.random() * 256)
+  if (!globalThis.crypto?.getRandomValues) {
+    throw new Error('This browser cannot generate a secure password. Please use a modern browser.')
   }
+  const bytes = new Uint8Array(generatedPasswordLength)
+  globalThis.crypto.getRandomValues(bytes)
   return Array.from(bytes, (byte) => passwordAlphabet[byte % passwordAlphabet.length]).join('')
 }
 
