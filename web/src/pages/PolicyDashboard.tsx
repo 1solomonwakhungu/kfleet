@@ -12,6 +12,7 @@ import {
 } from '@primer/octicons-react'
 
 import { api } from '../lib/api'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import type { PolicyResult, PolicyResultsResponse, PolicySeverity, PolicyStatus } from '../types/policy'
 import layout from '../styles/layout.module.css'
 import styles from './PolicyDashboard.module.css'
@@ -34,6 +35,7 @@ const statusPriority: Record<PolicyStatus, number> = {
 }
 
 export default function PolicyDashboard() {
+  useDocumentTitle('Policies · kfleet')
   const [data, setData] = useState<PolicyResultsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)

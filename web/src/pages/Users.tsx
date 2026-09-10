@@ -4,6 +4,7 @@ import { Blankslate, SkeletonText } from '@primer/react/experimental'
 import { CopyIcon, KeyIcon, PersonAddIcon, SyncIcon, TrashIcon } from '@primer/octicons-react'
 
 import { useAuth } from '../auth/AuthContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { ConfirmDialog } from '../components/admin/ConfirmDialog'
 import { PermissionNotice } from '../components/admin/PermissionNotice'
 import { useUsers } from '../hooks/useUsers'
@@ -41,6 +42,7 @@ function formatTimestamp(value: string): string {
 }
 
 export function UsersPage() {
+  useDocumentTitle('Users · Admin · kfleet')
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const { users, loading, error, reload, replaceUser, removeUser } = useUsers(isAdmin)

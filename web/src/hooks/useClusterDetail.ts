@@ -34,6 +34,7 @@ export function useClusterDetail(clusterId: string | undefined) {
   const [namespaces, setNamespaces] = useState<string[]>([]);
   const [namespace, setNamespace] = useState<string | undefined>(undefined);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusNotFound, setStatusNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(
@@ -44,6 +45,7 @@ export function useClusterDetail(clusterId: string | undefined) {
       }
       setLoading(true);
       setStatusError(null);
+      setStatusNotFound(false);
 
       try {
         const status = await api.getClusterStatus(clusterId, signal);
@@ -53,7 +55,10 @@ export function useClusterDetail(clusterId: string | undefined) {
         setStatusError(null);
       } catch (err) {
         if (signal.aborted) return;
-        if (!isAbortError(err)) setStatusError(errorMessage(err));
+        if (!isAbortError(err)) {
+          setStatusError(errorMessage(err));
+          setStatusNotFound(err instanceof ApiError && err.status === 404);
+        }
       } finally {
         if (!signal.aborted) setLoading(false);
       }
@@ -115,5 +120,6 @@ export function useClusterDetail(clusterId: string | undefined) {
     setNamespace,
     loading,
     statusError,
+    statusNotFound,
   };
 }

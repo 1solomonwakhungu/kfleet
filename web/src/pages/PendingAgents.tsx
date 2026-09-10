@@ -6,6 +6,7 @@ import { CheckCircleIcon, ShieldCheckIcon, SyncIcon } from '@primer/octicons-rea
 import { PendingAgentTable } from '../components/agents/PendingAgentTable'
 import { RegistrationTokenCard } from '../components/admin/RegistrationTokenCard'
 import { useAuth } from '../auth/AuthContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import {
   approvePendingAgent,
   getPendingAgents,
@@ -23,6 +24,7 @@ function isAbortError(error: unknown): boolean {
 }
 
 function PendingAgentsPage() {
+  useDocumentTitle('Agents · kfleet')
   const { user } = useAuth()
   const canApprove = user?.role === 'admin' || user?.role === 'operator'
   const [agents, setAgents] = useState<PendingAgent[]>([])

@@ -5,6 +5,7 @@ import { AlertIcon, BellIcon, CheckIcon, StopIcon, SyncIcon, type Icon } from '@
 
 import { api } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import type { Alert, AlertDeliveryStatus, AlertStatus } from '../types/alert'
 import layout from '../styles/layout.module.css'
 import styles from './Alerts.module.css'
@@ -41,6 +42,7 @@ const statusVariants: Record<AlertStatus, 'danger' | 'accent' | 'success'> = {
 }
 
 export default function AlertsPage() {
+  useDocumentTitle('Alerts · kfleet')
   const { user } = useAuth()
   const canAcknowledge = user?.role === 'admin' || user?.role === 'operator'
   const [alerts, setAlerts] = useState<Alert[]>([])
