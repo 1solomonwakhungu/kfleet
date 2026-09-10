@@ -49,6 +49,9 @@ hub.
 | View clusters, resources, timeline, policies, and live updates | Yes | Yes | Yes |
 | Register or remove clusters | No | Yes | Yes |
 | Approve pending agents | No | Yes | Yes |
+| View alerts and alert rules | Yes | Yes | Yes |
+| Acknowledge alerts | No | Yes | Yes |
+| Create or edit alert rules | No | No | Yes |
 | Change their own password | Yes | Yes | Yes |
 | Create, update, disable, or delete users | No | No | Yes |
 | Reset another user's password | No | No | Yes |

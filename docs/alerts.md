@@ -117,6 +117,13 @@ The Helm chart exposes the same settings under `alerts`. The webhook secret is s
 
 The bundled development receiver refuses non-loopback listen addresses. It verifies signatures, stores received payloads in memory, and provides failure injection.
 
+| Environment variable | Default | Purpose |
+| --- | --- | --- |
+| `KFLEET_RECEIVER_LISTEN_ADDR` | `127.0.0.1:9099` | Listen address. Must be a loopback host; the receiver exits otherwise. |
+| `KFLEET_RECEIVER_SECRET` | required | HMAC secret used to verify `X-Kfleet-Signature`. |
+| `KFLEET_RECEIVER_FAIL_FIRST` | `0` | Number of initial deliveries to fail before succeeding. |
+| `KFLEET_RECEIVER_FAIL_STATUS` | `503` | HTTP status returned by injected failures. Must be 400–599. |
+
 Terminal 1:
 
 ```bash
