@@ -75,11 +75,11 @@ describe('UsersPage', () => {
   })
 
   it('surfaces the hub error message when loading fails', async () => {
-    vi.mocked(adminApi.listUsers).mockRejectedValue(new Error('this action requires a higher role'))
+    vi.mocked(adminApi.listUsers).mockRejectedValue(new Error('this action requires the admin role'))
 
     render(<UsersPage />)
 
-    expect(await screen.findByText('this action requires a higher role')).toBeTruthy()
+    expect(await screen.findByText('this action requires the admin role')).toBeTruthy()
   })
 
   it('changes a role through the API and shows the result', async () => {
