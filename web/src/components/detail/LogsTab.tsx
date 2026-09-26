@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Button, FormControl, Select, Spinner, TextInput } from '@primer/react'
+import { Button, FormControl, Spinner, TextInput } from '@primer/react'
 import {
   AlertIcon,
   BroadcastIcon,
@@ -12,6 +12,7 @@ import {
 } from '@primer/octicons-react'
 
 import { usePodLogs, type PodLogStatus } from '../../hooks/usePodLogs'
+import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
 import type { PodInfo } from '../../types/resources'
 import { ResourceState } from './ResourceTabState'
 import resource from './resource.module.css'
@@ -46,8 +47,10 @@ export function LogsTab({ clusterId, pods, selectedPod, onSelectPod }: LogsTabPr
   const [autoScroll, setAutoScroll] = useState(true)
   const [wrapLines, setWrapLines] = useState(true)
   const [filter, setFilter] = useState('')
+  const [namespace, setNamespace] = useState(() => selectedPod?.namespace ?? '')
   const viewerRef = useRef<HTMLDivElement>(null)
   const podSelectId = useId()
+  const namespaceSelectId = useId()
 
   const { lines, status: streamStatus, error, clear, retry } = usePodLogs({
     clusterId,
@@ -61,10 +64,42 @@ export function LogsTab({ clusterId, pods, selectedPod, onSelectPod }: LogsTabPr
     if (viewport) viewport.scrollTop = viewport.scrollHeight
   }, [lines, autoScroll])
 
-  const podKey = useMemo(
-    () => (selectedPod ? `${selectedPod.namespace}/${selectedPod.name}` : undefined),
-    [selectedPod],
+  const namespaceOptions = useMemo<SearchableSelectOption[]>(() => {
+    const names = Array.from(new Set(pods.map((pod) => pod.namespace).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b),
+    )
+    return [{ value: '', label: 'All namespaces' }, ...names.map((name) => ({ value: name, label: name }))]
+  }, [pods])
+
+  const podOptions = useMemo<SearchableSelectOption[]>(
+    () =>
+      pods
+        .filter((pod) => !namespace || pod.namespace === namespace)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((pod) => ({ value: `${pod.namespace}/${pod.name}`, label: `${pod.namespace}/${pod.name}` })),
+    [pods, namespace],
   )
+
+  const podKey = selectedPod ? `${selectedPod.namespace}/${selectedPod.name}` : ''
+
+  const handleNamespaceChange = (next: string) => {
+    setNamespace(next)
+    if (selectedPod && selectedPod.namespace !== next) {
+      clear()
+      setFilter('')
+      setAutoScroll(true)
+      onSelectPod(undefined)
+    }
+  }
+
+  const handlePodChange = (key: string) => {
+    const pod = pods.find((candidate) => `${candidate.namespace}/${candidate.name}` === key) ?? undefined
+    clear()
+    setFilter('')
+    setAutoScroll(true)
+    if (pod && !namespace) setNamespace(pod.namespace)
+    onSelectPod(pod)
+  }
   const query = filter.trim().toLowerCase()
   const visibleLines = useMemo(
     () =>
@@ -89,26 +124,30 @@ export function LogsTab({ clusterId, pods, selectedPod, onSelectPod }: LogsTabPr
   return (
     <section className={resource.panel} aria-label="Pod log viewer">
       <div className={styles.controls}>
+        <FormControl id={namespaceSelectId}>
+          <FormControl.Label>Namespace</FormControl.Label>
+          <SearchableSelect
+            id={namespaceSelectId}
+            ariaLabel="Namespace for log stream"
+            value={namespace}
+            options={namespaceOptions}
+            onChange={handleNamespaceChange}
+            placeholder="All namespaces"
+            emptyMessage="No matching namespace"
+          />
+        </FormControl>
+
         <FormControl id={podSelectId}>
           <FormControl.Label>Pod</FormControl.Label>
-          <Select
-            aria-label="Pod for log stream"
-            value={podKey ?? ''}
-            onChange={(event) => {
-              const pod = pods.find((candidate) => `${candidate.namespace}/${candidate.name}` === event.target.value)
-              clear()
-              setFilter('')
-              setAutoScroll(true)
-              onSelectPod(pod)
-            }}
-          >
-            <Select.Option value="">Select a pod</Select.Option>
-            {pods.map((pod) => (
-              <Select.Option key={`${pod.namespace}/${pod.name}`} value={`${pod.namespace}/${pod.name}`}>
-                {pod.namespace}/{pod.name}
-              </Select.Option>
-            ))}
-          </Select>
+          <SearchableSelect
+            id={podSelectId}
+            ariaLabel="Pod for log stream"
+            value={podKey}
+            options={podOptions}
+            onChange={handlePodChange}
+            placeholder="Select a pod"
+            emptyMessage={namespace ? `No pods in ${namespace}` : 'No pods available'}
+          />
         </FormControl>
 
         <FormControl disabled={!selectedPod || lines.length === 0}>
