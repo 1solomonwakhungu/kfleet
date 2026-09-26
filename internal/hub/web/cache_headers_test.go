@@ -10,10 +10,11 @@ import (
 
 func cacheTestFS() fstest.MapFS {
 	return fstest.MapFS{
-		"index.html":             {Data: []byte("<html><body>hub</body></html>")},
-		"assets/index-abc12.css": {Data: []byte("body{}")},
-		"assets/index-9xy89.js":  {Data: []byte("console.log(1)")},
-		"favicon.ico":            {Data: []byte("ico")},
+		"index.html":                {Data: []byte("<html><body>hub</body></html>")},
+		"assets/index-Abc12xyz.css": {Data: []byte("body{}")},
+		"assets/index-9xy8912z.js":  {Data: []byte("console.log(1)")},
+		"assets/runtime.js":         {Data: []byte("runtime")},
+		"favicon.ico":               {Data: []byte("ico")},
 	}
 }
 
@@ -55,19 +56,27 @@ func TestCacheHeaders(t *testing.T) {
 	})
 
 	t.Run("hashed assets are immutable", func(t *testing.T) {
-		for _, path := range []string{"/assets/index-abc12.css", "/assets/index-9xy89.js"} {
+		for _, path := range []string{"/assets/index-Abc12xyz.css", "/assets/index-9xy8912z.js"} {
 			resp := getHeader(t, root, path)
 			requireCacheControl(t, resp, "public, max-age=31536000, immutable")
 			resp.Body.Close()
 		}
 	})
 
-	t.Run("missing hashed asset does not get immutable caching", func(t *testing.T) {
+	t.Run("non-hashed asset files are revalidated", func(t *testing.T) {
+		resp := getHeader(t, root, "/assets/runtime.js")
+		defer resp.Body.Close()
+		requireCacheControl(t, resp, "no-cache")
+	})
+
+	t.Run("missing hashed asset returns 404 without immutable caching", func(t *testing.T) {
 		resp := getHeader(t, root, "/assets/missing-1234.css")
 		defer resp.Body.Close()
-		cc := resp.Header.Get("Cache-Control")
-		if strings.Contains(cc, "immutable") {
-			t.Fatalf("missing asset Cache-Control = %q, must not be immutable", cc)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", resp.StatusCode)
+		}
+		if cc := resp.Header.Get("Cache-Control"); cc != "no-cache" {
+			t.Fatalf("missing asset Cache-Control = %q, want no-cache (not immutable)", cc)
 		}
 	})
 
