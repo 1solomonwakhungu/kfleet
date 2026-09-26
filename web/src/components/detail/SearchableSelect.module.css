@@ -1,0 +1,104 @@
+.container {
+  position: relative;
+  min-width: 0;
+}
+
+.trigger {
+  position: relative;
+}
+
+.input {
+  width: 100%;
+  padding: var(--base-size-6, 6px) var(--base-size-32, 32px) var(--base-size-6, 6px) var(--base-size-12, 12px);
+  overflow: hidden;
+  font-size: var(--text-body-size-medium, 14px);
+  color: var(--fgColor-default);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+  background-color: var(--bgColor-default);
+  border: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium, 6px);
+}
+
+.input::placeholder {
+  color: var(--fgColor-muted);
+}
+
+.input:hover {
+  background-color: var(--bgColor-muted);
+  border-color: var(--borderColor-accent-emphasis);
+}
+
+.input:focus-visible {
+  outline: var(--borderWidth-thick, 2px) solid var(--focus-outlineColor, var(--borderColor-accent-emphasis));
+  outline-offset: -1px;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.chevron {
+  position: absolute;
+  top: 50%;
+  right: var(--base-size-8, 8px);
+  color: var(--fgColor-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.list {
+  position: absolute;
+  z-index: 30;
+  width: 100%;
+  max-height: var(--base-size-256, 256px);
+  padding: var(--base-size-4, 4px) 0;
+  margin: var(--base-size-4, 4px) 0 0;
+  overflow: auto;
+  list-style: none;
+  background-color: var(--overlay-bgColor, var(--bgColor-default));
+  border: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium, 6px);
+  box-shadow: var(--shadow-overlay, 0 8px 24px rgba(0, 0, 0, 0.2));
+}
+
+.empty {
+  padding: var(--base-size-8, 8px) var(--base-size-12, 12px);
+  font-size: var(--text-body-size-medium, 14px);
+  color: var(--fgColor-muted);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--base-size-32, 32px);
+  padding: var(--base-size-4, 4px) var(--base-size-12, 12px);
+  font-size: var(--text-body-size-medium, 14px);
+  font-family: inherit;
+  color: var(--fgColor-default);
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.option:focus-visible {
+  outline: none;
+}
+
+.optionActive,
+.option:hover,
+.option:focus-visible {
+  color: var(--fgColor-onEmphasis, inherit);
+  background-color: var(--bgColor-accent-emphasis);
+}
+
+.optionLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

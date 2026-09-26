@@ -7,7 +7,7 @@
 
 @media (min-width: 1012px) {
   .controls {
-    grid-template-columns: minmax(14rem, 1fr) minmax(12rem, 0.7fr) auto;
+    grid-template-columns: minmax(11rem, 0.8fr) minmax(16rem, 1fr) minmax(12rem, 0.8fr) auto;
     align-items: end;
   }
 }
