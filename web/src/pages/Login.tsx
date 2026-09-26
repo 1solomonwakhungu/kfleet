@@ -61,7 +61,6 @@ export function Login() {
         <Heading as="h1" variant="medium" className={styles.title}>
           Sign in
         </Heading>
-        <Text className={styles.subtitle}>Use an account provisioned by a kfleet administrator.</Text>
 
         <form className={styles.form} onSubmit={(event) => void submit(event)}>
           <FormControl required>
