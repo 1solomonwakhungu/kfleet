@@ -1,6 +1,6 @@
 .controls {
   display: grid;
-  gap: var(--base-size-12, 12px);
+  gap: var(--base-size-8, 8px);
   padding: var(--base-size-12, 12px);
   border-bottom: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
 }
