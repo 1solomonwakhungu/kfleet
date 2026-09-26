@@ -73,7 +73,7 @@ export default function ClusterDetail() {
     (pod: PodInfo) => {
       updateParams((params) => {
         params.set('tab', 'logs')
-        params.set('pod', pod.name)
+        params.set('pod', `${pod.namespace}/${pod.name}`)
       })
     },
     [updateParams],
@@ -83,7 +83,7 @@ export default function ClusterDetail() {
     (pod: PodInfo | undefined) => {
       updateParams((params) => {
         if (pod) {
-          params.set('pod', pod.name)
+          params.set('pod', `${pod.namespace}/${pod.name}`)
         } else {
           params.delete('pod')
         }
@@ -94,6 +94,15 @@ export default function ClusterDetail() {
 
   const logsPod = useMemo(() => {
     if (!podParam) return undefined
+    // The pod param encodes "namespace/name" so duplicate pod names across
+    // namespaces resolve to the pod actually selected. Plain names (older
+    // links) fall back to the global namespace filter, then to first match.
+    const separator = podParam.indexOf('/')
+    if (separator >= 0) {
+      const namespace = podParam.slice(0, separator)
+      const name = podParam.slice(separator + 1)
+      return detail.pods.data.find((pod) => pod.namespace === namespace && pod.name === name)
+    }
     const named = detail.pods.data.filter((pod) => pod.name === podParam)
     return named.find((pod) => pod.namespace === detail.namespace) ?? named[0]
   }, [podParam, detail.pods.data, detail.namespace])

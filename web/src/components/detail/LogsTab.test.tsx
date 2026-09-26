@@ -104,4 +104,47 @@ describe('LogsTab namespace and pod selectors', () => {
     fireEvent.click(within(screen.getByRole('listbox', { name: 'Pod for log stream' })).getByText('default/api-7d9f'))
     expect(onSelectPod).toHaveBeenCalledWith(pods[0])
   })
+
+  it('selects options with keyboard navigation', () => {
+    render(<LogsTab clusterId="c1" pods={pods} selectedPod={undefined} onSelectPod={onSelectPod} />)
+    const input = screen.getByRole('combobox', { name: 'Pod for log stream' })
+    fireEvent.focus(input)
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onSelectPod).toHaveBeenCalledWith(pods[1])
+  })
+
+  it('closes the list on Escape and on blur', () => {
+    render(<LogsTab clusterId="c1" pods={pods} selectedPod={undefined} onSelectPod={onSelectPod} />)
+    const input = screen.getByRole('combobox', { name: 'Pod for log stream' })
+    fireEvent.focus(input)
+    expect(screen.getByRole('listbox', { name: 'Pod for log stream' })).toBeTruthy()
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(screen.queryByRole('listbox', { name: 'Pod for log stream' })).toBeNull()
+
+    fireEvent.focus(input)
+    fireEvent.blur(input)
+    expect(screen.queryByRole('listbox', { name: 'Pod for log stream' })).toBeNull()
+  })
+
+  it('keeps the typed query when clicking inside the open input', () => {
+    render(<LogsTab clusterId="c1" pods={pods} selectedPod={undefined} onSelectPod={onSelectPod} />)
+    const input = screen.getByRole('combobox', { name: 'Pod for log stream' })
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'ingress' } })
+    fireEvent.click(input)
+    const list = screen.getByRole('listbox', { name: 'Pod for log stream' })
+    expect(within(list).getByText('kube-system/ingress-controller')).toBeTruthy()
+    expect(within(list).queryByText('default/api-7d9f')).toBeNull()
+  })
+
+  it('exposes the highlighted option via aria-activedescendant', () => {
+    render(<LogsTab clusterId="c1" pods={pods} selectedPod={undefined} onSelectPod={onSelectPod} />)
+    const input = screen.getByRole('combobox', { name: 'Pod for log stream' }) as HTMLInputElement
+    fireEvent.focus(input)
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    const list = screen.getByRole('listbox', { name: 'Pod for log stream' })
+    const activeOption = within(list).getByRole('option', { name: 'kube-system/ingress-controller' })
+    expect(input.getAttribute('aria-activedescendant')).toBe(activeOption.id)
+  })
 })
