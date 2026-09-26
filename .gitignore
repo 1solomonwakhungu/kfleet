@@ -35,3 +35,6 @@ STATUS.md
 .DS_Store
 .idea/
 .vscode/
+
+# worktree symlink artifacts (symlinks are not matched by the trailing-slash pattern)
+node_modules
