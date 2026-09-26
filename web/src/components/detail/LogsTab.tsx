@@ -64,6 +64,12 @@ export function LogsTab({ clusterId, pods, selectedPod, onSelectPod }: LogsTabPr
     if (viewport) viewport.scrollTop = viewport.scrollHeight
   }, [lines, autoScroll])
 
+  // Adopt the selected pod's namespace when no namespace filter is chosen yet,
+  // so deep links land with the namespace and pod dropdowns in sync.
+  useEffect(() => {
+    if (selectedPod && !namespace) setNamespace(selectedPod.namespace)
+  }, [selectedPod, namespace])
+
   const namespaceOptions = useMemo<SearchableSelectOption[]>(() => {
     const names = Array.from(new Set(pods.map((pod) => pod.namespace).filter(Boolean))).sort((a, b) =>
       a.localeCompare(b),

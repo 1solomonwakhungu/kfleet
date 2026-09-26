@@ -193,6 +193,20 @@ describe('ClusterDetail deep links', () => {
     await waitFor(() => expect(podSelect.value).toBe('payments/api-7d9f'))
   })
 
+  it('resolves a deep-linked pod by namespace when pod names collide', async () => {
+    vi.spyOn(api, 'getPods').mockResolvedValue([
+      { ...pods[0], namespace: 'payments' },
+      { ...pods[0], namespace: 'kube-system' },
+    ])
+    renderDetail('cluster-a', '?tab=logs&pod=kube-system/api-7d9f')
+
+    const podInput = (await screen.findByRole('combobox', { name: 'Pod for log stream' })) as HTMLInputElement
+    await waitFor(() => expect(podInput.value).toBe('kube-system/api-7d9f'))
+    const namespaceInput = screen.getByRole('combobox', { name: 'Namespace for log stream' }) as HTMLInputElement
+    expect(namespaceInput.value).toBe('kube-system')
+    expect(screen.getByRole('log', { name: 'Logs for kube-system/api-7d9f' })).toBeTruthy()
+  })
+
   it('carries tab and pod params when opening logs from the pods tab', async () => {
     renderDetail('cluster-a', '?namespace=payments')
 
@@ -201,7 +215,7 @@ describe('ClusterDetail deep links', () => {
     )
 
     await waitFor(() => expect(searchParam('tab')).toBe('logs'))
-    expect(searchParam('pod')).toBe('api-7d9f')
+    expect(searchParam('pod')).toBe('payments/api-7d9f')
     expect(searchParam('namespace')).toBe('payments')
   })
 

@@ -41,6 +41,7 @@ export function SearchableSelect({
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const listId = `${id ?? 'searchable-select'}-listbox`
 
   const selected = options.find((option) => option.value === value)
@@ -69,6 +70,11 @@ export function SearchableSelect({
     setQuery('')
     setActiveIndex(Math.max(0, options.findIndex((option) => option.value === value)))
     setOpen(true)
+  }
+
+  const closeList = () => {
+    setOpen(false)
+    setQuery('')
   }
 
   const commit = (option: SearchableSelectOption) => {
@@ -122,9 +128,18 @@ export function SearchableSelect({
             if (!open) setOpen(true)
           }}
           onFocus={openList}
-          onClick={openList}
+          onClick={() => {
+            // Only open on click when closed; clicking inside the input while
+            // already open must not reset the typed query.
+            if (!open) openList()
+          }}
+          onBlur={(event) => {
+            if (!event.relatedTarget || !containerRef.current?.contains(event.relatedTarget as Node)) closeList()
+          }}
           onKeyDown={handleKeyDown}
           className={styles.input}
+          ref={inputRef}
+          aria-activedescendant={open && filtered.length > 0 ? `${listId}-opt-${activeIndex}` : undefined}
         />
         <TriangleDownIcon className={styles.chevron} aria-hidden="true" />
       </div>
@@ -140,6 +155,8 @@ export function SearchableSelect({
                 <button
                   type="button"
                   role="option"
+                  id={`${listId}-opt-${index}`}
+                  tabIndex={-1}
                   aria-selected={option.value === value}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => commit(option)}
