@@ -42,7 +42,7 @@ export function ClusterCard({ cluster, to }: ClusterCardProps) {
   return (
     <Link
       to={to}
-      className={`${styles.card} ${styles[cluster.health]}`}
+      className={styles.card}
       aria-label={`Open ${cluster.name} cluster, health ${cluster.health}`}
     >
       <div className={styles.body}>
