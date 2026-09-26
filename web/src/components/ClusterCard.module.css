@@ -10,7 +10,6 @@
   cursor: pointer;
   background-color: var(--bgColor-default);
   border: var(--borderWidth-thin, 1px) solid var(--borderColor-default);
-  border-left-width: var(--base-size-4, 4px);
   border-radius: var(--borderRadius-medium, 6px);
 }
 
@@ -21,22 +20,6 @@
 .card:focus-visible {
   outline: var(--borderWidth-thick, 2px) solid var(--focus-outlineColor, var(--borderColor-accent-emphasis));
   outline-offset: 2px;
-}
-
-.healthy {
-  border-left-color: var(--bgColor-success-emphasis);
-}
-
-.degraded {
-  border-left-color: var(--bgColor-attention-emphasis);
-}
-
-.unreachable {
-  border-left-color: var(--bgColor-danger-emphasis);
-}
-
-.unknown {
-  border-left-color: var(--bgColor-neutral-emphasis);
 }
 
 .body {
