@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
 )
 
@@ -60,6 +61,13 @@ func HandlerFor(root fs.FS) http.Handler {
 				files.ServeHTTP(w, r)
 				return
 			}
+			// Bundled assets are individually addressable files; a missing one
+			// must 404 instead of falling back to the HTML document.
+			if strings.HasPrefix(assetPath, "assets/") {
+				w.Header().Set("Cache-Control", "no-cache")
+				http.NotFound(w, r)
+				return
+			}
 		}
 
 		index, readErr := fs.ReadFile(root, "index.html")
@@ -76,11 +84,17 @@ func HandlerFor(root fs.FS) http.Handler {
 	})
 }
 
+// contentHashPattern matches Vite's default content-hashed asset names:
+// <name>-<8 hash chars>.<ext> (e.g. index-DgAqilCc.css).
+var contentHashPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.]*-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$`)
+
 // cacheControl returns the Cache-Control value for a served static file.
-// Paths under assets/ are Vite content-hashed bundles and are safe to cache
-// forever; anything else (favicon, logos, manifests) is revalidated.
+// Only content-hashed files under assets/ are safe to cache forever; other
+// asset files (e.g. runtime helpers) and non-hashed root files are
+// revalidated on every load.
 func cacheControl(assetPath string) string {
-	if strings.HasPrefix(assetPath, "assets/") {
+	if strings.HasPrefix(assetPath, "assets/") &&
+		contentHashPattern.MatchString(path.Base(assetPath)) {
 		return "public, max-age=31536000, immutable"
 	}
 	return "no-cache"
