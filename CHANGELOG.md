@@ -13,6 +13,11 @@ v0.1.2) predate it. Their notes live on the
 
 ### Added
 
+- The hub sends `Cache-Control: no-cache` for `index.html` (including SPA
+  fallback routes) and non-hashed static files, and
+  `Cache-Control: public, max-age=31536000, immutable` for the content-hashed
+  files under `assets/`. Deployed UIs now pick up new bundles on the next
+  navigation instead of requiring a hard refresh.
 - The hub exposes `GET /metrics` in the Prometheus text format with
   aggregate fleet gauges (registered agents, dead-lettered alerts, live log
   relays, dashboard clients, active log streams, database size). It is
