@@ -38,11 +38,6 @@
   margin-bottom: var(--base-size-4, 4px);
 }
 
-.subtitle {
-  display: block;
-  color: var(--fgColor-muted);
-}
-
 .form {
   display: flex;
   flex-direction: column;
