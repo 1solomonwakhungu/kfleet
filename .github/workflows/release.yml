@@ -134,6 +134,11 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Build and embed web UI
         run: make web-build
+      # The web build empties both dist directories, deleting their tracked
+      # .gitkeep placeholders. Restore them so GoReleaser sees a clean tree;
+      # this also covers tags whose Makefile predates the same fix.
+      - name: Restore tracked web placeholders
+        run: git checkout -- web/dist/.gitkeep internal/hub/web/dist/.gitkeep
       - name: Set up Helm
         uses: azure/setup-helm@v4
       - name: Package release charts
