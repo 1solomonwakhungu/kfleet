@@ -2,6 +2,7 @@
 package hubclient
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -113,6 +114,121 @@ func (c *Client) GetEvents(ctx context.Context, id, namespace string) ([]types.E
 	return events, nil
 }
 
+// ListNamespaces returns the namespace names in a cluster's latest snapshot.
+func (c *Client) ListNamespaces(ctx context.Context, id string) ([]string, error) {
+	var namespaces []string
+	if err := c.get(ctx, clusterPath(id, "/namespaces"), nil, &namespaces); err != nil {
+		return nil, err
+	}
+	return namespaces, nil
+}
+
+// PodLogsQuery selects the log output GetPodLogs fetches.
+type PodLogsQuery struct {
+	ClusterID string
+	Namespace string
+	Pod       string
+	// Container is optional for single-container pods.
+	Container string
+	// TailLines bounds the number of lines returned; the hub applies its
+	// own default and cap when it is zero or too large.
+	TailLines int64
+	// Previous reads the previous terminated container instance.
+	Previous bool
+	// SinceSeconds limits output to lines newer than this many seconds.
+	SinceSeconds int64
+}
+
+// sseMaxLineBytes bounds one SSE line. Agents truncate log lines at 16 KiB,
+// so this leaves ample headroom for the field prefix.
+const sseMaxLineBytes = 1 << 20
+
+// GetPodLogs fetches a bounded, non-following snapshot of pod logs. The hub
+// streams logs as server-sent events; this reads the stream until the hub's
+// end event and returns the lines in order.
+func (c *Client) GetPodLogs(ctx context.Context, q PodLogsQuery) ([]string, error) {
+	namespace := strings.TrimSpace(q.Namespace)
+	pod := strings.TrimSpace(q.Pod)
+	if namespace == "" || pod == "" {
+		return nil, errors.New("namespace and pod are required")
+	}
+	query := url.Values{}
+	query.Set("follow", "false")
+	if container := strings.TrimSpace(q.Container); container != "" {
+		query.Set("container", container)
+	}
+	if q.TailLines > 0 {
+		query.Set("tailLines", strconv.FormatInt(q.TailLines, 10))
+	}
+	if q.Previous {
+		query.Set("previous", "true")
+	}
+	if q.SinceSeconds > 0 {
+		query.Set("sinceSeconds", strconv.FormatInt(q.SinceSeconds, 10))
+	}
+	path := clusterPath(q.ClusterID, "/pods/"+url.PathEscape(namespace)+"/"+url.PathEscape(pod)+"/logs")
+
+	response, err := c.open(ctx, path, query, "text/event-stream")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = response.Body.Close() }()
+	return readLogEvents(response.Body)
+}
+
+// readLogEvents consumes the hub's pod log SSE stream. Unnamed events carry
+// one log line each, "end" closes a completed stream, and "stream-error"
+// carries a JSON {"message": ...} describing why the stream failed.
+func readLogEvents(body io.Reader) ([]string, error) {
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 64<<10), sseMaxLineBytes)
+
+	lines := make([]string, 0)
+	event := ""
+	var data []string
+	hasData := false
+	for scanner.Scan() {
+		field := scanner.Text()
+		if field == "" {
+			switch event {
+			case "", "message":
+				if hasData {
+					lines = append(lines, strings.Join(data, "\n"))
+				}
+			case "end":
+				return lines, nil
+			case "stream-error":
+				var payload struct {
+					Message string `json:"message"`
+				}
+				message := strings.Join(data, "\n")
+				if json.Unmarshal([]byte(message), &payload) == nil && payload.Message != "" {
+					message = payload.Message
+				}
+				return nil, fmt.Errorf("pod log stream failed: %s", message)
+			}
+			event, data, hasData = "", nil, false
+			continue
+		}
+		if strings.HasPrefix(field, ":") {
+			continue
+		}
+		name, value, _ := strings.Cut(field, ":")
+		value = strings.TrimPrefix(value, " ")
+		switch name {
+		case "event":
+			event = value
+		case "data":
+			data = append(data, value)
+			hasData = true
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("read pod log stream: %w", err)
+	}
+	return nil, errors.New("pod log stream ended before the hub finished it")
+}
+
 // TimelineQuery narrows a GetTimeline call. An empty ClusterID queries the
 // whole fleet rather than a single cluster.
 type TimelineQuery struct {
@@ -157,15 +273,30 @@ func clusterPath(id, suffix string) string {
 }
 
 func (c *Client) get(ctx context.Context, path string, query url.Values, target any) error {
+	response, err := c.open(ctx, path, query, "application/json")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = response.Body.Close() }()
+	if err := json.NewDecoder(response.Body).Decode(target); err != nil {
+		return fmt.Errorf("decode hub response: %w", err)
+	}
+	return nil
+}
+
+// open issues an authenticated GET, re-establishing an expired session once,
+// and returns the response only when it carries a 2xx status. The caller owns
+// the response body.
+func (c *Client) open(ctx context.Context, path string, query url.Values, accept string) (*http.Response, error) {
 	if c.username != "" {
 		if err := c.ensureAuthenticated(ctx); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	response, err := c.doGet(ctx, path, query)
+	response, err := c.doGet(ctx, path, query, accept)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if response.StatusCode == http.StatusUnauthorized && c.username != "" {
 		_ = response.Body.Close()
@@ -173,29 +304,26 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, target 
 		c.loggedIn = false
 		c.authMu.Unlock()
 		if err := c.ensureAuthenticated(ctx); err != nil {
-			return err
+			return nil, err
 		}
-		response, err = c.doGet(ctx, path, query)
+		response, err = c.doGet(ctx, path, query, accept)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		defer func() { _ = response.Body.Close() }()
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
 		var apiError api.ErrorResponse
 		if json.Unmarshal(body, &apiError) == nil && apiError.Error != "" {
-			return fmt.Errorf("hub API returned %s: %s", response.Status, apiError.Error)
+			return nil, fmt.Errorf("hub API returned %s: %s", response.Status, apiError.Error)
 		}
-		return fmt.Errorf("hub API returned %s", response.Status)
+		return nil, fmt.Errorf("hub API returned %s", response.Status)
 	}
-	if err := json.NewDecoder(response.Body).Decode(target); err != nil {
-		return fmt.Errorf("decode hub response: %w", err)
-	}
-	return nil
+	return response, nil
 }
 
-func (c *Client) doGet(ctx context.Context, path string, query url.Values) (*http.Response, error) {
+func (c *Client) doGet(ctx context.Context, path string, query url.Values, accept string) (*http.Response, error) {
 	endpoint := c.hubURL + path
 	if len(query) > 0 {
 		endpoint += "?" + query.Encode()
@@ -204,7 +332,7 @@ func (c *Client) doGet(ctx context.Context, path string, query url.Values) (*htt
 	if err != nil {
 		return nil, fmt.Errorf("create hub request: %w", err)
 	}
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", accept)
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}

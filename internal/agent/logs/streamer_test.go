@@ -171,3 +171,51 @@ func TestLogChannelEndpoint(t *testing.T) {
 		}
 	}
 }
+
+func TestStreamerPassesPreviousAndSinceSeconds(t *testing.T) {
+	opener := &stubOpener{reader: nopCloser{strings.NewReader("panic: boom\n")}}
+	streamer := NewStreamerWithOpener(opener)
+
+	err := streamer.Stream(context.Background(), Request{
+		Namespace: "apps", Pod: "api", TailLines: 50, Previous: true, SinceSeconds: 600,
+	}, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("Stream() error = %v", err)
+	}
+	if !opener.options.Previous {
+		t.Fatalf("options.Previous = false, want true")
+	}
+	if opener.options.SinceSeconds == nil || *opener.options.SinceSeconds != 600 {
+		t.Fatalf("options.SinceSeconds = %v, want 600", opener.options.SinceSeconds)
+	}
+}
+
+func TestStreamerOmitsUnsetSinceSeconds(t *testing.T) {
+	opener := &stubOpener{reader: nopCloser{strings.NewReader("")}}
+	if err := NewStreamerWithOpener(opener).Stream(context.Background(), Request{Namespace: "apps", Pod: "api"}, func(string) error { return nil }); err != nil {
+		t.Fatalf("Stream() error = %v", err)
+	}
+	if opener.options.Previous || opener.options.SinceSeconds != nil || opener.options.TailLines != nil {
+		t.Fatalf("options = %#v, want no previous, since, or tail", opener.options)
+	}
+}
+
+func TestStreamerReadsPreviousLogsFromFakeClientset(t *testing.T) {
+	clientset := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "apps"},
+		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "api"}}},
+	})
+	var lines []string
+	err := NewStreamer(clientset).Stream(context.Background(), Request{
+		Namespace: "apps", Pod: "api", Container: "api", TailLines: 10, Previous: true, SinceSeconds: 60,
+	}, func(line string) error {
+		lines = append(lines, line)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Stream() error = %v", err)
+	}
+	if len(lines) == 0 {
+		t.Fatalf("Stream() produced no lines")
+	}
+}

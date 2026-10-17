@@ -24,6 +24,12 @@ type LogStreamMessage struct {
 	Container string `json:"container,omitempty"`
 	Follow    bool   `json:"follow,omitempty"`
 	TailLines int64  `json:"tailLines,omitempty"`
-	Line      string `json:"line,omitempty"`
-	Error     string `json:"error,omitempty"`
+	// Previous requests logs from the previous terminated container
+	// instance, which is where a crashlooping container's failure output
+	// lives. Agents that predate this field ignore it.
+	Previous bool `json:"previous,omitempty"`
+	// SinceSeconds limits output to lines newer than this many seconds.
+	SinceSeconds int64  `json:"sinceSeconds,omitempty"`
+	Line         string `json:"line,omitempty"`
+	Error        string `json:"error,omitempty"`
 }

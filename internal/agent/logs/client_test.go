@@ -13,6 +13,7 @@ import (
 	"github.com/1solomonwakhungu/kfleet/pkg/api"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func testLogger() *slog.Logger {
@@ -38,6 +39,64 @@ func fakeHub(t *testing.T, handle func(ctx context.Context, conn *websocket.Conn
 	}))
 	t.Cleanup(server.Close)
 	return server, headers
+}
+
+// recordingOpener hands the requested log options to the test over a channel
+// so the assertion is ordered after the agent goroutine that opened the logs.
+type recordingOpener struct {
+	options chan *corev1.PodLogOptions
+}
+
+func (o recordingOpener) OpenPodLogs(_ context.Context, _, _ string, options *corev1.PodLogOptions) (io.ReadCloser, error) {
+	o.options <- options
+	return nopCloser{strings.NewReader("panic: boom\n")}, nil
+}
+
+func TestClientForwardsLogOptionsFromStartFrame(t *testing.T) {
+	server, _ := fakeHub(t, func(ctx context.Context, conn *websocket.Conn) {
+		if err := wsjson.Write(ctx, conn, api.LogStreamMessage{
+			Type: api.LogStreamStart, StreamID: "s1", Namespace: "apps", Pod: "api",
+			Container: "app", TailLines: 20, Previous: true, SinceSeconds: 120,
+		}); err != nil {
+			t.Errorf("write start error = %v", err)
+			return
+		}
+		for {
+			var message api.LogStreamMessage
+			if err := wsjson.Read(ctx, conn, &message); err != nil || message.Type == api.LogStreamEnd {
+				return
+			}
+		}
+	})
+
+	opener := recordingOpener{options: make(chan *corev1.PodLogOptions, 1)}
+	client := NewClient(server.URL, "prod", "agent-token", "acme", NewStreamerWithOpener(opener), testLogger(), nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = client.connect(ctx)
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
+
+	select {
+	case options := <-opener.options:
+		if options.Container != "app" || !options.Previous {
+			t.Fatalf("options = %#v, want container app and previous", options)
+		}
+		if options.TailLines == nil || *options.TailLines != 20 {
+			t.Fatalf("tail lines = %v, want 20", options.TailLines)
+		}
+		if options.SinceSeconds == nil || *options.SinceSeconds != 120 {
+			t.Fatalf("since seconds = %v, want 120", options.SinceSeconds)
+		}
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for the agent to open pod logs")
+	}
 }
 
 func TestClientStreamsLogsBackToHub(t *testing.T) {

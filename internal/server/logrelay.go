@@ -133,11 +133,13 @@ func (c *agentLogConn) enqueue(message api.LogStreamMessage) bool {
 
 // logStreamRequest describes a single browser log request.
 type logStreamRequest struct {
-	Namespace string
-	Pod       string
-	Container string
-	Follow    bool
-	TailLines int64
+	Namespace    string
+	Pod          string
+	Container    string
+	Follow       bool
+	TailLines    int64
+	Previous     bool
+	SinceSeconds int64
 }
 
 // logStream is the hub side handle for one in-flight browser log stream.
@@ -248,13 +250,15 @@ func (r *LogRelay) open(clusterID string, request logStreamRequest) (*logStream,
 		return nil, errNoAgentConnected
 	}
 	start := api.LogStreamMessage{
-		Type:      api.LogStreamStart,
-		StreamID:  id,
-		Namespace: request.Namespace,
-		Pod:       request.Pod,
-		Container: request.Container,
-		Follow:    request.Follow,
-		TailLines: request.TailLines,
+		Type:         api.LogStreamStart,
+		StreamID:     id,
+		Namespace:    request.Namespace,
+		Pod:          request.Pod,
+		Container:    request.Container,
+		Follow:       request.Follow,
+		TailLines:    request.TailLines,
+		Previous:     request.Previous,
+		SinceSeconds: request.SinceSeconds,
 	}
 	if !conn.enqueue(start) {
 		conn.removeStream(id)

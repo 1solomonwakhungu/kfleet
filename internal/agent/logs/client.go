@@ -200,11 +200,13 @@ func (c *Client) startStream(
 
 func (c *Client) runStream(ctx context.Context, message api.LogStreamMessage, outbound chan api.LogStreamMessage) {
 	request := Request{
-		Namespace: message.Namespace,
-		Pod:       message.Pod,
-		Container: message.Container,
-		Follow:    message.Follow,
-		TailLines: message.TailLines,
+		Namespace:    message.Namespace,
+		Pod:          message.Pod,
+		Container:    message.Container,
+		Follow:       message.Follow,
+		TailLines:    message.TailLines,
+		Previous:     message.Previous,
+		SinceSeconds: message.SinceSeconds,
 	}
 	err := c.streamer.Stream(ctx, request, func(line string) error {
 		return sendFrame(ctx, outbound, api.LogStreamMessage{

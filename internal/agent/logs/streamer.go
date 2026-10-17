@@ -28,6 +28,10 @@ type Request struct {
 	Container string
 	Follow    bool
 	TailLines int64
+	// Previous reads the previous terminated container instance.
+	Previous bool
+	// SinceSeconds limits output to lines newer than this many seconds.
+	SinceSeconds int64
 }
 
 // PodLogOpener opens a pod log stream. The clientset implementation is used
@@ -69,10 +73,15 @@ func (s *Streamer) Stream(ctx context.Context, request Request, emit func(line s
 	options := &corev1.PodLogOptions{
 		Container: request.Container,
 		Follow:    request.Follow,
+		Previous:  request.Previous,
 	}
 	if request.TailLines > 0 {
 		tail := request.TailLines
 		options.TailLines = &tail
+	}
+	if request.SinceSeconds > 0 {
+		since := request.SinceSeconds
+		options.SinceSeconds = &since
 	}
 
 	reader, err := s.opener.OpenPodLogs(ctx, request.Namespace, request.Pod, options)
