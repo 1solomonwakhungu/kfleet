@@ -11,9 +11,21 @@ import (
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
 	protocol "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"golang.org/x/mod/semver"
 )
 
-const highRestartCount = 5
+const (
+	highRestartCount = 5
+
+	// defaultPodLogTailLines and maxPodLogTailLines keep get_pod_logs output
+	// small enough for a model's context window by default.
+	defaultPodLogTailLines = 100
+	maxPodLogTailLines     = 1000
+	// maxPodLogBytes caps the log text returned by get_pod_logs. When the
+	// lines exceed it, the oldest lines are dropped so the newest output
+	// (usually the failure) survives.
+	maxPodLogBytes = 256 << 10
+)
 
 type toolHandlers struct {
 	hub *hubclient.Client
@@ -82,6 +94,24 @@ func registerTools(server *mcpserver.MCPServer, hub *hubclient.Client) {
 				protocol.WithNumber("before", protocol.Description("Optional positive cursor from nextCursor for the next older page")),
 				protocol.WithNumber("limit", protocol.Description("Maximum number of events to return (default 50, max 500)"))),
 			Handler: handlers.getTimeline,
+		},
+		mcpserver.ServerTool{
+			Tool: protocol.NewTool("list_namespaces",
+				protocol.WithDescription("List the Kubernetes namespaces in a cluster's latest snapshot."),
+				protocol.WithString("cluster", protocol.Required(), protocol.Description("Cluster name or ID"))),
+			Handler: handlers.listNamespaces,
+		},
+		mcpserver.ServerTool{
+			Tool: protocol.NewTool("get_pod_logs",
+				protocol.WithDescription("Fetch recent logs for a pod container. Set previous=true to read the last terminated instance, which holds the crash reason for a CrashLoopBackOff pod."),
+				protocol.WithString("cluster", protocol.Required(), protocol.Description("Cluster name or ID")),
+				protocol.WithString("namespace", protocol.Required(), protocol.Description("Kubernetes namespace of the pod")),
+				protocol.WithString("pod", protocol.Required(), protocol.Description("Pod name")),
+				protocol.WithString("container", protocol.Description("Optional container name; required for pods with more than one container")),
+				protocol.WithNumber("tailLines", protocol.Description("Number of most recent lines to return (default 100, max 1000)")),
+				protocol.WithBoolean("previous", protocol.Description("Read logs from the previous terminated container instance (default false)")),
+				protocol.WithNumber("sinceSeconds", protocol.Description("Optional; only return lines newer than this many seconds"))),
+			Handler: handlers.getPodLogs,
 		},
 	)
 }
@@ -239,6 +269,113 @@ func (h *toolHandlers) getTimeline(ctx context.Context, request protocol.CallToo
 		return toolError("get timeline", err), nil
 	}
 	return jsonResult(map[string]any{"events": page.Events, "count": len(page.Events), "nextCursor": page.NextCursor})
+}
+
+func (h *toolHandlers) listNamespaces(ctx context.Context, request protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+	cluster, result := h.requiredCluster(ctx, request)
+	if result != nil {
+		return result, nil
+	}
+	namespaces, err := h.hub.ListNamespaces(ctx, cluster.ID)
+	if err != nil {
+		return toolError("list namespaces", err), nil
+	}
+	return jsonResult(map[string]any{"cluster": cluster, "namespaces": namespaces, "count": len(namespaces)})
+}
+
+type podLogs struct {
+	Cluster   types.Cluster `json:"cluster"`
+	Namespace string        `json:"namespace"`
+	Pod       string        `json:"pod"`
+	Container string        `json:"container,omitempty"`
+	Previous  bool          `json:"previous"`
+	LineCount int           `json:"lineCount"`
+	Truncated bool          `json:"truncated,omitempty"`
+	Note      string        `json:"note,omitempty"`
+	Logs      string        `json:"logs"`
+}
+
+func (h *toolHandlers) getPodLogs(ctx context.Context, request protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+	namespace := strings.TrimSpace(request.GetString("namespace", ""))
+	pod := strings.TrimSpace(request.GetString("pod", ""))
+	if namespace == "" || pod == "" {
+		return protocol.NewToolResultError("namespace and pod are required and must be non-empty strings"), nil
+	}
+	tailLines := request.GetInt("tailLines", defaultPodLogTailLines)
+	if tailLines < 1 || tailLines > maxPodLogTailLines {
+		return protocol.NewToolResultError(fmt.Sprintf("tailLines must be between 1 and %d", maxPodLogTailLines)), nil
+	}
+	sinceSeconds := request.GetInt("sinceSeconds", 0)
+	if sinceSeconds < 0 {
+		return protocol.NewToolResultError("sinceSeconds must be zero or a positive number of seconds"), nil
+	}
+	cluster, result := h.requiredCluster(ctx, request)
+	if result != nil {
+		return result, nil
+	}
+
+	query := hubclient.PodLogsQuery{
+		ClusterID:    cluster.ID,
+		Namespace:    namespace,
+		Pod:          pod,
+		Container:    strings.TrimSpace(request.GetString("container", "")),
+		TailLines:    int64(tailLines),
+		Previous:     request.GetBool("previous", false),
+		SinceSeconds: int64(sinceSeconds),
+	}
+	lines, err := h.hub.GetPodLogs(ctx, query)
+	if err != nil {
+		return toolError("get pod logs", err), nil
+	}
+
+	kept, truncated := newestLinesWithin(lines, maxPodLogBytes)
+	output := podLogs{
+		Cluster: cluster, Namespace: namespace, Pod: pod, Container: query.Container,
+		Previous: query.Previous, LineCount: len(kept), Truncated: truncated,
+		Logs: strings.Join(kept, "\n"),
+	}
+	switch {
+	case query.Previous && agentIgnoresLogOptions(cluster.AgentVersion):
+		output.Note = fmt.Sprintf("agent %s predates %s and ignores previous and sinceSeconds, so these are the current container's logs; upgrade the agent to read the previous instance", cluster.AgentVersion, minLogOptionsAgentVersion)
+	case truncated:
+		output.Note = fmt.Sprintf("output exceeded %d KiB; dropped the %d oldest lines", maxPodLogBytes>>10, len(lines)-len(kept))
+	case len(lines) == 0 && !query.Previous:
+		output.Note = "no log output; for a crashlooping container, retry with previous=true"
+	case len(lines) == 0:
+		output.Note = "no log output"
+	}
+	return jsonResult(output)
+}
+
+// minLogOptionsAgentVersion is the first agent release that honors the
+// previous and sinceSeconds log options.
+const minLogOptionsAgentVersion = "v0.2.0"
+
+// agentIgnoresLogOptions reports whether an agent version is a known release
+// older than minLogOptionsAgentVersion. Development and unparseable versions
+// are assumed to be current.
+func agentIgnoresLogOptions(agentVersion string) bool {
+	version := strings.TrimSpace(agentVersion)
+	if version == "" {
+		return false
+	}
+	if !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+	return semver.IsValid(version) && semver.Compare(version, minLogOptionsAgentVersion) < 0
+}
+
+// newestLinesWithin keeps the newest lines whose joined size fits in budget
+// bytes and reports whether any older lines were dropped.
+func newestLinesWithin(lines []string, budget int) ([]string, bool) {
+	size := 0
+	for i := len(lines) - 1; i >= 0; i-- {
+		size += len(lines[i]) + 1
+		if size > budget+1 {
+			return lines[i+1:], true
+		}
+	}
+	return lines, false
 }
 
 func (h *toolHandlers) requiredCluster(ctx context.Context, request protocol.CallToolRequest) (types.Cluster, *protocol.CallToolResult) {

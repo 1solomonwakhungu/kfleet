@@ -243,7 +243,7 @@ configuration:
 }
 ```
 
-You can also build and use the standalone server at `./cmd/mcp`. Available tools list clusters, retrieve status, pods, Kubernetes events, and recent operational events, locate crashlooping pods, and produce a composite cluster diagnosis. The `get_recent_events` tool accepts an optional cluster, RFC3339 `since` and `until` filters, a page `limit`, and a `before` cursor.
+You can also build and use the standalone server at `./cmd/mcp`. Available tools list clusters and namespaces, retrieve status, pods, Kubernetes events, and recent operational events, locate crashlooping pods, read pod logs, and produce a composite cluster diagnosis. The `get_pod_logs` tool takes a cluster, namespace, pod, and optional container, returns the newest `tailLines` lines (default 100, max 1000, output capped at 256 KiB), accepts `sinceSeconds` to limit the time window, and reads the previous terminated container with `previous: true` so a crashlooping pod's failure output is reachable. The `get_recent_events` tool accepts an optional cluster, RFC3339 `since` and `until` filters, a page `limit`, and a `before` cursor.
 
 Example prompts:
 
