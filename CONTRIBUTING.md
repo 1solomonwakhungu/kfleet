@@ -60,3 +60,16 @@ make web-build
 ```
 
 Add or update tests for behavior changes. Do not commit generated binaries, local databases, credentials, or environment-specific configuration.
+
+## Releases
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please).
+
+1. Every push to `main` updates an open release PR titled `chore: release X.Y.Z`. It bumps the version in `.release-please-manifest.json` and adds a `CHANGELOG.md` entry built from the Conventional Commit messages merged since the last tag. `feat` commits bump the minor version, `fix` commits bump the patch version, and breaking changes bump the minor version while kfleet is below 1.0.0.
+2. Merging the release PR creates the `vX.Y.Z` tag and GitHub release, then runs `.github/workflows/release.yml` from the same workflow run. That publishes the hub and agent images to GHCR, the Helm charts to `oci://ghcr.io/1solomonwakhungu/charts`, and the GoReleaser binaries and Homebrew cask.
+
+Squash-merge titles become changelog entries, so keep PR titles in Conventional Commit form. To adjust the notes, edit `CHANGELOG.md` on the release PR branch right before merging; release-please rewrites that branch on every push to `main`.
+
+The repository setting **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** must be enabled for release-please to open the release PR with `GITHUB_TOKEN`. Pull requests opened by `GITHUB_TOKEN` do not trigger CI. To run CI on release PRs, add a fine-grained personal access token with contents and pull-request write access as the `RELEASE_PLEASE_TOKEN` secret. With that secret set, the tag push itself triggers `release.yml` and the release-please workflow skips its own publish job.
+
+Manual releases still work: push a `v*` tag, or run the Release workflow from the Actions tab with an existing tag.

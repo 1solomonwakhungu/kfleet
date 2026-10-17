@@ -10,6 +10,16 @@ on:
         description: Existing release tag to publish (for example, v1.2.3)
         required: true
         type: string
+  workflow_call:
+    inputs:
+      version:
+        description: Release tag to publish (for example, v1.2.3)
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   images:
@@ -143,5 +153,6 @@ jobs:
           version: v2
           args: release --clean
         env:
+          GORELEASER_CURRENT_TAG: ${{ env.RELEASE_TAG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
