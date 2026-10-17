@@ -121,7 +121,9 @@ describe('ClusterDetail error states', () => {
 
     expect(await screen.findByRole('heading', { name: 'Cluster not found' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
-    expect(document.title).toBe('Cluster not found · kfleet')
+    // useDocumentTitle writes the title in a passive effect, which can flush
+    // after findByRole has already seen the heading commit to the DOM.
+    await waitFor(() => expect(document.title).toBe('Cluster not found · kfleet'))
     expect(screen.getByRole('link', { name: 'Back to clusters' }).getAttribute('href')).toBe('/')
   })
 
