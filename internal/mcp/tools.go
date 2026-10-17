@@ -11,6 +11,7 @@ import (
 	"github.com/1solomonwakhungu/kfleet/pkg/types"
 	protocol "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -306,7 +307,7 @@ func (h *toolHandlers) getPodLogs(ctx context.Context, request protocol.CallTool
 	}
 	sinceSeconds := request.GetInt("sinceSeconds", 0)
 	if sinceSeconds < 0 {
-		return protocol.NewToolResultError("sinceSeconds must be a positive number of seconds"), nil
+		return protocol.NewToolResultError("sinceSeconds must be zero or a positive number of seconds"), nil
 	}
 	cluster, result := h.requiredCluster(ctx, request)
 	if result != nil {
@@ -334,6 +335,8 @@ func (h *toolHandlers) getPodLogs(ctx context.Context, request protocol.CallTool
 		Logs: strings.Join(kept, "\n"),
 	}
 	switch {
+	case query.Previous && agentIgnoresLogOptions(cluster.AgentVersion):
+		output.Note = fmt.Sprintf("agent %s predates %s and ignores previous and sinceSeconds, so these are the current container's logs; upgrade the agent to read the previous instance", cluster.AgentVersion, minLogOptionsAgentVersion)
 	case truncated:
 		output.Note = fmt.Sprintf("output exceeded %d KiB; dropped the %d oldest lines", maxPodLogBytes>>10, len(lines)-len(kept))
 	case len(lines) == 0 && !query.Previous:
@@ -342,6 +345,24 @@ func (h *toolHandlers) getPodLogs(ctx context.Context, request protocol.CallTool
 		output.Note = "no log output"
 	}
 	return jsonResult(output)
+}
+
+// minLogOptionsAgentVersion is the first agent release that honors the
+// previous and sinceSeconds log options.
+const minLogOptionsAgentVersion = "v0.2.0"
+
+// agentIgnoresLogOptions reports whether an agent version is a known release
+// older than minLogOptionsAgentVersion. Development and unparseable versions
+// are assumed to be current.
+func agentIgnoresLogOptions(agentVersion string) bool {
+	version := strings.TrimSpace(agentVersion)
+	if version == "" {
+		return false
+	}
+	if !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+	return semver.IsValid(version) && semver.Compare(version, minLogOptionsAgentVersion) < 0
 }
 
 // newestLinesWithin keeps the newest lines whose joined size fits in budget

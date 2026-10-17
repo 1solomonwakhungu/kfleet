@@ -96,6 +96,8 @@ type fakeHub struct {
 	logPath   string
 	logStream string
 	logStatus int
+	// agentVersion is reported for the fake cluster.
+	agentVersion string
 }
 
 func newFakeHub(t *testing.T, hub *fakeHub) *hubclient.Client {
@@ -103,7 +105,7 @@ func newFakeHub(t *testing.T, hub *fakeHub) *hubclient.Client {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/api/v1/clusters":
-			_ = json.NewEncoder(w).Encode(api.ListClustersResponse{Clusters: []types.Cluster{{ID: "cluster-1", Name: "production"}}})
+			_ = json.NewEncoder(w).Encode(api.ListClustersResponse{Clusters: []types.Cluster{{ID: "cluster-1", Name: "production", AgentVersion: hub.agentVersion}}})
 		case r.URL.Path == "/api/v1/clusters/cluster-1/namespaces":
 			_ = json.NewEncoder(w).Encode([]string{"apps", "kube-system"})
 		case strings.HasSuffix(r.URL.Path, "/logs"):
@@ -203,6 +205,31 @@ func TestGetPodLogsToolForwardsOptions(t *testing.T) {
 	}
 }
 
+func TestGetPodLogsToolWarnsWhenAgentIgnoresPrevious(t *testing.T) {
+	tests := map[string]struct {
+		agentVersion string
+		wantNote     bool
+	}{
+		"old release":         {agentVersion: "0.1.2", wantNote: true},
+		"old release with v":  {agentVersion: "v0.1.2", wantNote: true},
+		"supporting release":  {agentVersion: "v0.2.0"},
+		"development build":   {agentVersion: "dev"},
+		"unknown agent build": {},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			hub := &fakeHub{logStream: "data: line\n\nevent: end\ndata: {}\n\n", agentVersion: tt.agentVersion}
+			client := newTestClient(t, newFakeHub(t, hub))
+			got := decodeResult[podLogs](t, callTool(t, client, "get_pod_logs", map[string]any{
+				"cluster": "production", "namespace": "apps", "pod": "api", "previous": true,
+			}))
+			if hasNote := strings.Contains(got.Note, "ignores previous"); hasNote != tt.wantNote {
+				t.Fatalf("note = %q, want old-agent warning %v", got.Note, tt.wantNote)
+			}
+		})
+	}
+}
+
 func TestGetPodLogsToolDefaults(t *testing.T) {
 	hub := &fakeHub{logStream: "event: end\ndata: {}\n\n"}
 	client := newTestClient(t, newFakeHub(t, hub))
@@ -233,7 +260,7 @@ func TestGetPodLogsToolRejectsInvalidArguments(t *testing.T) {
 		"unknown cluster": {map[string]any{"cluster": "staging", "namespace": "apps", "pod": "api"}, `cluster "staging" was not found`},
 		"tail too large":  {map[string]any{"cluster": "production", "namespace": "apps", "pod": "api", "tailLines": maxPodLogTailLines + 1}, "tailLines must be between 1 and 1000"},
 		"tail zero":       {map[string]any{"cluster": "production", "namespace": "apps", "pod": "api", "tailLines": 0}, "tailLines must be between 1 and 1000"},
-		"negative since":  {map[string]any{"cluster": "production", "namespace": "apps", "pod": "api", "sinceSeconds": -1}, "sinceSeconds must be a positive"},
+		"negative since":  {map[string]any{"cluster": "production", "namespace": "apps", "pod": "api", "sinceSeconds": -1}, "sinceSeconds must be zero or a positive"},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
