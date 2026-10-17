@@ -191,7 +191,7 @@ func TestPodLogsStreamsAgentOutput(t *testing.T) {
 	registration := registeredLogAgent(t, server)
 	conn := dialAgentLogChannel(t, server, srv, registration.ClusterID, registration.Token)
 
-	path := "/api/v1/clusters/" + registration.ClusterID + "/pods/apps/api/logs?container=sidecar&follow=false&tailLines=42"
+	path := "/api/v1/clusters/" + registration.ClusterID + "/pods/apps/api/logs?container=sidecar&follow=false&tailLines=42&previous=true&sinceSeconds=300"
 	response := openLogStream(t, server, path, defaultSessionFor(server), "")
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
@@ -211,6 +211,9 @@ func TestPodLogsStreamsAgentOutput(t *testing.T) {
 	}
 	if start.Container != "sidecar" || start.Follow || start.TailLines != 42 {
 		t.Fatalf("start frame options = %#v, want container/follow/tail passthrough", start)
+	}
+	if !start.Previous || start.SinceSeconds != 300 {
+		t.Fatalf("start frame options = %#v, want previous/sinceSeconds passthrough", start)
 	}
 
 	for _, line := range []string{"alpha", "bravo"} {
@@ -413,5 +416,18 @@ func TestParseLogStreamQueryParams(t *testing.T) {
 	}
 	if got := parseTailLines("77"); got != 77 {
 		t.Fatalf("parseTailLines(\"77\") = %d, want 77", got)
+	}
+}
+
+func TestParsePreviousAndSinceSeconds(t *testing.T) {
+	for raw, want := range map[string]bool{"": false, "false": false, "nonsense": false, "true": true, "1": true} {
+		if got := parsePrevious(raw); got != want {
+			t.Errorf("parsePrevious(%q) = %t, want %t", raw, got, want)
+		}
+	}
+	for raw, want := range map[string]int64{"": 0, "-5": 0, "abc": 0, "0": 0, "90": 90} {
+		if got := parseSinceSeconds(raw); got != want {
+			t.Errorf("parseSinceSeconds(%q) = %d, want %d", raw, got, want)
+		}
 	}
 }

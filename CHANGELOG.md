@@ -13,6 +13,11 @@ v0.1.2) predate it. Their notes live on the
 
 ### Added
 
+- The MCP server adds a `get_pod_logs` tool that returns recent pod
+  container logs as text, including the previous terminated instance
+  (`previous: true`) for crashlooping pods, and a `list_namespaces` tool.
+  The hub log endpoint and agents accept matching `previous` and
+  `sinceSeconds` options (#30).
 - The hub sends `Cache-Control: no-cache` for `index.html` (including SPA
   fallback routes) and non-hashed static files, and
   `Cache-Control: public, max-age=31536000, immutable` for the content-hashed

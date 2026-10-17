@@ -148,11 +148,13 @@ func (s *Server) handleClusterPodLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	request := logStreamRequest{
-		Namespace: namespace,
-		Pod:       pod,
-		Container: strings.TrimSpace(r.URL.Query().Get("container")),
-		Follow:    parseFollow(r.URL.Query().Get("follow")),
-		TailLines: parseTailLines(r.URL.Query().Get("tailLines")),
+		Namespace:    namespace,
+		Pod:          pod,
+		Container:    strings.TrimSpace(r.URL.Query().Get("container")),
+		Follow:       parseFollow(r.URL.Query().Get("follow")),
+		TailLines:    parseTailLines(r.URL.Query().Get("tailLines")),
+		Previous:     parsePrevious(r.URL.Query().Get("previous")),
+		SinceSeconds: parseSinceSeconds(r.URL.Query().Get("sinceSeconds")),
 	}
 
 	stream, err := s.logs.open(cluster.ID, request)
@@ -333,6 +335,23 @@ func parseTailLines(raw string) int64 {
 	}
 	if value > maxLogTailLines {
 		return maxLogTailLines
+	}
+	return value
+}
+
+// parsePrevious reports whether the previous container instance's logs were
+// requested. Anything other than a valid true value reads the current one.
+func parsePrevious(raw string) bool {
+	previous, err := strconv.ParseBool(strings.TrimSpace(raw))
+	return err == nil && previous
+}
+
+// parseSinceSeconds returns a positive relative time window in seconds, or 0
+// (no window) for empty or invalid input.
+func parseSinceSeconds(raw string) int64 {
+	value, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || value <= 0 {
+		return 0
 	}
 	return value
 }
