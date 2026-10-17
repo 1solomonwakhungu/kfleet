@@ -9,6 +9,13 @@ This changelog begins in September 2026; older releases (v0.1.0 through
 v0.1.2) predate it. Their notes live on the
 [GitHub releases page](https://github.com/1solomonwakhungu/kfleet/releases).
 
+## [0.2.1](https://github.com/1solomonwakhungu/kfleet/compare/v0.2.0...v0.2.1) (2026-10-17)
+
+
+### Bug fixes
+
+* **release:** restore web dist placeholders before GoReleaser ([#59](https://github.com/1solomonwakhungu/kfleet/issues/59)) ([3a31f1e](https://github.com/1solomonwakhungu/kfleet/commit/3a31f1ef06d41a6ef742c54ec3073249bfa89d1c))
+
 ## [0.2.0](https://github.com/1solomonwakhungu/kfleet/compare/v0.1.2...v0.2.0) (2026-10-17)
 
 ### Added
