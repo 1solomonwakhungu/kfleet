@@ -4,6 +4,7 @@ bin/
 /agent
 /mcp
 dist/
+.release/
 *.test
 *.out
 coverage.*

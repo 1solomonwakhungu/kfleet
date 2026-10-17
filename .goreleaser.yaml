@@ -86,6 +86,9 @@ homebrew_casks:
           end
 
 release:
+  # release-please creates the GitHub release and its notes before this runs;
+  # keep those notes and attach the artifacts to the existing release.
+  mode: keep-existing
   extra_files:
     - glob: .release/*.tgz
 
