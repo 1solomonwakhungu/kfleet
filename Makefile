@@ -15,6 +15,9 @@ web-build:
 	cd web && npm ci && npm run build
 	rm -rf internal/hub/web/dist
 	cp -R web/dist internal/hub/web/dist
+	# The build empties both output directories; restore the tracked
+	# placeholders so the tree stays clean for GoReleaser.
+	-git checkout -- web/dist/.gitkeep internal/hub/web/dist/.gitkeep 2>/dev/null
 
 test:
 	go test ./... -race -cover
