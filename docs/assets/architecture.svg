@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 830" width="1200" height="830" role="img" aria-labelledby="arch-title arch-desc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="arch-title">kfleet architecture</title>
+  <desc id="arch-desc">Browsers, AI clients through the MCP server, and Prometheus connect to the kfleet hub. The hub is one Go binary with a REST API, live updates, a log relay, a policy engine, an alert manager, and a SQLite database. It sends signed alert webhooks out. One agent in each Kubernetes cluster opens every connection to the hub: HTTPS for registration, heartbeats, and snapshots, and a WebSocket for pod logs. The hub holds no Kubernetes credentials.</desc>
+
+  <defs>
+    <marker id="head-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10z" fill="#9198a1"/>
+    </marker>
+    <marker id="head-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10z" fill="#58a6ff"/>
+    </marker>
+    <marker id="head-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10z" fill="#3fb950"/>
+    </marker>
+    <marker id="head-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10z" fill="#bc8cff"/>
+    </marker>
+    <marker id="head-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10z" fill="#d29922"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="830" rx="14" fill="#0d1117"/>
+
+  <!-- Clients -->
+  <g fill="#161b22" stroke="#30363d" stroke-width="1.5">
+    <rect x="45" y="40" width="190" height="64" rx="8"/>
+    <rect x="275" y="40" width="190" height="64" rx="8" stroke="#8957e5"/>
+    <rect x="505" y="40" width="190" height="64" rx="8" stroke="#8957e5"/>
+    <rect x="735" y="40" width="190" height="64" rx="8"/>
+    <rect x="965" y="40" width="190" height="64" rx="8" stroke="#9e6a03"/>
+  </g>
+  <g text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">
+    <text x="140" y="68">Browser</text>
+    <text x="370" y="68">AI client</text>
+    <text x="600" y="68">kfleet-hub mcp</text>
+    <text x="830" y="68">Prometheus</text>
+    <text x="1060" y="68">Webhook receiver</text>
+  </g>
+  <g text-anchor="middle" fill="#9198a1" font-size="12.5">
+    <text x="140" y="88">embedded web UI</text>
+    <text x="370" y="88">any MCP client</text>
+    <text x="600" y="88">MCP server, 9 read-only tools</text>
+    <text x="830" y="88">scrapes aggregates</text>
+    <text x="1060" y="88">your alert endpoint</text>
+  </g>
+
+  <!-- Client connections -->
+  <g fill="none" stroke-width="1.75">
+    <path d="M140 104V198" stroke="#9198a1" marker-end="url(#head-gray)"/>
+    <path d="M465 72H503" stroke="#bc8cff" marker-end="url(#head-purple)"/>
+    <path d="M600 104V198" stroke="#bc8cff" marker-end="url(#head-purple)"/>
+    <path d="M830 104V198" stroke="#9198a1" marker-end="url(#head-gray)"/>
+    <path d="M1060 200V106" stroke="#d29922" marker-end="url(#head-orange)"/>
+  </g>
+  <g fill="#9198a1" font-size="12.5">
+    <text x="152" y="148">HTTPS session,</text>
+    <text x="152" y="165">WebSocket, SSE</text>
+    <text x="484" y="62" text-anchor="middle">stdio</text>
+    <text x="612" y="148">REST API as a</text>
+    <text x="612" y="165">read-only user</text>
+    <text x="842" y="157">GET /metrics</text>
+    <text x="1048" y="148" text-anchor="end">HMAC-signed</text>
+    <text x="1048" y="165" text-anchor="end">alert webhooks</text>
+  </g>
+
+  <!-- Hub -->
+  <rect x="45" y="200" width="1110" height="250" rx="12" fill="#101b2d" stroke="#1f6feb" stroke-width="2"/>
+  <text x="70" y="234" fill="#e6edf3" font-size="18" font-weight="700">kfleet hub</text>
+  <text x="172" y="234" fill="#9198a1" font-size="13.5">one Go binary · web UI embedded · holds no Kubernetes credentials</text>
+
+  <g fill="#161b22" stroke="#30363d" stroke-width="1.5">
+    <rect x="70" y="254" width="250" height="64" rx="8"/>
+    <rect x="340" y="254" width="250" height="64" rx="8"/>
+    <rect x="610" y="254" width="250" height="64" rx="8"/>
+    <rect x="880" y="254" width="250" height="64" rx="8"/>
+    <rect x="70" y="354" width="1060" height="70" rx="8"/>
+  </g>
+  <g text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">
+    <text x="195" y="282">REST API</text>
+    <text x="465" y="282">Live updates</text>
+    <text x="735" y="282">Log relay</text>
+    <text x="1005" y="282">Policy engine + alerts</text>
+    <text x="600" y="385">SQLite</text>
+  </g>
+  <g text-anchor="middle" fill="#9198a1" font-size="12.5">
+    <text x="195" y="302">sessions · RBAC · audit log</text>
+    <text x="465" y="302">WebSocket to the dashboard</text>
+    <text x="735" y="302">agent channel in, SSE out</text>
+    <text x="1005" y="302">7 drift checks · health alerts</text>
+    <text x="600" y="406">latest cluster snapshots · operational timeline · alerts · users · audit</text>
+  </g>
+  <g fill="none" stroke="#484f58" stroke-width="1.5">
+    <path d="M195 318V354"/>
+    <path d="M1005 318V354"/>
+  </g>
+
+  <!-- Clusters -->
+  <g fill="#12161c" stroke="#30363d" stroke-width="1.5">
+    <rect x="45" y="610" width="350" height="150" rx="12"/>
+    <rect x="425" y="610" width="350" height="150" rx="12"/>
+    <rect x="805" y="610" width="350" height="150" rx="12"/>
+  </g>
+  <g text-anchor="end" fill="#9198a1" font-size="13" font-weight="600">
+    <text x="377" y="636">cluster-a</text>
+    <text x="757" y="636">cluster-b</text>
+    <text x="1137" y="636">cluster-c</text>
+  </g>
+  <g fill="#161b22" stroke-width="1.5">
+    <g stroke="#1f6feb">
+      <rect x="63" y="654" width="160" height="84" rx="8"/>
+      <rect x="443" y="654" width="160" height="84" rx="8"/>
+      <rect x="823" y="654" width="160" height="84" rx="8"/>
+    </g>
+    <g stroke="#30363d">
+      <rect x="267" y="654" width="110" height="84" rx="8"/>
+      <rect x="647" y="654" width="110" height="84" rx="8"/>
+      <rect x="1027" y="654" width="110" height="84" rx="8"/>
+    </g>
+  </g>
+  <g text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">
+    <text x="143" y="692">kfleet agent</text>
+    <text x="523" y="692">kfleet agent</text>
+    <text x="903" y="692">kfleet agent</text>
+    <text x="322" y="692">Kubernetes</text>
+    <text x="702" y="692">Kubernetes</text>
+    <text x="1082" y="692">Kubernetes</text>
+  </g>
+  <g text-anchor="middle" fill="#9198a1" font-size="12.5">
+    <text x="143" y="712">list + pod logs only</text>
+    <text x="523" y="712">list + pod logs only</text>
+    <text x="903" y="712">list + pod logs only</text>
+    <text x="322" y="712">API server</text>
+    <text x="702" y="712">API server</text>
+    <text x="1082" y="712">API server</text>
+  </g>
+  <g fill="none" stroke="#9198a1" stroke-width="1.75">
+    <path d="M223 696H265" marker-end="url(#head-gray)"/>
+    <path d="M603 696H645" marker-end="url(#head-gray)"/>
+    <path d="M983 696H1025" marker-end="url(#head-gray)"/>
+  </g>
+
+  <!-- Agent connections -->
+  <g fill="none" stroke-width="1.75">
+    <path d="M113 654V452" stroke="#58a6ff" marker-end="url(#head-blue)"/>
+    <path d="M493 654V452" stroke="#58a6ff" marker-end="url(#head-blue)"/>
+    <path d="M873 654V452" stroke="#58a6ff" marker-end="url(#head-blue)"/>
+    <g stroke="#3fb950" stroke-dasharray="6 5" marker-start="url(#head-green)" marker-end="url(#head-green)">
+      <path d="M173 652V452"/>
+      <path d="M553 652V452"/>
+      <path d="M933 652V452"/>
+    </g>
+  </g>
+  <g font-size="12.5">
+    <g fill="#58a6ff" text-anchor="end">
+      <text x="103" y="530">HTTPS</text>
+      <text x="483" y="530">HTTPS</text>
+      <text x="863" y="530">HTTPS</text>
+    </g>
+    <g fill="#3fb950">
+      <text x="183" y="530">WebSocket</text>
+      <text x="563" y="530">WebSocket</text>
+      <text x="943" y="530">WebSocket</text>
+    </g>
+  </g>
+
+  <!-- Legend -->
+  <g font-size="13">
+    <path d="M45 795H85" fill="none" stroke="#58a6ff" stroke-width="1.75" marker-end="url(#head-blue)"/>
+    <text x="95" y="799" fill="#9198a1">register, heartbeat, snapshot every 30s</text>
+    <path d="M388 795H428" fill="none" stroke="#3fb950" stroke-width="1.75" stroke-dasharray="6 5" marker-start="url(#head-green)" marker-end="url(#head-green)"/>
+    <text x="438" y="799" fill="#9198a1">pod log requests down, log lines up</text>
+    <text x="1155" y="799" fill="#e6edf3" text-anchor="end" font-weight="600">Agents open every connection. Nothing dials into a cluster.</text>
+  </g>
+</svg>
