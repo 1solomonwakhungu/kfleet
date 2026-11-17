@@ -99,7 +99,7 @@ Lens and Headlamp read the Kubernetes API live, so a cluster you cannot reach sh
 | AI interface | Read-only MCP server, built in | Liz + MCP (Rancher Prime) | Prism + MCP | AI Assistant plugin | Community MCP servers |
 | License | Apache 2.0 | Apache 2.0 | Proprietary, free tier | Apache 2.0 | Apache 2.0 |
 
-Competitor details were checked in November 2026 against each project's documentation and release notes: [Rancher AI](https://documentation.suse.com/cloudnative/rancher-ai/latest/en/introduction.html), [Lens MCP server](https://markets.financialcontent.com/spoke/article/bizwire-2026-3-18-lens-launches-built-in-mcp-server-connecting-ai-coding-assistants-to-kubernetes), [Headlamp AI Assistant](https://artifacthub.io/packages/headlamp/headlamp-plugins/headlamp_ai_assistant), [OCM MCP proposal](https://github.com/open-cluster-management-io/ocm/issues/1790). These tools move quickly. If a cell is out of date, please open an issue.
+Competitor details were checked in November 2026. These tools move quickly. If a cell is out of date, please open an issue.
 
 ### When to pick something else
 
