@@ -53,6 +53,7 @@ func newTestApp(t *testing.T, runner commandRunner) (app, *bytes.Buffer, *bytes.
 		statePath: filepath.Join(t.TempDir(), "quickstart.json"),
 		http:      http.DefaultClient,
 		open:      func(string) error { return nil },
+		runMCP:    func() error { return nil },
 	}, stdout, stderr
 }
 
@@ -64,12 +65,88 @@ func TestRunHelpAndVersion(t *testing.T) {
 	if !strings.Contains(stdout.String(), "kfleet quickstart") {
 		t.Fatalf("help output = %q", stdout.String())
 	}
+	if !strings.Contains(stdout.String(), "kfleet mcp") {
+		t.Fatalf("help output missing kfleet mcp = %q", stdout.String())
+	}
 	stdout.Reset()
 	if err := a.run(context.Background(), []string{"version"}); err != nil {
 		t.Fatal(err)
 	}
 	if got := stdout.String(); got != "kfleet dev\n" {
 		t.Fatalf("version output = %q", got)
+	}
+}
+
+func TestMCPDispatchesToRunner(t *testing.T) {
+	a, _, _ := newTestApp(t, &fakeRunner{})
+	called := 0
+	a.runMCP = func() error {
+		called++
+		return nil
+	}
+	if err := a.run(context.Background(), []string{"mcp"}); err != nil {
+		t.Fatal(err)
+	}
+	if called != 1 {
+		t.Fatalf("runMCP called %d times, want 1", called)
+	}
+}
+
+func TestMCPPropagatesError(t *testing.T) {
+	a, _, _ := newTestApp(t, &fakeRunner{})
+	want := errors.New("KFLEET_HUB_URL is required")
+	a.runMCP = func() error {
+		return want
+	}
+	err := a.run(context.Background(), []string{"mcp"})
+	if !errors.Is(err, want) {
+		t.Fatalf("error = %v, want %v", err, want)
+	}
+}
+
+func TestMCPRejectsUnexpectedArguments(t *testing.T) {
+	cases := [][]string{
+		{"mcp", "extra"},
+		{"mcp", "--unknown"},
+		{"mcp", "-h", "extra"},
+	}
+	for _, args := range cases {
+		a, _, _ := newTestApp(t, &fakeRunner{})
+		called := false
+		a.runMCP = func() error {
+			called = true
+			return nil
+		}
+		err := a.run(context.Background(), args)
+		if err == nil || err.Error() != "mcp accepts no arguments" {
+			t.Fatalf("args %v: error = %v, want %q", args, err, "mcp accepts no arguments")
+		}
+		if called {
+			t.Fatalf("args %v: runMCP should not be called", args)
+		}
+	}
+}
+
+func TestMCPHelp(t *testing.T) {
+	for _, flagArg := range []string{"-h", "--help"} {
+		a, stdout, _ := newTestApp(t, &fakeRunner{})
+		called := false
+		a.runMCP = func() error {
+			called = true
+			return nil
+		}
+		if err := a.run(context.Background(), []string{"mcp", flagArg}); err != nil {
+			t.Fatalf("flag %s: unexpected error: %v", flagArg, err)
+		}
+		if called {
+			t.Fatalf("flag %s: runMCP should not be called", flagArg)
+		}
+		out := stdout.String()
+		for _, want := range []string{"kfleet mcp", "KFLEET_HUB_URL", "KFLEET_HUB_USERNAME", "KFLEET_HUB_PASSWORD", "demo-mode"} {
+			if !strings.Contains(out, want) {
+				t.Fatalf("flag %s: usage %q missing %q", flagArg, out, want)
+			}
+		}
 	}
 }
 

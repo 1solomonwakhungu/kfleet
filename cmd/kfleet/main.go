@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	kfleetmcp "github.com/1solomonwakhungu/kfleet/internal/mcp"
 	"github.com/1solomonwakhungu/kfleet/internal/version"
 )
 
@@ -92,6 +93,7 @@ type app struct {
 	statePath string
 	http      *http.Client
 	open      func(string) error
+	runMCP    func() error
 }
 
 func main() {
@@ -110,6 +112,7 @@ func main() {
 		statePath: statePath,
 		http:      &http.Client{Timeout: 5 * time.Second},
 		open:      openBrowser,
+		runMCP:    kfleetmcp.RunStdio,
 	}
 	if err := a.run(ctx, os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
@@ -131,6 +134,8 @@ func (a app) run(ctx context.Context, args []string) error {
 		return a.status(ctx, args[1:])
 	case "open":
 		return a.openUI(args[1:])
+	case "mcp":
+		return a.mcp(args[1:])
 	case "version", "--version", "-v":
 		fmt.Fprintf(a.stdout, "kfleet %s\n", version.String())
 		return nil
@@ -143,14 +148,42 @@ func (a app) run(ctx context.Context, args []string) error {
 }
 
 func (a app) usage() {
-	fmt.Fprintln(a.stdout, `kfleet manages a local multi-cluster demo.
+	fmt.Fprintln(a.stdout, `kfleet manages a local multi-cluster demo and runs the read-only MCP server.
 
 Usage:
   kfleet quickstart [--clusters 3] [--port 8080] [--version VERSION]
   kfleet status
   kfleet open
   kfleet cleanup [--clusters 3]
+  kfleet mcp
   kfleet version`)
+}
+
+func (a app) mcp(args []string) error {
+	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
+		a.mcpUsage()
+		return nil
+	}
+	if len(args) != 0 {
+		return errors.New("mcp accepts no arguments")
+	}
+	run := a.runMCP
+	if run == nil {
+		run = kfleetmcp.RunStdio
+	}
+	return run()
+}
+
+func (a app) mcpUsage() {
+	fmt.Fprintln(a.stdout, `Run the read-only kfleet MCP server over stdio.
+
+Usage:
+  kfleet mcp
+
+Environment:
+  KFLEET_HUB_URL       Hub base URL (required, e.g. http://localhost:8080 or https://kfleet.sullylab.de)
+  KFLEET_HUB_USERNAME  Hub username (optional when targeting a demo-mode hub)
+  KFLEET_HUB_PASSWORD  Hub password (optional when targeting a demo-mode hub)`)
 }
 
 func (a app) quickstart(ctx context.Context, args []string) error {
