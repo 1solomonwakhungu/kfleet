@@ -9,6 +9,27 @@ This changelog begins in September 2026; older releases (v0.1.0 through
 v0.1.2) predate it. Their notes live on the
 [GitHub releases page](https://github.com/1solomonwakhungu/kfleet/releases).
 
+## [0.3.0](https://github.com/1solomonwakhungu/kfleet/compare/v0.2.1...v0.3.0) (2026-11-22)
+
+
+### Features
+
+* **cli:** add kfleet mcp subcommand and refresh README ([#65](https://github.com/1solomonwakhungu/kfleet/issues/65)) ([192e542](https://github.com/1solomonwakhungu/kfleet/commit/192e542af0bcd0eeb0e2e33ba155bb0633ac5755))
+* **landing:** add live demo CTA, demo GIF, synced comparison, and PNG social card ([#64](https://github.com/1solomonwakhungu/kfleet/issues/64)) ([ea60b0a](https://github.com/1solomonwakhungu/kfleet/commit/ea60b0a10e80a469869c0a3fe9ed2276ee9054f4))
+
+
+### Bug fixes
+
+* **demo:** keep demo heartbeats fresh, support demo MCP, and fix Linux quickstart ([#66](https://github.com/1solomonwakhungu/kfleet/issues/66)) ([3e656f8](https://github.com/1solomonwakhungu/kfleet/commit/3e656f851ce8045de21626dcd716b8a7bd51e66e))
+* **deps:** bump Go toolchain to 1.26.11 for govulncheck ([b55ace8](https://github.com/1solomonwakhungu/kfleet/commit/b55ace8123fa3dc463c24be6a10563cb38d86329))
+* **release:** migrate Homebrew cask hook to install_steps ([d863fc7](https://github.com/1solomonwakhungu/kfleet/commit/d863fc740d5bc60a8a7e05eccba481060a784625))
+
+
+### Documentation
+
+* drop competitor source links from README ([b34787a](https://github.com/1solomonwakhungu/kfleet/commit/b34787a9f8a9221c3a5f6ac2aa8bbc28ae24c6ed))
+* rewrite README with demo GIF, architecture diagram, and comparison ([dd4b27a](https://github.com/1solomonwakhungu/kfleet/commit/dd4b27aa3a0f741e2af7774c05e2142fb7abd95d))
+
 ## [0.2.1](https://github.com/1solomonwakhungu/kfleet/compare/v0.2.0...v0.2.1) (2026-10-17)
 
 
