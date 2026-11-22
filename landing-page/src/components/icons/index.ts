@@ -1,5 +1,6 @@
 export { ActivityHeartbeatIcon } from "./activity-heartbeat";
 export { ArrowRightIcon } from "./arrow-right";
+export { BellIcon } from "./bell";
 export { BrandGithubIcon } from "./brand-github";
 export { CheckIcon } from "./check";
 export { ExternalLinkIcon } from "./external-link";
