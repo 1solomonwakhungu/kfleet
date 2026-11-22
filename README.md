@@ -7,58 +7,60 @@
 
 # kfleet
 
-> See every Kubernetes cluster you run from one place, and let an AI client ask questions about them, without handing anyone a kubeconfig.
+> Read-only multi-cluster Kubernetes visibility and MCP diagnostics in a single 14 MB Go + SQLite binary — without handing anyone (or any AI client) a kubeconfig.
 
 [![CI](https://github.com/1solomonwakhungu/kfleet/actions/workflows/ci.yml/badge.svg)](https://github.com/1solomonwakhungu/kfleet/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/1solomonwakhungu/kfleet)](https://github.com/1solomonwakhungu/kfleet/releases)
 [![License](https://img.shields.io/github/license/1solomonwakhungu/kfleet)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/1solomonwakhungu/kfleet)](https://goreportcard.com/report/github.com/1solomonwakhungu/kfleet)
-[![GHCR](https://img.shields.io/badge/GHCR-kfleet--hub-blue?logo=github)](https://github.com/1solomonwakhungu/kfleet/pkgs/container/kfleet-hub)
+[![GHCR](https://img.shields.io/badge/GHCR-kfleet%2Fhub-blue?logo=github)](https://github.com/1solomonwakhungu/kfleet/pkgs/container/kfleet%2Fhub)
 
-kfleet is a read-only control plane for a fleet of Kubernetes clusters. One small agent per cluster reports state to a single Go hub. The hub serves a web UI, a REST API, and a Model Context Protocol (MCP) server from one binary, and keeps everything in one SQLite file.
+kfleet is a lightweight, read-only control plane for a fleet of Kubernetes clusters. One small outbound-only agent per cluster reports state to a single Go hub. The hub serves an embedded web UI, a REST API, live pod log streaming, cross-cluster drift checks, signed health alerts, and a read-only Model Context Protocol (MCP) server — all backed by one SQLite file.
 
 <p align="center">
   <a href="https://kfleet.sullylab.de">
-    <img src="docs/assets/demo.gif" alt="A tour of the kfleet web UI: the fleet dashboard with three clusters, a degraded cluster's detail page, live pod logs, policy and drift results, and alert history" width="900">
+    <img src="docs/assets/demo.gif" alt="Tour of the kfleet web UI: fleet dashboard with three clusters, degraded cluster detail page, live pod logs, policy and drift results, and alert history" width="900">
   </a>
 </p>
 
 <p align="center">
-  <a href="https://kfleet.sullylab.de"><strong>Open the live demo</strong></a> (synthetic data, read-only)
+  <a href="https://kfleet.sullylab.de"><strong>Try the live demo</strong></a> (synthetic data, read-only)
   ·
-  <a href="#quickstart">Run it locally</a>
+  <a href="#try-it-in-30-seconds">Run locally in 30s</a>
+  ·
+  <a href="#install-with-helm">Install with Helm</a>
+  ·
+  <a href="#use-it-from-an-ai-client-mcp">MCP setup</a>
   ·
   <a href="docs/README.md">Docs</a>
 </p>
 
-The recording shows the hub running in [demo mode](docs/public-demo.md) with synthetic clusters. Nothing in it comes from a real environment.
+The recording shows the hub running in [demo mode](docs/public-demo.md) with three synthetic clusters (`demo-us-central`, `demo-eu-west`, `demo-edge-lab`). Nothing in it comes from a real environment.
 
 ## Contents
 
 - [Why kfleet](#why-kfleet)
 - [Architecture](#architecture)
-- [Quickstart](#quickstart)
+- [Try it in 30 seconds](#try-it-in-30-seconds)
 - [Install with Helm](#install-with-helm)
-- [Use it from an AI client](#use-it-from-an-ai-client)
+- [Use it from an AI client (MCP)](#use-it-from-an-ai-client-mcp)
 - [What you get](#what-you-get)
 - [Development](#development)
 - [Documentation](#documentation)
 
 ## Why kfleet
 
-Rancher, Open Cluster Management (OCM), Lens, and Headlamp are good tools that do more than kfleet does. kfleet is for the case where you want to *see* a fleet and do not want to run a platform, or widen who can change your clusters, to get that view.
+Rancher, Open Cluster Management (OCM), Lens, Headlamp, `k9s`, and kubeconfig-based Kubernetes MCP servers are great tools that do more than kfleet does. kfleet is built for one specific job: **let engineers and AI clients see across a fleet of clusters without running a heavy management platform, exposing private cluster APIs, or widening write/secret access.**
 
-### The hub is one process
+### 1. The hub is one 14 MB process
 
-The hub is a 14 MB static Go binary with the web UI embedded and SQLite as its only store. In demo mode with three clusters loaded it idles at about 20 MB of memory. It needs no management cluster, cert-manager, CRDs, or operators, so it runs as a Deployment, a container, or a plain process on a VM.
+The hub is a single static Go binary (`CGO_ENABLED=0`) with the React UI embedded and SQLite (WAL mode) as its only store. In demo mode with three clusters loaded it idles at ~20 MB of memory. No management cluster, no CRDs, no cert-manager, and no operators — run it as a Kubernetes Deployment, a container, or a plain binary on a VM.
 
-Rancher's server runs on its own Kubernetes cluster, usually with cert-manager alongside it. OCM installs a cluster manager operator and its controllers on a hub cluster.
+### 2. Zero kubeconfigs centrally — 3-rule read-only agent RBAC
 
-### The hub cannot touch your clusters
+The hub holds no kubeconfigs, service account tokens, or cluster certificates. Each agent initiates outbound HTTPS and WebSocket connections to the hub, so cluster API servers never need to be reachable from the hub or from anyone's laptop.
 
-The hub stores no kubeconfigs, service account tokens, or cluster certificates. Each agent opens its own outbound connections, so no cluster API server has to be reachable from the hub or from anyone's laptop.
-
-The agent's entire ClusterRole is three rules:
+The agent's entire `ClusterRole` (`charts/kfleet-agent/templates/clusterrole.yaml`) is three rules:
 
 ```yaml
 rules:
@@ -73,62 +75,68 @@ rules:
     verbs: ["get"]
 ```
 
-It cannot read Secrets or ConfigMaps, and it has no write verbs. If the hub is compromised, the attacker gets inventory and pod logs. They do not get a way into the clusters.
+It cannot read `Secrets` or `ConfigMaps`, and it has no write verbs. If the hub is compromised, an attacker gets cluster inventory and pod logs — never a foothold to mutate workloads or exfiltrate secrets.
 
-Lens and Headlamp work from each user's kubeconfig, so every user needs credentials for, and a network path to, every cluster. Rancher's downstream agent is bound to `cluster-admin`, and the Rancher server proxies the Kubernetes API with it.
+### 3. Built-in read-only MCP without kubeconfig sprawl
 
-### The AI interface is read-only and comes in the box
+Most Kubernetes MCP servers require mounting multi-context kubeconfigs onto a developer's laptop or granting an in-cluster LLM direct API-server credentials. kfleet ships a read-only MCP server directly inside both the `kfleet` CLI (`kfleet mcp`) and the hub binary (`hub mcp`). It exposes **9 read-only tools**, authenticates to the hub as a normal `read_only` user (or anonymously against a demo-mode hub), and works across every connected cluster — even private or edge clusters behind NAT — with any MCP client (Claude Desktop, Claude Code, Cursor, etc.).
 
-`kfleet-hub mcp` is an MCP server compiled into the same binary. It exposes nine tools, all of them reads, and signs in to the hub as an ordinary read-only user, so the model can do what that user can do and nothing else. It works with any MCP client and any model you choose.
+### 4. It remembers when a cluster goes dark
 
-The other tools have AI features now, with different trade-offs. Rancher's Liz assistant and its MCP server ship with SUSE Rancher Prime. Lens has the Prism assistant and a built-in MCP server inside its proprietary desktop app. Headlamp has an AI Assistant plugin that can also write to clusters after confirmation. OCM has an open proposal for an upstream MCP server and community-built ones today.
-
-### It remembers
-
-Lens and Headlamp read the Kubernetes API live, so a cluster you cannot reach shows you nothing. kfleet's hub keeps each cluster's last snapshot and a 90-day operational timeline, so an unreachable cluster still shows its last known state, when it dropped, and what changed before it did. The same store backs seven cross-cluster drift checks and health alerts with signed webhooks.
+Live-pull tools like Lens, Headlamp, and `k9s` show nothing when a cluster API server is unreachable. kfleet retains each cluster's last snapshot plus an append-only 90-day operational timeline in SQLite, so you can still inspect the last known state, see when heartbeats stopped, review what changed beforehand, and track 7 cross-cluster drift checks and HMAC-signed health alerts.
 
 ### At a glance
 
-| | kfleet | Rancher | Lens | Headlamp | OCM |
-| --- | --- | --- | --- | --- | --- |
-| Runs centrally | One binary + SQLite | Server on a dedicated cluster | Nothing | Nothing, or one in-cluster app | Operator + controllers on a hub cluster |
-| Runs in each cluster | One agent, three read rules | Agent with `cluster-admin` | Nothing | Nothing | Klusterlet agents |
-| Cluster credentials held centrally | None | Yes | No, in each kubeconfig | No, in each kubeconfig | No, agents pull work |
-| Can change clusters | No | Yes | Yes | Yes | Yes |
-| State of an unreachable cluster | Last snapshot + timeline | Last known status | None | None | Last known status |
-| AI interface | Read-only MCP server, built in | Liz + MCP (Rancher Prime) | Prism + MCP | AI Assistant plugin | Community MCP servers |
-| License | Apache 2.0 | Apache 2.0 | Proprietary, free tier | Apache 2.0 | Apache 2.0 |
+| | kfleet | Rancher | Lens | Headlamp | OCM | Kubeconfig MCP servers |
+| --- | --- | --- | --- | --- | --- | --- |
+| Central footprint | 1 Go binary + SQLite | Dedicated K8s cluster | None | None, or in-cluster app | Operator + controllers | Local/in-cluster process |
+| In-cluster footprint | 1 agent (3 read rules) | `cluster-admin` agent | None | None | Klusterlet agents | None |
+| Central/laptop kubeconfigs | **None** | Central proxy | Per-user kubeconfig | Per-user kubeconfig | Agents pull work | Required on client/host |
+| Can mutate clusters | **No** | Yes | Yes | Yes | Yes | Depends on RBAC |
+| Offline cluster history | Last snapshot + 90d timeline | Last status | None | None | Last status | None |
+| AI / MCP interface | Read-only MCP built in (9 tools) | Liz + MCP (Prime) | Prism + MCP (proprietary) | AI Assistant plugin | Community MCP servers | MCP only (no UI/alerts/drift) |
+| License | Apache 2.0 | Apache 2.0 | Proprietary / free tier | Apache 2.0 | Apache 2.0 | Varies |
 
-Competitor details were checked in November 2026. These tools move quickly. If a cell is out of date, please open an issue.
+*Competitor details checked November 2026. If a cell is out of date, please open an issue.*
 
 ### When to pick something else
 
-- You need to provision clusters, deploy workloads, or manage RBAC across the fleet. Use Rancher or OCM. kfleet never writes to a cluster.
-- You want to edit resources, exec into pods, or port-forward. Use Lens, Headlamp, or `kubectl`.
-- You need a highly available control plane. The hub is a single replica on SQLite. A hub outage costs you the view, not your clusters, but it is still an outage.
-- You need more than pods, deployments, services, nodes, namespaces, and events. That list is what the agent collects today.
+- **Cluster provisioning, GitOps, or workload deployment:** Use Rancher, ArgoCD, Flux, or OCM. kfleet never writes to clusters.
+- **Interactive debugging (`exec`, port-forward, editing YAML):** Use `k9s`, Lens/Freelens, Headlamp, or `kubectl`.
+- **Multi-replica HA control plane:** The hub is a single replica on SQLite. A hub outage interrupts visibility (never your workloads), but it is not active-active HA.
+- **Broad CRD / resource inventory:** The agent currently collects `pods`, `deployments`, `services`, `nodes`, `namespaces`, `events`, and `pods/log`.
 
 ## Architecture
 
 <p align="center">
-  <img src="docs/assets/architecture.svg" alt="kfleet architecture: browsers, AI clients through the MCP server, and Prometheus connect to the hub. The hub contains the REST API, live updates, the log relay, the policy engine and alerts, and SQLite. One agent in each cluster connects out to the hub over HTTPS and WebSocket and reads from its own Kubernetes API server." width="900">
+  <img src="docs/assets/architecture.svg" alt="kfleet architecture: browsers, AI clients through the MCP server, and Prometheus connect to the hub. The hub serves the REST API, live WebSocket updates, SSE log relay, policy engine, alerts, and SQLite. One agent per cluster connects out to the hub over HTTPS and WebSocket and reads from its local Kubernetes API server." width="900">
 </p>
 
-**Hub.** The only service people connect to. It serves the REST API, the embedded React UI, a WebSocket for live dashboard updates, and Prometheus metrics. It authenticates users with sessions, enforces admin, operator, and read-only roles, and writes an audit log. State lives in SQLite: the latest snapshot per cluster, the operational timeline, alerts, users, and audit records.
+- **Hub (`cmd/hub`):** The single entry point for humans, Prometheus (`/metrics`), and AI clients (`kfleet mcp` or `hub mcp`). Serves the embedded React UI, REST API, live dashboard WebSocket, session auth (`admin`, `operator`, `read_only`), audit log, policy/drift engine, and SQLite store.
+- **Agent (`cmd/agent`):** One Deployment per cluster (`50m` CPU / `64Mi` RAM default requests). Registers using a shared registration token, waits for operator/admin approval, then sends 15s heartbeats and 30s normalized snapshots. Marks a cluster stale after 3 missed intervals.
+- **Log relay:** Each approved agent holds an outbound WebSocket to the hub. When a user or MCP client requests pod logs, the hub forwards the request down that socket and streams lines back over Server-Sent Events (SSE). See [Pod log streaming](docs/pod-logs.md).
+- **Alerts out:** Evaluates fleet health transitions (`degraded`, `unreachable`) and delivers HMAC-SHA256-signed webhooks with durable retries and dead-letter tracking. See [Fleet health alerts](docs/alerts.md).
 
-**Agent.** One Deployment per cluster. It lists resources with client-go, registers with the hub using a shared registration token, waits for an operator or admin to approve it, then sends a heartbeat and a normalized snapshot every 30 seconds. The hub marks a cluster stale after three missed intervals.
+## Try it in 30 seconds
 
-**Log channel.** The hub has no credentials, so it cannot fetch logs itself. Each approved agent holds an outbound WebSocket open to the hub. When someone opens a pod's logs, the hub sends the request down that socket, the agent streams lines back, and the hub relays them to the browser as Server-Sent Events. See [Pod log streaming](docs/pod-logs.md).
+### Option 1: Hosted live demo (0 seconds)
 
-**MCP server.** A subcommand of the hub binary that speaks MCP over stdio and calls the same REST API as the UI.
+Open **[https://kfleet.sullylab.de](https://kfleet.sullylab.de)** — no login, synthetic data, all mutations blocked with HTTP 405.
 
-**Alerts out.** When a cluster turns degraded or unreachable, the hub records an alert and, if configured, delivers an HMAC-SHA256-signed webhook with durable retries.
+### Option 2: Local demo with Docker (10 seconds, no Kubernetes required)
 
-## Quickstart
+Runs the embedded UI and API against an in-memory SQLite database seeded with three synthetic clusters:
 
-### Look around without Kubernetes
+```bash
+docker run --rm -p 8080:8080 \
+  -e KFLEET_DEMO_MODE=true \
+  ghcr.io/1solomonwakhungu/kfleet/hub:v0.2.1
+```
 
-Demo mode seeds an in-memory database with three synthetic clusters and rejects every write. It needs Go and Node.js, and no cluster.
+Open <http://localhost:8080>.
+
+<details>
+<summary>Or run demo mode from source (requires Go 1.26+ and Node.js 22)</summary>
 
 ```bash
 git clone https://github.com/1solomonwakhungu/kfleet.git
@@ -137,30 +145,32 @@ make web-build
 KFLEET_DEMO_MODE=true go run ./cmd/hub
 ```
 
-Open <http://localhost:8080>.
+</details>
 
-### Three real clusters on your laptop
+### Option 3: Three real local `kind` clusters (Homebrew)
 
-The Homebrew cask installs the `kfleet` CLI along with kind, `kubectl`, and Helm. Docker must be running.
+The Homebrew cask installs the `kfleet` CLI (local quickstart + read-only MCP server) along with `kind`, `kubectl`, and `helm` (requires Docker running):
 
 ```bash
 brew install --cask 1solomonwakhungu/tap/kfleet
 kfleet quickstart
 ```
 
-This creates three kind clusters, installs the released hub and agents, and starts a port-forward. Open the URL it prints, or run `kfleet open`.
+This creates three `kind` clusters (`kfleet-1..3`), installs the released hub and agents via OCI Helm charts, starts a port-forward, and prints your local URL and generated admin credentials.
 
 ```bash
-kfleet quickstart --clusters 2 --port 9090   # different size or port
-kfleet status                                # what is running
-kfleet cleanup                               # remove everything
+kfleet quickstart --clusters 2 --port 9090   # customize cluster count or port
+kfleet status                                # check hub readiness
+kfleet open                                  # open the UI in your browser
+kfleet mcp                                   # run the read-only stdio MCP server
+kfleet cleanup                               # tear down all clusters and port-forward
 ```
 
-From a source checkout, `./hack/quickstart.sh` does the same with images built from your working tree.
+From a source checkout, `./hack/quickstart.sh` builds images from your working tree and runs the same local stack.
 
 ## Install with Helm
 
-Install the hub once:
+### 1. Install the hub (once)
 
 ```bash
 export KFLEET_REGISTRATION_TOKEN="$(openssl rand -hex 32)"
@@ -168,6 +178,7 @@ export KFLEET_ADMIN_PASSWORD="$(openssl rand -base64 24)"
 
 helm upgrade --install kfleet-hub \
   oci://ghcr.io/1solomonwakhungu/charts/kfleet-hub \
+  --version 0.2.1 \
   --namespace kfleet-system \
   --create-namespace \
   --set registration.token="$KFLEET_REGISTRATION_TOKEN" \
@@ -178,11 +189,14 @@ helm upgrade --install kfleet-hub \
   --set persistence.size=1Gi
 ```
 
-Expose it with an Ingress, a `LoadBalancer` service, or a port-forward. Then install the agent in each cluster you want to see:
+Expose the hub via Ingress, `LoadBalancer`, or `kubectl port-forward`.
+
+### 2. Install the agent in each cluster you want to observe
 
 ```bash
 helm upgrade --install kfleet-agent \
   oci://ghcr.io/1solomonwakhungu/charts/kfleet-agent \
+  --version 0.2.1 \
   --kube-context my-cluster \
   --namespace kfleet-system \
   --create-namespace \
@@ -191,91 +205,186 @@ helm upgrade --install kfleet-agent \
   --set cluster.name=my-cluster
 ```
 
-Sign in to the hub as the bootstrap admin and approve the agent on the **Agents** page (operators can approve too). The cluster appears on the dashboard after its next report.
+Sign in to the hub UI as the bootstrap admin and approve the pending agent on the **Agents** page (operators can approve too). The cluster appears on the dashboard on its next report.
 
-Things to know before production:
+### Production notes
 
-- `hub.url`, `hub.token`, and `cluster.name` are required. The agent exits with the missing variable named instead of retrying forever.
-- For GitOps, keep tokens out of values with `hub.existingSecret` on the agent and `registration.existingSecret` and `auth.existingSecret` on the hub. Set `hub.caBundle` when the hub uses a private CA.
-- Each release publishes matching charts. Pin with `--version 0.2.1`.
-- The default requests are 100m CPU and 128Mi for the hub, and 50m CPU and 64Mi for each agent.
+- `hub.url`, `hub.token`, and `cluster.name` are required; the agent fails fast naming any missing variable.
+- For GitOps / External Secrets, pass existing Kubernetes Secrets with `registration.existingSecret` + `auth.existingSecret` (hub) and `hub.existingSecret` (agent).
+- For private or internal CAs, pass a PEM bundle via `hub.caBundle` (agent).
+- Default resource requests: **100m CPU / 128Mi RAM** (hub) and **50m CPU / 64Mi RAM** (agent).
+- See the [operations runbook](docs/operations.md) for all environment variables, probes, backups, and upgrades, and [authentication & authorization](docs/authentication.md) for roles, sessions, audit logs, and token rotation.
 
-The [operations runbook](docs/operations.md) covers every environment variable, health probes, upgrades, backups, and troubleshooting. [Authentication and authorization](docs/authentication.md) covers roles, sessions, audit retention, and registration token rotation.
+## Use it from an AI client (MCP)
 
-## Use it from an AI client
+Both the `kfleet` CLI (`kfleet mcp`, included with the Homebrew cask) and the `hub` binary (`hub mcp`, from [GitHub Releases](https://github.com/1solomonwakhungu/kfleet/releases) or Docker `ghcr.io/1solomonwakhungu/kfleet/hub:v0.2.1 mcp`) run the read-only stdio MCP server against a kfleet hub's REST API.
 
-Create a dedicated read-only user in the hub at `/admin/users`, then point your MCP client at the hub binary. For Claude Desktop:
+### Try MCP against the live demo (no credentials)
+
+Point your MCP client at the hosted read-only demo (`https://kfleet.sullylab.de`) with no username or password required:
+
+**Claude Desktop / Cursor (`mcpServers` JSON):**
 
 ```json
 {
   "mcpServers": {
-    "kfleet": {
-      "command": "/usr/local/bin/kfleet-hub",
+    "kfleet-demo": {
+      "command": "kfleet",
       "args": ["mcp"],
       "env": {
-        "KFLEET_HUB_URL": "http://localhost:8080",
-        "KFLEET_HUB_USERNAME": "mcp-reader",
-        "KFLEET_HUB_PASSWORD": "replace-with-the-read-only-user-password"
+        "KFLEET_HUB_URL": "https://kfleet.sullylab.de"
       }
     }
   }
 }
 ```
 
+**Claude Code CLI:**
+
+```bash
+claude mcp add kfleet-demo \
+  -e KFLEET_HUB_URL=https://kfleet.sullylab.de \
+  -- kfleet mcp
+```
+
+Using the `hub` binary from GitHub Releases instead of Homebrew? Replace `kfleet mcp` with `/usr/local/bin/hub mcp` (or `docker run --rm -i -e KFLEET_HUB_URL=https://kfleet.sullylab.de ghcr.io/1solomonwakhungu/kfleet/hub:v0.2.1 mcp`).
+
+### Connect to your own hub
+
+1. Install `kfleet` via Homebrew (`brew install --cask 1solomonwakhungu/tap/kfleet`), download `kfleet` or `hub` for your OS/arch from [GitHub Releases](https://github.com/1solomonwakhungu/kfleet/releases) (e.g. `hub_0.2.1_darwin_arm64.tar.gz`), or run via Docker (`ghcr.io/1solomonwakhungu/kfleet/hub:v0.2.1`).
+2. Create a dedicated `read_only` user in the hub at `/admin/users`.
+3. Add kfleet to your MCP client:
+
+**Claude Desktop / Cursor (`mcpServers` JSON, Homebrew `kfleet`):**
+
+```json
+{
+  "mcpServers": {
+    "kfleet": {
+      "command": "kfleet",
+      "args": ["mcp"],
+      "env": {
+        "KFLEET_HUB_URL": "http://localhost:8080",
+        "KFLEET_HUB_USERNAME": "mcp-reader",
+        "KFLEET_HUB_PASSWORD": "replace-with-read-only-password"
+      }
+    }
+  }
+}
+```
+
+<details>
+<summary>Use the <code>hub</code> binary from GitHub Releases</summary>
+
+```json
+{
+  "mcpServers": {
+    "kfleet": {
+      "command": "/usr/local/bin/hub",
+      "args": ["mcp"],
+      "env": {
+        "KFLEET_HUB_URL": "http://localhost:8080",
+        "KFLEET_HUB_USERNAME": "mcp-reader",
+        "KFLEET_HUB_PASSWORD": "replace-with-read-only-password"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>Run MCP via Docker (no local binary download needed)</summary>
+
+```json
+{
+  "mcpServers": {
+    "kfleet": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "-e", "KFLEET_HUB_URL",
+        "-e", "KFLEET_HUB_USERNAME",
+        "-e", "KFLEET_HUB_PASSWORD",
+        "ghcr.io/1solomonwakhungu/kfleet/hub:v0.2.1",
+        "mcp"
+      ],
+      "env": {
+        "KFLEET_HUB_URL": "https://kfleet.example.com",
+        "KFLEET_HUB_USERNAME": "mcp-reader",
+        "KFLEET_HUB_PASSWORD": "replace-with-read-only-password"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>Claude Code CLI</summary>
+
+```bash
+claude mcp add kfleet \
+  -e KFLEET_HUB_URL=http://localhost:8080 \
+  -e KFLEET_HUB_USERNAME=mcp-reader \
+  -e KFLEET_HUB_PASSWORD=replace-with-read-only-password \
+  -- kfleet mcp
+```
+
+(Or substitute `/usr/local/bin/hub mcp` if using the `hub` release archive.)
+
+</details>
+
+### Exposed MCP tools (all read-only)
+
 | Tool | What it returns |
 | --- | --- |
-| `list_clusters` | Every cluster with health, version, and counts |
-| `get_cluster_status` | One cluster's current status |
-| `list_namespaces` | Namespaces in a cluster |
-| `get_pods` | Pods, optionally filtered by namespace |
-| `get_events` | Kubernetes events from the latest snapshot |
-| `get_recent_events` | The hub's operational timeline, with time filters and paging |
-| `find_crashloop_pods` | Crashlooping and frequently restarting pods across the fleet |
-| `get_pod_logs` | Recent log lines for a pod, including the previous container of a crashlooping pod |
-| `diagnose_cluster` | A composite report on one cluster |
+| `list_clusters` | Every cluster with health, Kubernetes version, node count, and pod count |
+| `get_cluster_status` | Latest full status snapshot and node details for one cluster |
+| `list_namespaces` | Namespaces in a cluster's latest snapshot |
+| `get_pods` | Pods in a cluster, optionally filtered by namespace |
+| `get_events` | Kubernetes events from the latest snapshot (filterable by namespace and `Normal`/`Warning`) |
+| `get_recent_events` | Durable operational timeline (registrations, disconnects, reconnects, version changes, policy findings) |
+| `find_crashloop_pods` | Pods in `CrashLoopBackOff` or with `>= 5` container restarts across one cluster or the whole fleet |
+| `get_pod_logs` | Recent log lines for a pod container, including `previous: true` for crashlooping containers (default 100 lines, max 1000, capped at 256 KiB) |
+| `diagnose_cluster` | Composite report combining cluster status, crashlooping pods, and Warning events |
 
-Prompts to try:
+**Prompts to try:**
+- *"List my clusters and summarize anything that is not healthy."*
+- *"Find crashlooping pods across the fleet and show me the previous container logs from the worst one."*
+- *"Diagnose the production cluster and explain its recent Warning events."*
+- *"Show recent disconnects, reconnects, and policy findings across the fleet."*
 
-- "List my clusters and summarize anything that is not healthy."
-- "Find crashlooping pods across the fleet and show me the last logs from the worst one."
-- "Diagnose the production cluster and explain its recent Warning events."
-- "Show recent reconnects and policy findings across the fleet."
-
-`get_pod_logs` returns the newest 100 lines by default, up to 1000, capped at 256 KiB. A standalone build of the server is also available at `./cmd/mcp`.
+A standalone MCP binary entrypoint also lives at `./cmd/mcp`.
 
 ## What you get
 
 | Feature | What it does | Details |
 | --- | --- | --- |
-| Fleet dashboard | Health, version, node and pod counts per cluster, with search by name or label and live updates over WebSocket | |
-| Cluster detail | Pods, services, deployments, events, node capacity, and labels, with deep links to a tab, namespace, or pod | |
-| Pod logs | Live log streaming through the agent channel, with follow, tail, and search | [pod-logs.md](docs/pod-logs.md) |
-| Operational timeline | Append-only history of registrations, approvals, health changes, disconnects, reconnects, version changes, and policy findings. Kept for 90 days by default and survives cluster deletion | [api.md](docs/api.md#timeline-and-policy-findings) |
-| Policy and drift | Seven built-in checks across the fleet: Kubernetes version, required labels, namespace and workload consistency, workload availability, and pod and namespace security. Results are `pass`, `fail`, `unknown`, or `stale`. kfleet reports and never remediates | [policy-drift.md](docs/policy-drift.md) |
-| Health alerts | Alerts when a cluster turns degraded or unreachable, with acknowledgement and HMAC-signed webhooks retried from durable state | [alerts.md](docs/alerts.md) |
-| Users and audit | Admin, operator, and read-only roles, with an append-only audit log of security-relevant actions | [authentication.md](docs/authentication.md) |
-| Multi-tenancy | Agent and API traffic scoped by tenant ID | [policy-drift.md](docs/policy-drift.md) |
-| Metrics | Prometheus endpoint at `/metrics` with non-sensitive aggregates only | [operations.md](docs/operations.md) |
-| REST API | Everything the UI does | [api.md](docs/api.md) |
+| Fleet dashboard | Cluster health, Kubernetes version, node & pod counts, name/label search, and live WebSocket updates | |
+| Cluster detail | Pods, deployments, services, events, node capacity, and labels with deep links to tabs, namespaces, and pods | |
+| Pod logs | Live log streaming through the reverse agent channel with follow, tail, `previous`, and search | [pod-logs.md](docs/pod-logs.md) |
+| Operational timeline | Append-only history of registrations, approvals, health changes, disconnects, reconnects, version changes, and policy findings (90-day retention, survives cluster deletion) | [api.md](docs/api.md#timeline-and-policy-findings) |
+| Policy & drift | 7 built-in read-only checks (`kubernetes-version-consistency`, `required-cluster-labels`, `namespace-consistency`, `workload-configuration-consistency`, `workload-availability`, `pod-security-baseline`, `namespace-pod-security`) reporting `pass`, `fail`, `unknown`, or `stale` | [policy-drift.md](docs/policy-drift.md) |
+| Health alerts | Alerts on `degraded` / `unreachable` transitions with acknowledgement and HMAC-SHA256-signed webhooks with durable retries | [alerts.md](docs/alerts.md) |
+| Users & audit | `admin`, `operator`, and `read_only` roles with an append-only audit log of security-relevant actions | [authentication.md](docs/authentication.md) |
+| Multi-tenancy | Agent and API traffic scoped by `X-Kfleet-Tenant-ID` / `KFLEET_TENANT_ID` | [policy-drift.md](docs/policy-drift.md#tenant-isolation) |
+| Metrics & REST API | Prometheus `/metrics` (non-sensitive aggregate gauges) and full JSON REST API | [operations.md](docs/operations.md), [api.md](docs/api.md) |
 
 ## Development
 
-Prerequisites:
-
-- Go 1.26 or newer
-- Node.js 22 and npm
-- Docker
-- `kubectl`, Helm 3, and kind for end-to-end work
-- `golangci-lint` for `make lint`
+Prerequisites: Go 1.26+, Node.js 22, Docker, `golangci-lint` (for `make lint`), and `kubectl` / Helm 3 / `kind` for end-to-end work.
 
 ```bash
-make build       # React UI plus the kfleet, hub, and agent binaries
-make web-build   # only the embedded web application
-make test        # Go tests with the race detector
-make lint
+make build       # Build embedded React UI + bin/kfleet, bin/hub, bin/agent
+make web-build   # Build only the embedded React UI
+make test        # Run Go tests with -race -cover
+make lint        # Run golangci-lint
 ```
 
-Run the hub locally with a disposable database:
+Run the hub locally with a disposable SQLite database:
 
 ```bash
 KFLEET_DB_PATH=/tmp/kfleet.db \
@@ -287,31 +396,31 @@ KFLEET_REGISTRATION_TOKEN=local-dev-registration-token \
 go run ./cmd/hub
 ```
 
-The hub listens on `:8080`. Run the MCP server against it with:
+Run the MCP server against it:
 
 ```bash
-KFLEET_HUB_URL=http://localhost:8080 go run ./cmd/hub mcp
+KFLEET_HUB_URL=http://localhost:8080 \
+KFLEET_HUB_USERNAME=admin \
+KFLEET_HUB_PASSWORD='local-development-password' \
+go run ./cmd/kfleet mcp
 ```
 
-Repository layout:
+(Or `go run ./cmd/hub mcp`.)
 
 | Path | Contents |
 | --- | --- |
-| `cmd/hub`, `cmd/agent`, `cmd/kfleet`, `cmd/mcp` | Entry points for the hub, the agent, the quickstart CLI, and the standalone MCP server |
-| `internal/server`, `internal/store` | Hub HTTP handlers and the SQLite store |
-| `internal/agent` | Collector, registrar, reporter, and log channel client |
-| `internal/policy`, `internal/alerts`, `internal/mcp` | Drift checks, alert delivery, and MCP tools |
-| `web/` | React UI, embedded into the hub at build time |
-| `charts/` | Helm charts for the hub and the agent |
+| `cmd/hub`, `cmd/agent`, `cmd/kfleet`, `cmd/mcp`, `cmd/webhook-receiver` | Entrypoints for hub, agent, quickstart & MCP CLI, standalone MCP server, and local alert webhook receiver |
+| `internal/server`, `internal/store` | Hub HTTP handlers, SSE log relay, WebSocket hub, and SQLite store |
+| `internal/agent` | Collector, registrar, heartbeat/snapshot reporter, and reverse log-channel client |
+| `internal/policy`, `internal/alerts`, `internal/mcp` | 7 drift checks, durable alert delivery, and 9 MCP tools |
+| `web/` | React UI built with `@primer/react` and `@primer/primitives` (embedded into the hub binary) |
+| `charts/` | Helm charts for `kfleet-hub` and `kfleet-agent` |
 
-The web UI is built with [Primer](https://primer.style), GitHub's design system. Components come from `@primer/react`, and colors, spacing, and radii resolve to `@primer/primitives` tokens, so the interface supports light and dark themes. Layout lives in CSS modules next to each component. Use the primitives custom properties (`--bgColor-*`, `--fgColor-*`, `--base-size-*`) there instead of hardcoded values.
-
-To re-record the demo GIF after a UI change, see the header of [`hack/record-demo.mjs`](hack/record-demo.mjs).
+To re-record `docs/assets/demo.gif`, see the header comments in [`hack/record-demo.mjs`](hack/record-demo.mjs).
 
 ## Documentation
 
-The index is at [docs/README.md](docs/README.md).
-
+- [Documentation index](docs/README.md)
 - [REST API reference](docs/api.md)
 - [Operations runbook](docs/operations.md)
 - [Authentication and authorization](docs/authentication.md)
@@ -322,7 +431,7 @@ The index is at [docs/README.md](docs/README.md).
 
 ## Contributing
 
-Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the pull request flow, Conventional Commit format, DCO sign-off, and local test and lint commands.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the PR flow, Conventional Commits, DCO sign-off, and local test/lint commands.
 
 ## License
 
