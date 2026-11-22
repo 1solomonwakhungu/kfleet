@@ -1,8 +1,9 @@
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   ActivityHeartbeatIcon,
   ArrowRightIcon,
+  BellIcon,
   BrandGithubIcon,
   CheckIcon,
   ExternalLinkIcon,
@@ -57,7 +58,7 @@ const comparisonRows = [
   ],
   [
     'Can mutate clusters',
-    'No',
+    'No (read-only)',
     'Yes',
     'Yes',
     'Yes',
@@ -93,10 +94,40 @@ const comparisonRows = [
   ],
 ] as const
 
-type QuickstartTabId = 'live' | 'docker' | 'brew'
+const agentClusterRoleYaml = `rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "nodes", "events", "namespaces"]
+    verbs: ["list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]`
+
+const mcpPrompts = [
+  'List my clusters and summarize anything degraded, unreachable, or off our Kubernetes version.',
+  'Find crashlooping pods across the fleet and show the previous container logs from the worst one.',
+  'Diagnose demo-eu-west and explain its recent Warning events, reconnects, and policy findings.',
+]
+
+const mcpTools = [
+  'list_clusters',
+  'get_cluster_status',
+  'list_namespaces',
+  'get_pods',
+  'get_events',
+  'get_recent_events',
+  'find_crashloop_pods',
+  'get_pod_logs',
+  'diagnose_cluster',
+] as const
+
+type QuickstartTabId = 'live' | 'docker' | 'brew' | 'helm'
 
 interface QuickstartStep {
   step: string
+  label?: string
   code: string
   copyValue?: string
 }
@@ -120,21 +151,23 @@ const quickstartTabs: QuickstartTab[] = [
     label: 'Live demo',
     badge: '0s',
     summary:
-      'Explore three synthetic clusters immediately in your browser — no login, all write requests blocked with HTTP 405. You can also connect an MCP client anonymously.',
+      'Explore three synthetic clusters in your browser right now—no signup, no login, every write rejected with HTTP 405. You can also connect an MCP client anonymously.',
     steps: [
       {
         step: 'UI',
+        label: 'Open the hosted read-only fleet dashboard',
         code: 'https://kfleet.sullylab.de',
         copyValue: liveDemoUrl,
       },
       {
         step: 'MCP',
+        label: 'Point any stdio MCP client at the public demo (no credentials required)',
         code: 'KFLEET_HUB_URL=https://kfleet.sullylab.de kfleet mcp',
         copyValue: 'KFLEET_HUB_URL=https://kfleet.sullylab.de kfleet mcp',
       },
     ],
     resultText:
-      'Synthetic data only (demo-us-central, demo-eu-west, demo-edge-lab). No signup or credentials required.',
+      'Synthetic data only (demo-us-central, demo-eu-west, demo-edge-lab). Try find_crashloop_pods on demo-eu-west.',
     resultLinkLabel: 'Open live demo',
     resultLinkHref: liveDemoUrl,
     resultExternal: true,
@@ -145,17 +178,18 @@ const quickstartTabs: QuickstartTab[] = [
     label: 'Docker',
     badge: '10s',
     summary:
-      'Run the embedded web UI and REST API locally against an in-memory SQLite database seeded with three synthetic clusters. No Kubernetes required.',
+      'Run the embedded web UI, REST API, and demo MCP target locally against an in-memory SQLite database. Needs only Docker—no Kubernetes required.',
     steps: [
       {
         step: '01',
-        code: 'docker run --rm -p 8080:8080 -e KFLEET_DEMO_MODE=true ghcr.io/1solomonwakhungu/kfleet/hub:v0.2.1',
+        label: 'Start the 14 MB Go hub in synthetic demo mode',
+        code: 'docker run --rm -p 8080:8080 -e KFLEET_DEMO_MODE=true ghcr.io/1solomonwakhungu/kfleet/hub:v0.3.0',
         copyValue:
-          'docker run --rm -p 8080:8080 -e KFLEET_DEMO_MODE=true ghcr.io/1solomonwakhungu/kfleet/hub:v0.2.1',
+          'docker run --rm -p 8080:8080 -e KFLEET_DEMO_MODE=true ghcr.io/1solomonwakhungu/kfleet/hub:v0.3.0',
       },
     ],
     resultText:
-      'Starts the 14 MB Go hub in demo mode with live UI, policy drift results, and synthetic pod logs.',
+      'Serves the live UI, policy drift checks, operational timeline, and synthetic pod logs on port 8080.',
     resultLinkLabel: 'Open localhost:8080',
     resultLinkHref: 'http://localhost:8080',
     resultExternal: true,
@@ -166,37 +200,76 @@ const quickstartTabs: QuickstartTab[] = [
     label: 'Homebrew + kind',
     badge: '60s',
     summary:
-      'Spin up three real local kind clusters with the released OCI Helm charts, port-forwarded hub UI, and the kfleet mcp CLI included. Requires Docker running.',
+      'Spin up three real local kind clusters with the released OCI Helm charts, port-forwarded hub UI, and the kfleet mcp CLI bundled. Requires only Docker running.',
     steps: [
       {
         step: '01',
+        label: 'Install kfleet along with kind, kubectl, and Helm',
         code: 'brew install --cask 1solomonwakhungu/tap/kfleet',
         copyValue: 'brew install --cask 1solomonwakhungu/tap/kfleet',
       },
       {
         step: '02',
+        label: 'Create 3 kind clusters, deploy hub + agents, and port-forward :8080',
         code: 'kfleet quickstart',
         copyValue: 'kfleet quickstart',
       },
+      {
+        step: '03',
+        label: 'Remove all local clusters and port-forwards cleanly when finished',
+        code: 'kfleet cleanup',
+        copyValue: 'kfleet cleanup',
+      },
     ],
     resultText:
-      'Creates kfleet-1..3 clusters, installs hub and agents, prints generated credentials, and ships kfleet mcp.',
+      'Creates kfleet-1..3 clusters, prints generated admin credentials, and ships kfleet mcp in the same CLI.',
     resultLinkLabel: 'Open localhost:8080',
     resultLinkHref: 'http://localhost:8080',
     resultExternal: true,
     resultEvent: 'local_dashboard_opened',
+  },
+  {
+    id: 'helm',
+    label: 'Helm OCI (prod)',
+    badge: '2m',
+    summary:
+      'Deploy one single-replica hub (100m CPU · 128Mi RAM · 1Gi disk) and one read-only agent per cluster (50m CPU · 64Mi RAM). No CRDs, operators, or cert-manager needed.',
+    steps: [
+      {
+        step: '01',
+        label: 'Install the hub once (persistence 1Gi enabled by default)',
+        code: 'helm upgrade --install kfleet-hub oci://ghcr.io/1solomonwakhungu/charts/kfleet-hub -n kfleet-system --create-namespace --set registration.token="$KFLEET_TOKEN" --set-string auth.bootstrapAdmin.username=admin --set-string auth.bootstrapAdmin.email=admin@example.com --set-string auth.bootstrapAdmin.password="$KFLEET_ADMIN_PASSWORD"',
+        copyValue:
+          'helm upgrade --install kfleet-hub oci://ghcr.io/1solomonwakhungu/charts/kfleet-hub -n kfleet-system --create-namespace --set registration.token="$KFLEET_TOKEN" --set-string auth.bootstrapAdmin.username=admin --set-string auth.bootstrapAdmin.email=admin@example.com --set-string auth.bootstrapAdmin.password="$KFLEET_ADMIN_PASSWORD"',
+      },
+      {
+        step: '02',
+        label: 'Install the 3-rule read-only agent in each cluster you want to see',
+        code: 'helm upgrade --install kfleet-agent oci://ghcr.io/1solomonwakhungu/charts/kfleet-agent --kube-context my-cluster -n kfleet-system --create-namespace --set hub.url=https://kfleet.example.com --set hub.token="$KFLEET_TOKEN" --set cluster.name=my-cluster',
+        copyValue:
+          'helm upgrade --install kfleet-agent oci://ghcr.io/1solomonwakhungu/charts/kfleet-agent --kube-context my-cluster -n kfleet-system --create-namespace --set hub.url=https://kfleet.example.com --set hub.token="$KFLEET_TOKEN" --set cluster.name=my-cluster',
+      },
+    ],
+    resultText:
+      'Sign in as admin and approve each agent on the Agents page. Supports existingSecret for GitOps and hub.caBundle for private CAs.',
+    resultLinkLabel: 'Full Helm guide',
+    resultLinkHref: `${repositoryUrl}#install-with-helm`,
+    resultExternal: true,
+    resultEvent: 'helm_guide_opened',
   },
 ]
 
 function FleetMap() {
   return (
     <figure className="fleet-map">
-      <svg viewBox="0 0 1180 650" role="img" aria-labelledby="map-title map-description">
-        <title id="map-title">kfleet system topology</title>
+      <svg viewBox="0 0 1180 660" role="img" aria-labelledby="map-title map-description">
+        <title id="map-title">kfleet zero-kubeconfig system topology</title>
         <desc id="map-description">
-          Operators and AI clients connect to one 14 MB kfleet hub. Approved outbound agents with
-          3-rule read-only RBAC report state from production, staging, and development Kubernetes
-          clusters.
+          Operators and AI clients connect to one 14 MB kfleet hub over authenticated sessions and
+          read-only MCP tools. Approved agents inside production, staging, and edge clusters open
+          outbound HTTPS and WebSocket connections up to the hub using only three read-only RBAC
+          rules. The hub stores snapshots and 90-day history in SQLite and holds zero Kubernetes
+          credentials.
         </desc>
         <defs>
           <pattern id="map-grid" width="36" height="36" patternUnits="userSpaceOnUse">
@@ -213,110 +286,131 @@ function FleetMap() {
           >
             <path d="M 0 0 L 10 5 L 0 10 z" className="map-arrow" />
           </marker>
+          <marker
+            id="map-arrow-outbound"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" className="map-arrow-outbound" />
+          </marker>
         </defs>
-        <rect width="1180" height="650" className="map-field" />
-        <rect width="1180" height="650" fill="url(#map-grid)" />
+        <rect width="1180" height="660" className="map-field" />
+        <rect width="1180" height="660" fill="url(#map-grid)" />
 
         <g className="map-route">
-          <path d="M235 157 H480 Q510 157 510 187 V252" markerEnd="url(#map-arrow)" />
-          <path d="M945 157 H700 Q670 157 670 187 V252" markerEnd="url(#map-arrow)" />
-          <path d="M590 386 V447 H215 V491" markerEnd="url(#map-arrow)" />
-          <path d="M590 386 V491" markerEnd="url(#map-arrow)" />
-          <path d="M590 447 H965 V491" markerEnd="url(#map-arrow)" />
-          <path d="M690 319 H895" markerEnd="url(#map-arrow)" />
+          <path d="M390 124 H502 Q522 124 522 144 V238" markerEnd="url(#map-arrow)" />
+          <path d="M790 124 H678 Q658 124 658 144 V238" markerEnd="url(#map-arrow)" />
+          <path d="M765 316 H863" markerEnd="url(#map-arrow)" />
         </g>
 
-        <g className="map-node client-node" transform="translate(95 100)">
-          <rect width="280" height="114" rx="10" />
-          <circle cx="30" cy="30" r="6" className="node-signal" />
-          <text x="52" y="36" className="node-title">
+        <g className="map-route-outbound">
+          <path d="M220 508 V456 H540 V392" markerEnd="url(#map-arrow-outbound)" />
+          <path d="M590 508 V392" markerEnd="url(#map-arrow-outbound)" />
+          <path d="M960 508 V456 H640 V392" markerEnd="url(#map-arrow-outbound)" />
+        </g>
+
+        <g className="map-node client-node" transform="translate(80 68)">
+          <rect width="310" height="112" rx="10" />
+          <circle cx="28" cy="30" r="6" className="node-signal" />
+          <text x="48" y="35" className="node-title">
             OPERATORS
           </text>
-          <text x="30" y="72" className="node-copy">
-            Web app · REST API
+          <text x="28" y="68" className="node-copy">
+            Web UI · REST API · SSE logs
           </text>
-          <text x="30" y="94" className="node-meta">
-            zero kubeconfigs · role scoped
+          <text x="28" y="92" className="node-meta">
+            zero kubeconfigs · role-scoped sessions
           </text>
         </g>
 
-        <g className="map-node client-node" transform="translate(805 100)">
-          <rect width="280" height="114" rx="10" />
-          <circle cx="30" cy="30" r="6" className="node-signal" />
-          <text x="52" y="36" className="node-title">
+        <g className="map-node client-node" transform="translate(790 68)">
+          <rect width="310" height="112" rx="10" />
+          <circle cx="28" cy="30" r="6" className="node-signal" />
+          <text x="48" y="35" className="node-title">
             AI CLIENTS
           </text>
-          <text x="30" y="72" className="node-copy">
-            Model Context Protocol
+          <text x="28" y="68" className="node-copy">
+            kfleet mcp (stdio)
           </text>
-          <text x="30" y="94" className="node-meta">
-            9 read-only diagnosis tools
+          <text x="28" y="92" className="node-meta">
+            9 read-only tools · read_only user
           </text>
         </g>
 
-        <g className="map-node hub-node" transform="translate(440 252)">
-          <rect width="300" height="134" rx="10" />
-          <rect x="1" y="1" width="298" height="7" rx="4" className="hub-accent" />
-          <text x="28" y="48" className="node-kicker">
-            14 MB GO BINARY
+        <g className="map-node hub-node" transform="translate(415 240)">
+          <rect width="350" height="150" rx="10" />
+          <rect x="1" y="1" width="348" height="7" rx="4" className="hub-accent" />
+          <text x="26" y="42" className="node-kicker">
+            14 MB STATIC GO BINARY
           </text>
-          <text x="28" y="80" className="hub-title">
+          <text x="26" y="76" className="hub-title">
             kfleet hub
           </text>
-          <text x="28" y="108" className="node-meta">
-            inventory · logs · policy · alerts
+          <text x="26" y="104" className="node-copy">
+            UI · API · Log relay · 7 drift checks
           </text>
-          <circle cx="266" cy="68" r="8" className="node-healthy" />
+          <text x="26" y="128" className="node-meta">
+            holds zero Kubernetes credentials
+          </text>
+          <circle cx="322" cy="64" r="7" className="node-healthy" />
         </g>
 
-        <g className="map-node store-node" transform="translate(895 270)">
-          <rect width="190" height="98" rx="10" />
-          <text x="24" y="38" className="node-title">
+        <g className="map-node store-node" transform="translate(865 264)">
+          <rect width="235" height="104" rx="10" />
+          <text x="22" y="36" className="node-title">
             SQLITE
           </text>
-          <text x="24" y="66" className="node-copy">
-            Durable history
+          <text x="22" y="64" className="node-copy">
+            Durable local store
           </text>
-          <text x="24" y="84" className="node-meta">
-            90-day default retention
+          <text x="22" y="86" className="node-meta">
+            snapshots · 90d timeline · audit
           </text>
         </g>
 
         {[
-          { x: 80, name: 'PRODUCTION', detail: '3-rule read-only agent' },
-          { x: 455, name: 'STAGING', detail: '3-rule read-only agent' },
-          { x: 830, name: 'EDGE / NAT', detail: '3-rule read-only agent' },
-        ].map(({ x, name, detail }) => (
-          <g className="map-node cluster-node" transform={`translate(${x} 491)`} key={name}>
-            <rect width="270" height="102" rx="10" />
-            <circle cx="28" cy="28" r="7" className="node-healthy" />
-            <text x="48" y="34" className="node-title">
+          { x: 70, name: 'PRODUCTION' },
+          { x: 440, name: 'STAGING' },
+          { x: 810, name: 'EDGE / NAT' },
+        ].map(({ x, name }) => (
+          <g className="map-node cluster-node" transform={`translate(${x} 508)`} key={name}>
+            <rect width="300" height="106" rx="10" />
+            <circle cx="26" cy="28" r="6" className="node-healthy" />
+            <text x="44" y="33" className="node-title">
               {name}
             </text>
-            <text x="28" y="68" className="node-copy">
-              Kubernetes cluster
+            <text x="26" y="66" className="node-copy">
+              kfleet agent · outbound only
             </text>
-            <text x="28" y="88" className="node-meta">
-              {detail} · outbound
+            <text x="26" y="88" className="node-meta">
+              3 read-only RBAC rules · no Secrets
             </text>
           </g>
         ))}
 
-        <text x="590" y="233" textAnchor="middle" className="route-label">
-          AUTHENTICATED REQUESTS
+        <text x="590" y="106" textAnchor="middle" className="route-label">
+          AUTHENTICATED SESSIONS · READ-ONLY MCP
         </text>
-        <text x="590" y="435" textAnchor="middle" className="route-label">
-          OUTBOUND HTTPS · REVERSE WEBSOCKET LOGS
-        </text>
+
+        <g transform="translate(362 442)">
+          <rect width="456" height="28" rx="6" className="route-pill" />
+          <text x="228" y="18" textAnchor="middle" className="route-label-outbound">
+            AGENTS DIAL OUT · HTTPS SNAPSHOTS (30s) · WEBSOCKET LOGS
+          </text>
+        </g>
       </svg>
       <figcaption>
         <span>
-          <i className="legend-dot healthy" /> approved and reporting
+          <i className="legend-dot healthy" /> approved agent (outbound only)
         </span>
         <span>
-          <i className="legend-dot route" /> outbound-only connection
+          <i className="legend-dot route" /> authenticated hub connection
         </span>
-        <span>One 14 MB hub. One 3-rule read-only agent per cluster.</span>
+        <span>Nothing dials into your clusters. Zero kubeconfigs stored centrally.</span>
       </figcaption>
     </figure>
   )
@@ -328,11 +422,36 @@ function App() {
     live: null,
     docker: null,
     brew: null,
+    helm: null,
   })
   const [activeTab, setActiveTab] = useState<QuickstartTabId>('live')
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
 
   const currentTab = quickstartTabs.find((tab) => tab.id === activeTab) ?? quickstartTabs[0]
+
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        if (navRef.current) {
+          navRef.current.open = !navRef.current.open
+        }
+      } else if (event.key === 'Escape' && navRef.current?.open) {
+        navRef.current.open = false
+      }
+    }
+    const onMouseDown = (event: MouseEvent) => {
+      if (navRef.current?.open && !navRef.current.contains(event.target as Node)) {
+        navRef.current.open = false
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('mousedown', onMouseDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('mousedown', onMouseDown)
+    }
+  }, [])
 
   const closeNav = () => {
     if (navRef.current) {
@@ -400,22 +519,29 @@ function App() {
           <summary>
             <SearchIcon aria-hidden="true" />
             <span>Navigate kfleet</span>
+            <kbd>⌘ K</kbd>
           </summary>
           <nav aria-label="Page navigation">
             <a href="#demo" onClick={closeNav}>
               Live UI <span>01</span>
             </a>
             <a href="#system" onClick={closeNav}>
-              System map <span>02</span>
+              Architecture <span>02</span>
+            </a>
+            <a href="#why" onClick={closeNav}>
+              Why kfleet <span>03</span>
             </a>
             <a href="#capabilities" onClick={closeNav}>
-              Capabilities <span>03</span>
+              Capabilities <span>04</span>
+            </a>
+            <a href="#proof" onClick={closeNav}>
+              RBAC &amp; AI tools <span>05</span>
             </a>
             <a href="#compare" onClick={closeNav}>
-              Compare <span>04</span>
+              Compare <span>06</span>
             </a>
             <a href="#quickstart" onClick={closeNav}>
-              Quickstart <span>05</span>
+              Quickstart <span>07</span>
             </a>
           </nav>
         </details>
@@ -434,17 +560,19 @@ function App() {
       <main id="main">
         <section className="orientation" id="top">
           <p className="orientation-line">
-            14 MB Go + SQLite · Zero central kubeconfigs · 3-rule read-only agent RBAC
+            Read-only Kubernetes fleet control plane · 14 MB Go + SQLite · Zero kubeconfigs
           </p>
           <h1>
-            One control plane.
+            See every cluster.
             <br />
-            <span>Your whole fleet.</span>
+            <span>Touch none of them.</span>
           </h1>
           <div className="orientation-meta">
             <p>
-              Read-only multi-cluster Kubernetes visibility and MCP diagnostics in one 14 MB Go +
-              SQLite binary — zero kubeconfigs centrally, no Secrets or write RBAC.
+              kfleet is an open-source, read-only control plane for a fleet of Kubernetes clusters.
+              One 14 MB Go binary with SQLite gives engineers a live web UI, streaming pod logs,
+              and 9 read-only MCP diagnostic tools for AI clients—without storing a single
+              kubeconfig or granting write access.
             </p>
             <div className="orientation-actions">
               <div className="orientation-cta-row">
@@ -474,7 +602,7 @@ function App() {
                 href="#quickstart"
                 onClick={() => capture('quickstart_cta_clicked')}
               >
-                Run locally in 10s <ArrowRightIcon aria-hidden="true" />
+                See what you need &amp; run in 10s <ArrowRightIcon aria-hidden="true" />
               </a>
             </div>
           </div>
@@ -497,7 +625,7 @@ function App() {
               <span className="demo-chrome-url">
                 <i className="legend-dot healthy" /> kfleet.sullylab.de · read-only demo mode
               </span>
-              <span className="demo-chrome-meta">HTTP 405 on writes · no login</span>
+              <span className="demo-chrome-meta">HTTP 405 on writes · no login · anonymous MCP</span>
             </div>
             <a
               className="demo-media-link"
@@ -537,81 +665,154 @@ function App() {
           <FleetMap />
         </section>
 
+        <section className="architecture-notes" id="why">
+          <div className="note-statement">
+            <span>01 · ZERO BLAST RADIUS</span>
+            <h2>The hub cannot touch your clusters.</h2>
+            <p>
+              Most multi-cluster tools force a trade-off: hand out kubeconfigs to every laptop and
+              AI client, or run a platform whose agent holds <code>cluster-admin</code>. kfleet
+              stores zero cluster credentials and every agent dials out with just three read-only
+              RBAC rules—never Secrets, never ConfigMaps, never writes.
+            </p>
+          </div>
+          <div className="note-statement">
+            <span>02 · ZERO PLATFORM TAX</span>
+            <h2>One binary. One SQLite file.</h2>
+            <p>
+              Skip dedicated management clusters, operators, CRDs, and cert-manager. The hub
+              compiles the React UI, REST API, log relay, alert engine, and MCP server into a single
+              14 MB static Go binary that idles around 20 MB of RAM—deployable via Helm, Docker, or
+              a plain VM.
+            </p>
+          </div>
+          <div className="note-statement">
+            <span>03 · BUILT TO REMEMBER</span>
+            <h2>History outlives outages.</h2>
+            <p>
+              Kubeconfig tools go blank the second a private or edge cluster drops off the network.
+              kfleet keeps each cluster’s latest snapshot and a 90-day append-only operational
+              timeline in SQLite, so you still see last known state, disconnects, and what changed
+              right before it fell over.
+            </p>
+          </div>
+        </section>
+
         <section className="capability-ledger" id="capabilities">
           <div className="ledger-intro">
-            <h2>What moves through the map</h2>
+            <h2>Everything you need to see and triage a fleet</h2>
             <p>
-              kfleet observes and explains. Agents hold three read-only RBAC rules — never Secrets,
-              never ConfigMaps, never writes.
+              Built for platform teams and SREs who want immediate multi-cluster clarity—and safe AI
+              diagnostics—without widening who can change production.
             </p>
           </div>
           <dl>
             <div>
               <dt>
-                <ActivityHeartbeatIcon aria-hidden="true" /> Fleet state &amp; logs
+                <ActivityHeartbeatIcon aria-hidden="true" /> Live fleet inventory
               </dt>
               <dd>
-                Cluster health, workloads, Kubernetes events, live reverse-WebSocket pod logs, and
-                an append-only operational timeline.
+                Track cluster health, Kubernetes versions, nodes, pods, deployments, services, and
+                events across every cluster with deep-linkable URLs and live WebSocket updates.
               </dd>
-              <small>Live updates over WebSocket &amp; SSE</small>
+              <small>30s snapshots · marked unreachable after 3 missed intervals</small>
             </div>
             <div>
               <dt>
-                <ShieldCheckIcon aria-hidden="true" /> Policy &amp; drift
+                <Terminal2Icon aria-hidden="true" /> Live pod log streaming
               </dt>
               <dd>
-                Seven built-in read-only checks report pass, fail, unknown, or stale results across
-                every cluster.
+                Tail, follow, and search container logs in the browser without exposing any cluster
+                API server. Approved agents relay lines over outbound WebSockets to SSE streams.
               </dd>
-              <small>Zero automated mutations</small>
+              <small>No kubeconfig · no inbound firewall rules</small>
             </div>
             <div>
               <dt>
-                <Terminal2Icon aria-hidden="true" /> Read-only MCP
+                <SearchIcon aria-hidden="true" /> Built-in read-only AI (MCP)
               </dt>
               <dd>
-                Nine built-in MCP tools list clusters, find crashlooping pods, stream previous
-                container logs, and diagnose events without kubeconfigs.
+                Connect Claude Desktop, Cursor, or any stdio MCP client with{' '}
+                <code>kfleet mcp</code>. Nine read-only tools find crashlooping pods, pull previous
+                container logs, inspect timeline history, and diagnose unhealthy clusters.
               </dd>
-              <small>Model Context Protocol · stdio</small>
+              <small>Authenticates as a read_only hub user · works with any model</small>
             </div>
             <div>
               <dt>
-                <ServerIcon aria-hidden="true" /> Durable SQLite history
+                <ShieldCheckIcon aria-hidden="true" /> Policy &amp; drift checks
               </dt>
               <dd>
-                Retains last snapshots, disconnects, version changes, policy findings, and signed
-                health alerts even after a cluster goes offline.
+                Seven built-in checks flag Kubernetes version skew, missing required labels,
+                namespace and deployment spec drift, unavailable workloads, and pod security
+                baseline gaps.
               </dd>
-              <small>90-day retention · Admin · operator · read-only</small>
+              <small>pass · fail · unknown · stale — reports only, never auto-remediates</small>
+            </div>
+            <div>
+              <dt>
+                <BellIcon aria-hidden="true" /> Health alerts &amp; webhooks
+              </dt>
+              <dd>
+                Alert when clusters turn degraded or unreachable with cooldown deduplication,
+                operator acknowledgement, and HMAC-SHA256-signed webhooks with durable SQLite
+                retries.
+              </dd>
+              <small>Dead-letter tracking · Prometheus /metrics included</small>
+            </div>
+            <div>
+              <dt>
+                <ServerIcon aria-hidden="true" /> RBAC, audit &amp; tenants
+              </dt>
+              <dd>
+                Enforce admin, operator, and read-only roles with explicit agent approval queues,
+                token rotation, tenant-scoped isolation, and a SQLite-enforced append-only audit
+                log.
+              </dd>
+              <small>Fail-closed agent registration · 90-day default timeline retention</small>
             </div>
           </dl>
         </section>
 
-        <section className="architecture-notes">
-          <div className="note-statement">
-            <span>01</span>
-            <h2>The hub is the boundary.</h2>
-            <p>
-              Operators and AI clients talk to one 14 MB Go service with role-scoped sessions and an
-              audit log — never directly to cluster API servers.
+        <section className="proof-section" id="proof" aria-label="Security boundary and AI tools">
+          <div className="proof-card">
+            <div className="proof-header">
+              <span>ENTIRE AGENT CLUSTERROLE · 3 RULES</span>
+              <h3>Audit the entire blast radius in ten seconds.</h3>
+              <p>
+                This is the complete ClusterRole installed in each cluster. No Secrets, no
+                ConfigMaps, no watch permissions, and zero write verbs.
+              </p>
+            </div>
+            <pre className="proof-code">
+              <code>{agentClusterRoleYaml}</code>
+            </pre>
+            <p className="proof-footer">
+              Distroless non-root image · read-only root filesystem · 50m CPU / 64Mi RAM default
             </p>
           </div>
-          <div className="note-statement">
-            <span>02</span>
-            <h2>Agents stay minimal.</h2>
-            <p>
-              One approved outbound agent per cluster runs with a 3-rule read-only ClusterRole. No
-              Secrets, no ConfigMaps, no write verbs.
-            </p>
-          </div>
-          <div className="note-statement">
-            <span>03</span>
-            <h2>History survives outages.</h2>
-            <p>
-              Snapshots and timeline events remain queryable in SQLite when a private or edge
-              cluster drops offline.
+
+          <div className="proof-card">
+            <div className="proof-header">
+              <span>MODEL CONTEXT PROTOCOL · 9 READ-ONLY TOOLS</span>
+              <h3>Ask your fleet in plain English.</h3>
+              <p>
+                Give an AI assistant real-time cluster visibility and crash logs without risking a
+                hallucinated write—or test it anonymously against the live demo right now.
+              </p>
+            </div>
+            <ul className="prompt-list">
+              {mcpPrompts.map((prompt) => (
+                <li key={prompt}>“{prompt}”</li>
+              ))}
+            </ul>
+            <div className="tool-chips" aria-label="Included read-only MCP tools">
+              {mcpTools.map((tool) => (
+                <code key={tool}>{tool}</code>
+              ))}
+            </div>
+            <p className="proof-footer">
+              Ships in kfleet mcp &amp; kfleet-hub mcp · previous crash logs up to 256 KiB
             </p>
           </div>
         </section>
@@ -620,8 +821,9 @@ function App() {
           <header>
             <h2>A deliberately smaller surface</h2>
             <p>
-              Built for read-only fleet visibility and safe MCP diagnostics — not cluster
-              provisioning or day-2 mutations. Competitor details checked November 2026.
+              Rancher, OCM, Lens, and Headlamp do more than kfleet—they also mutate clusters. kfleet
+              is built for read-only fleet visibility and safe MCP diagnostics without expanding
+              cluster write access.
             </p>
           </header>
           <div className="table-wrap" tabIndex={0} aria-label="Scrollable product comparison">
@@ -651,20 +853,47 @@ function App() {
               </tbody>
             </table>
           </div>
+          <p className="comparison-honesty">
+            <strong>When to pick something else:</strong> need workload deployment, cluster
+            provisioning, <code>kubectl exec</code>, or a multi-replica HA control plane? Pick
+            Rancher, OCM, Lens, or Headlamp. kfleet stays intentionally read-only and single-replica
+            on SQLite.
+          </p>
           <p className="comparison-note">Competitor details checked November 2026.</p>
         </section>
 
         <section className="quickstart" id="quickstart">
           <header>
             <h2>
-              Try it in
+              What you need.
               <br />
-              seconds.
+              How to start.
             </h2>
             <p>
-              Start in the browser with zero setup, spin up demo mode in Docker with no Kubernetes,
-              or launch three local kind clusters via Homebrew.
+              Explore the hosted demo in one click, boot demo mode in Docker with no Kubernetes,
+              launch three real kind clusters via Homebrew, or deploy directly to your clusters with
+              Helm.
             </p>
+            <ul className="requirements-list" aria-label="Requirements by setup path">
+              <li>
+                <strong>Live demo (0s)</strong>
+                <span>Just a browser — or kfleet mcp with no credentials</span>
+              </li>
+              <li>
+                <strong>Docker demo (10s)</strong>
+                <span>Docker only — no Kubernetes cluster required</span>
+              </li>
+              <li>
+                <strong>Local 3-cluster fleet (60s)</strong>
+                <span>Docker running; Homebrew installs kfleet, kind, kubectl, and Helm</span>
+              </li>
+              <li>
+                <strong>Production Helm (2m)</strong>
+                <span>
+                  1 hub (100m CPU · 128Mi · 1Gi disk) + 1 agent/cluster (50m · 64Mi)
+                </span>
+              </li>
+            </ul>
           </header>
           <div className="quickstart-panel">
             <div className="quickstart-tabs" role="tablist" aria-label="Quickstart methods">
@@ -704,13 +933,20 @@ function App() {
                 {currentTab.steps.map((item) => (
                   <div key={`${currentTab.id}-${item.step}`}>
                     <span className="command-step">{item.step}</span>
-                    <code>{item.code}</code>
+                    <div className="command-body">
+                      {item.label ? <span className="command-label">{item.label}</span> : null}
+                      <code>{item.code}</code>
+                    </div>
                     {item.copyValue ? (
                       <button
                         type="button"
                         className="copy-button"
-                        onClick={() => handleCopy(item.copyValue!)}
-                        aria-label={`Copy ${item.code}`}
+                        onClick={() => void handleCopy(item.copyValue!)}
+                        aria-label={
+                          copiedCode === item.copyValue
+                            ? `Copied ${item.code}`
+                            : `Copy ${item.code}`
+                        }
                       >
                         {copiedCode === item.copyValue ? 'Copied' : 'Copy'}
                       </button>
@@ -746,16 +982,24 @@ function App() {
             aria-hidden="true"
             draggable={false}
           />
-          kfleet · Apache 2.0 · 2026
+          kfleet · Read-only Kubernetes fleet control plane · Apache 2.0 · 2026
         </span>
         <div>
           <a
             href={liveDemoUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => capture('footer_live_demo_opened')}
+            onClick={() => capture('footer_live_demo_clicked')}
           >
             Live demo
+          </a>
+          <a
+            href={`${repositoryUrl}/blob/main/docs/README.md`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => capture('docs_opened')}
+          >
+            Docs
           </a>
           <a
             href={`${repositoryUrl}/blob/main/CONTRIBUTING.md`}
