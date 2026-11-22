@@ -68,7 +68,7 @@ homebrew_casks:
     binaries:
       - kfleet
     homepage: https://github.com/1solomonwakhungu/kfleet
-    description: Local multi-cluster Kubernetes quickstart and management CLI
+    description: Local multi-cluster Kubernetes quickstart and MCP CLI
     license: Apache-2.0
     dependencies:
       - formula: kind
