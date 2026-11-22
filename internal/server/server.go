@@ -119,6 +119,11 @@ func New(cfg *config.Config, logger *slog.Logger, st store.Store) *Server {
 	return server
 }
 
+// Handler returns the server's configured HTTP handler for in-process testing.
+func (s *Server) Handler() http.Handler {
+	return s.httpServer.Handler
+}
+
 // readinessTimeout bounds the store probe so a wedged database cannot hold the
 // readiness handler open indefinitely.
 const readinessTimeout = 2 * time.Second

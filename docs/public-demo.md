@@ -17,9 +17,16 @@ a connection to a live Kubernetes environment.
 - The stale-cluster monitor, alert delivery worker, timeline retention worker,
   and session-pruning worker are disabled so the demo process does not perform
   background mutations.
+- Synthetic cluster heartbeats are computed dynamically on reads relative to the
+  current clock (`demo-us-central` and `demo-eu-west` remain fresh while
+  `demo-edge-lab` stays stale), keeping policy evaluation accurate without
+  background writes.
 - Read routes run as a synthetic `read_only` viewer without creating a user or
   session. Admin-only reads remain forbidden, and every mutation is still
   rejected before routing.
+- The MCP server (`hub mcp`) allows unauthenticated read-only connections when
+  `/api/v1/meta` reports `demoMode: true`, so users can explore the public demo
+  without configuring hub credentials.
 - Synthetic alert history and timeline entries are seeded alongside the
   cluster snapshots so the demo covers the operational features without
   connecting to a live system.
