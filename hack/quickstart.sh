@@ -64,15 +64,25 @@ helm upgrade --install kfleet-hub charts/kfleet-hub \
 
 kubectl rollout status deployment/kfleet-hub --timeout=120s
 
+PORT_FORWARD_ARGS=(svc/kfleet-hub "${HUB_PORT}:8080")
+HUB_URL="http://host.docker.internal:${HUB_PORT}"
+if [ "$(uname -s)" = "Linux" ]; then
+    GATEWAY=$(docker network inspect kind --format '{{(index .IPAM.Config 0).Gateway}}')
+    if [ -z "$GATEWAY" ]; then
+        echo "ERROR: could not determine the kind Docker network gateway address." >&2
+        exit 1
+    fi
+    PORT_FORWARD_ARGS+=(--address "${GATEWAY},localhost")
+    HUB_URL="http://${GATEWAY}:${HUB_PORT}"
+fi
+
 # Start port-forward (background process)
 if [ -f "$PF_PID_FILE" ]; then
     kill "$(cat "$PF_PID_FILE")" 2>/dev/null || true
 fi
-kubectl port-forward svc/kfleet-hub "${HUB_PORT}:8080" > /dev/null 2>&1 &
+kubectl port-forward "${PORT_FORWARD_ARGS[@]}" > /dev/null 2>&1 &
 echo $! > "$PF_PID_FILE"
 sleep 3
-
-HUB_URL="http://host.docker.internal:${HUB_PORT}"
 
 curl --fail --silent --show-error \
     --cookie-jar "$COOKIE_FILE" \
