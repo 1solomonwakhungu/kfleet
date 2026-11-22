@@ -72,6 +72,23 @@ func New(hubURL, token string) (*Client, error) {
 	}, nil
 }
 
+// GetRuntimeInfo returns the hub's runtime metadata without requiring credentials.
+func (c *Client) GetRuntimeInfo(ctx context.Context) (api.RuntimeInfo, error) {
+	response, err := c.doGet(ctx, "/api/v1/meta", nil, "application/json")
+	if err != nil {
+		return api.RuntimeInfo{}, err
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return api.RuntimeInfo{}, decodeAPIError(response)
+	}
+	var info api.RuntimeInfo
+	if err := json.NewDecoder(response.Body).Decode(&info); err != nil {
+		return api.RuntimeInfo{}, fmt.Errorf("decode hub response: %w", err)
+	}
+	return info, nil
+}
+
 // ListClusters returns all clusters registered with the hub.
 func (c *Client) ListClusters(ctx context.Context) ([]types.Cluster, error) {
 	var response api.ListClustersResponse
@@ -313,14 +330,18 @@ func (c *Client) open(ctx context.Context, path string, query url.Values, accept
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		defer func() { _ = response.Body.Close() }()
-		body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
-		var apiError api.ErrorResponse
-		if json.Unmarshal(body, &apiError) == nil && apiError.Error != "" {
-			return nil, fmt.Errorf("hub API returned %s: %s", response.Status, apiError.Error)
-		}
-		return nil, fmt.Errorf("hub API returned %s", response.Status)
+		return nil, decodeAPIError(response)
 	}
 	return response, nil
+}
+
+func decodeAPIError(response *http.Response) error {
+	body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+	var apiError api.ErrorResponse
+	if json.Unmarshal(body, &apiError) == nil && apiError.Error != "" {
+		return fmt.Errorf("hub API returned %s: %s", response.Status, apiError.Error)
+	}
+	return fmt.Errorf("hub API returned %s", response.Status)
 }
 
 func (c *Client) doGet(ctx context.Context, path string, query url.Values, accept string) (*http.Response, error) {

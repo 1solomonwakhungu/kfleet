@@ -255,3 +255,70 @@ func TestGetPodLogsRequiresNamespaceAndPod(t *testing.T) {
 		t.Fatal("GetPodLogs() error = nil, want missing namespace/pod error")
 	}
 }
+
+func TestGetRuntimeInfoWorksWithoutCredentials(t *testing.T) {
+	loginCalled := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/auth/login":
+			loginCalled = true
+			http.Error(w, "login should not be called", http.StatusMethodNotAllowed)
+		case "/api/v1/meta":
+			if r.Header.Get("Authorization") != "" {
+				t.Errorf("Authorization = %q, want empty", r.Header.Get("Authorization"))
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(api.RuntimeInfo{
+				Version:       "v0.2.1",
+				DemoMode:      true,
+				ReadOnly:      true,
+				SyntheticData: true,
+				DataPolicy:    "Synthetic sample data only.",
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	unauthClient, err := New(server.URL, "")
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	info, err := unauthClient.GetRuntimeInfo(context.Background())
+	if err != nil {
+		t.Fatalf("GetRuntimeInfo() error = %v", err)
+	}
+	if !info.DemoMode || !info.ReadOnly || !info.SyntheticData || info.Version != "v0.2.1" {
+		t.Fatalf("GetRuntimeInfo() = %+v, want demo metadata", info)
+	}
+
+	credClient, err := NewWithCredentials(server.URL, "reader", "secret")
+	if err != nil {
+		t.Fatalf("NewWithCredentials() error = %v", err)
+	}
+	if _, err := credClient.GetRuntimeInfo(context.Background()); err != nil {
+		t.Fatalf("credClient.GetRuntimeInfo() error = %v", err)
+	}
+	if loginCalled {
+		t.Fatal("GetRuntimeInfo() unexpectedly attempted /api/v1/auth/login")
+	}
+}
+
+func TestGetRuntimeInfoReportsHTTPError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(api.ErrorResponse{Error: "hub starting"})
+	}))
+	defer server.Close()
+
+	client, err := New(server.URL, "")
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	_, err = client.GetRuntimeInfo(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "hub starting") {
+		t.Fatalf("GetRuntimeInfo() error = %v, want hub starting error", err)
+	}
+}
