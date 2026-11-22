@@ -1,8 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#0d0c12"/>
-  <circle cx="870" cy="80" r="360" fill="#5e6ad2" opacity=".18"/>
-  <g transform="translate(90 110) scale(1.8125)">
-    <rect width="32" height="32" rx="8" fill="#5E6AD2"/>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e2438" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="glow" cx="78%" cy="18%" r="55%">
+      <stop offset="0%" stop-color="#4e74ff" stop-opacity="0.28"/>
+      <stop offset="60%" stop-color="#3b56c8" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#0b0d14" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent-bar" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5e81ff"/>
+      <stop offset="100%" stop-color="#3a5de0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0b0d14"/>
+  <rect width="1200" height="630" fill="url(#grid)" opacity="0.65"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Subtle outer frame -->
+  <rect x="28" y="28" width="1144" height="574" rx="16" fill="none" stroke="#242b42" stroke-width="1.5"/>
+  <rect x="28" y="28" width="1144" height="5" rx="2.5" fill="url(#accent-bar)"/>
+
+  <!-- Top row: brand lockup + live demo URL -->
+  <g transform="translate(80 86) scale(1.75)">
+    <rect width="32" height="32" rx="8" fill="#4f6df5"/>
     <g fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round">
       <circle cx="16" cy="19" r="7.5"/>
       <path d="M16 19v-7M16 19l6.5 3.6M16 19l-6.5 3.6"/>
@@ -20,9 +43,33 @@
     </g>
     <path d="M9.3 9.4h13.4v2.1H9.3z" fill="#8A5220"/>
   </g>
-  <text x="170" y="151" fill="#f5f4f8" font-family="Arial, sans-serif" font-size="38" font-weight="600">kfleet</text>
-  <text x="90" y="300" fill="#f5f4f8" font-family="Arial, sans-serif" font-size="74" font-weight="600">Operate every cluster.</text>
-  <text x="90" y="380" fill="#a7a3b2" font-family="Arial, sans-serif" font-size="32">Lightweight Kubernetes fleet operations with a built-in AI interface.</text>
-  <rect x="90" y="455" width="280" height="62" rx="9" fill="#5e6ad2"/>
-  <text x="230" y="496" fill="white" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="600">Open source · Apache 2.0</text>
+  <text x="154" y="128" fill="#f4f6fc" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="40" font-weight="700" letter-spacing="-1.2">kfleet</text>
+
+  <!-- Right top status badge -->
+  <rect x="854" y="92" width="266" height="44" rx="22" fill="#131726" stroke="#2a3352" stroke-width="1.5"/>
+  <circle cx="882" cy="114" r="6" fill="#3fd688"/>
+  <text x="900" y="121" fill="#c6d0ec" font-family="'SF Mono', Menlo, Consolas, monospace" font-size="18" font-weight="500">kfleet.sullylab.de</text>
+
+  <!-- Headline -->
+  <text x="80" y="256" fill="#f4f6fc" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="68" font-weight="700" letter-spacing="-2.4">Read-only Kubernetes</text>
+  <text x="80" y="334" fill="#9eb0e6" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="68" font-weight="700" letter-spacing="-2.4">fleet visibility &amp; MCP.</text>
+
+  <!-- Subcopy -->
+  <text x="80" y="406" fill="#b4bed9" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="27" font-weight="400">Multi-cluster health, drift checks, live pod logs, and 9 MCP diagnostic tools</text>
+  <text x="80" y="444" fill="#b4bed9" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="27" font-weight="400">with outbound 3-rule read-only agents and zero central kubeconfigs.</text>
+
+  <!-- Bottom feature pills -->
+  <g transform="translate(80 498)">
+    <rect x="0" y="0" width="266" height="52" rx="10" fill="#182038" stroke="#3952a3" stroke-width="1.5"/>
+    <text x="133" y="33" fill="#e8eeff" text-anchor="middle" font-family="'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="600">14 MB Go + SQLite</text>
+
+    <rect x="284" y="0" width="256" height="52" rx="10" fill="#131726" stroke="#2a3352" stroke-width="1.5"/>
+    <text x="412" y="33" fill="#d3dcf5" text-anchor="middle" font-family="'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500">Zero kubeconfigs</text>
+
+    <rect x="558" y="0" width="234" height="52" rx="10" fill="#131726" stroke="#2a3352" stroke-width="1.5"/>
+    <text x="675" y="33" fill="#d3dcf5" text-anchor="middle" font-family="'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="500">Read-only MCP</text>
+
+    <rect x="810" y="0" width="230" height="52" rx="10" fill="#3a5de0"/>
+    <text x="925" y="33" fill="#ffffff" text-anchor="middle" font-family="'SF Mono', Menlo, Consolas, monospace" font-size="19" font-weight="600">Apache 2.0</text>
+  </g>
 </svg>
