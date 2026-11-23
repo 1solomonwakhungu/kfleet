@@ -1,5 +1,5 @@
 import { Check, Copy } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { TonalButton } from '@/components/tonal/button'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { cn } from '@/lib/utils'
 
@@ -18,16 +18,19 @@ export function CopyButton({ value, label, event, className }: CopyButtonProps) 
 
   return (
     <>
-      <Button
+      <TonalButton
         type="button"
         variant="ghost"
-        size="icon-sm"
+        size="icon"
         aria-label={`Copy ${label}`}
-        className={cn(copied && 'text-success hover:text-success', className)}
+        className={cn(
+          copied && 'text-[var(--t-chip-mint-fg)] hover:text-[var(--t-chip-mint-fg)]',
+          className,
+        )}
         onClick={() => void copy(value)}
       >
         {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-      </Button>
+      </TonalButton>
       <span role="status" className="sr-only">
         {copied ? `Copied ${label}` : ''}
       </span>
