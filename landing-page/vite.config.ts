@@ -10,4 +10,18 @@ export default defineConfig({
       '@': new URL('./src', import.meta.url).pathname,
     },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        // Analytics and the React runtime change far less often than the page
+        // itself, so they get their own long-cached chunks.
+        codeSplitting: {
+          groups: [
+            { name: 'analytics', test: /node_modules[\\/]posthog-js/ },
+            { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
 })
