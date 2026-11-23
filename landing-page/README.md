@@ -1,6 +1,8 @@
 # kfleet landing page
 
-The public marketing site for kfleet, built with React, Vite, Tailwind CSS v4, and the Better Design Linear component system.
+The public marketing site for kfleet, built with React, Vite, Tailwind CSS v4, and shadcn/ui components (`base-nova` style on Base UI primitives).
+
+All copy lives in `src/content/siteCopy.ts`. Page sections are in `src/components/sections/`, shadcn/ui primitives in `src/components/ui/`, and theme tokens in `src/index.css`.
 
 ```bash
 npm install
