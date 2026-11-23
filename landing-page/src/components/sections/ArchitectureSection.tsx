@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import { Section, SectionHeader } from '@/components/section'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { TonalChip } from '@/components/tonal/chip'
+import { SurfaceTile, type SurfaceTone } from '@/components/tonal/surface-tile'
 import { siteCopy } from '@/content/siteCopy'
 import { cn } from '@/lib/utils'
 
@@ -33,24 +34,22 @@ interface DiagramLayout {
   readonly edges: readonly DiagramEdge[]
 }
 
-// `advance` is the distance from the previous baseline (or the node's top
-// padding for the first line) to this line's baseline, in viewBox units.
 const LINE_STYLE: Record<LineKind, { size: number; advance: number; className: string }> = {
-  kicker: { size: 11, advance: 16, className: 'fill-brand font-mono' },
-  title: { size: 14, advance: 19, className: 'fill-foreground font-semibold' },
-  hubTitle: { size: 22, advance: 29, className: 'fill-foreground font-semibold' },
-  copy: { size: 12, advance: 18, className: 'fill-foreground/80' },
-  meta: { size: 11.5, advance: 17, className: 'fill-muted-foreground' },
+  kicker: { size: 11, advance: 16, className: 'fill-[var(--t-blue)] font-mono font-medium' },
+  title: { size: 14, advance: 19, className: 'fill-[var(--t-ink)] font-medium' },
+  hubTitle: { size: 22, advance: 29, className: 'fill-[var(--t-ink)] font-medium' },
+  copy: { size: 12, advance: 18, className: 'fill-[var(--t-ink-secondary)]' },
+  meta: { size: 11.5, advance: 17, className: 'fill-[var(--t-ink-muted)]' },
 }
 
 const NODE_TONE: Record<DiagramNode['tone'], string> = {
-  default: 'fill-card stroke-border',
-  hub: 'fill-card stroke-primary [filter:drop-shadow(0_0_26px_oklch(0.567_0.159_275.2/0.4))]',
-  store: 'fill-surface stroke-border',
+  default: 'fill-[var(--t-elevated)] stroke-[var(--t-border-subtle)]',
+  hub: 'fill-[var(--t-elevated)] stroke-[var(--t-blue)]',
+  store: 'fill-[var(--t-surface-cool)] stroke-[var(--t-border-subtle)]',
 }
 
-const NODE_PADDING_X = 14
-const NODE_PADDING_TOP = 9
+const NODE_PADDING_X = 16
+const NODE_PADDING_TOP = 10
 
 const HUB_LINES: readonly NodeLine[] = [
   { kind: 'kicker', text: '14 MB static Go binary' },
@@ -66,7 +65,6 @@ const STORE_LINES: readonly NodeLine[] = [
 
 const CLUSTER_NAMES = ['Production', 'Staging', 'Edge (NAT)'] as const
 
-// Desktop: clients on the left, hub in the middle, clusters on the right.
 const WIDE_LAYOUT: DiagramLayout = {
   width: 960,
   height: 400,
@@ -121,8 +119,6 @@ const WIDE_LAYOUT: DiagramLayout = {
   ],
 }
 
-// Narrow screens: clients on top, hub in the middle, clusters underneath, with
-// shorter node text so every label stays readable at phone width.
 const TALL_LAYOUT: DiagramLayout = {
   width: 344,
   height: 452,
@@ -181,6 +177,8 @@ const DIAGRAM_TITLE = 'kfleet zero-kubeconfig system topology'
 const DIAGRAM_DESCRIPTION =
   'Operators and AI clients connect to one 14 MB kfleet hub over authenticated sessions and read-only MCP tools. Approved agents inside production, staging, and edge clusters open outbound HTTPS and WebSocket connections to the hub using only three read-only RBAC rules. The hub stores snapshots and a 90-day timeline in SQLite and holds zero Kubernetes credentials.'
 
+const PILLAR_TONES: readonly SurfaceTone[] = ['neutral', 'warm', 'sky']
+
 function TopologyNode({ node }: { readonly node: DiagramNode }) {
   let baseline = node.y + NODE_PADDING_TOP
 
@@ -191,8 +189,8 @@ function TopologyNode({ node }: { readonly node: DiagramNode }) {
         y={node.y}
         width={node.width}
         height={node.height}
-        rx={10}
-        strokeWidth={node.tone === 'hub' ? 1.5 : 1}
+        rx={node.tone === 'hub' ? 18 : 14}
+        strokeWidth={node.tone === 'hub' ? 1.75 : 1}
         className={NODE_TONE[node.tone]}
       />
       {node.lines.map((line) => {
@@ -221,7 +219,6 @@ function TopologyDiagram({
   readonly layout: DiagramLayout
   readonly className?: string
 }) {
-  // Two diagrams share the page (one per breakpoint), so every id is unique.
   const id = useId()
   const titleId = `${id}-title`
   const descriptionId = `${id}-description`
@@ -248,7 +245,7 @@ function TopologyDiagram({
           markerUnits="userSpaceOnUse"
           orient="auto"
         >
-          <path d="M0 0.5 L8 4 L0 7.5 z" className="fill-muted-foreground" />
+          <path d="M0 0.5 L8 4 L0 7.5 z" className="fill-[var(--t-ink-muted)]" />
         </marker>
         <marker
           id={agentArrowId}
@@ -260,7 +257,7 @@ function TopologyDiagram({
           markerUnits="userSpaceOnUse"
           orient="auto"
         >
-          <path d="M0 0.5 L8 4 L0 7.5 z" className="fill-brand" />
+          <path d="M0 0.5 L8 4 L0 7.5 z" className="fill-[var(--t-blue)]" />
         </marker>
       </defs>
 
@@ -270,10 +267,10 @@ function TopologyDiagram({
             key={edge.d}
             d={edge.d}
             fill="none"
-            strokeWidth={1.5}
+            strokeWidth={1.75}
             strokeDasharray="6 6"
             markerEnd={`url(#${agentArrowId})`}
-            className="animate-dash-flow stroke-brand motion-reduce:animate-none"
+            className="animate-dash-flow stroke-[var(--t-blue)] motion-reduce:animate-none"
           />
         ) : (
           <path
@@ -282,7 +279,7 @@ function TopologyDiagram({
             fill="none"
             strokeWidth={1.25}
             markerEnd={`url(#${clientArrowId})`}
-            className="stroke-muted-foreground/70"
+            className="stroke-[var(--t-ink-muted)]/70"
           />
         ),
       )}
@@ -296,16 +293,21 @@ function TopologyDiagram({
 
 function TopologyLegend() {
   return (
-    <ul className="flex flex-col gap-x-8 gap-y-2 text-left text-[13px] text-muted-foreground sm:flex-row sm:flex-wrap sm:justify-center">
+    <ul className="flex flex-col gap-x-8 gap-y-2 text-left text-[13px] text-[var(--t-ink-muted)] sm:flex-row sm:flex-wrap sm:justify-center">
       <li className="flex items-center gap-2.5">
         <svg aria-hidden="true" viewBox="0 0 28 8" className="h-2 w-7 shrink-0">
-          <path d="M0 4 H28" strokeWidth={1.25} className="stroke-muted-foreground/70" />
+          <path d="M0 4 H28" strokeWidth={1.25} className="stroke-[var(--t-ink-muted)]/70" />
         </svg>
         Authenticated sessions and read-only MCP
       </li>
       <li className="flex items-center gap-2.5">
         <svg aria-hidden="true" viewBox="0 0 28 8" className="h-2 w-7 shrink-0">
-          <path d="M0 4 H28" strokeWidth={1.5} strokeDasharray="6 5" className="stroke-brand" />
+          <path
+            d="M0 4 H28"
+            strokeWidth={1.75}
+            strokeDasharray="6 5"
+            className="stroke-[var(--t-blue)]"
+          />
         </svg>
         Agents dial out: HTTPS snapshots (30s) and WebSocket logs
       </li>
@@ -325,27 +327,37 @@ export function ArchitectureSection() {
         subtitle={architecture.subtitle}
       />
 
-      <figure className="mt-12 rounded-xl border border-border/60 bg-surface px-4 py-6 sm:p-8 lg:p-10">
-        <TopologyDiagram layout={WIDE_LAYOUT} className="hidden lg:block" />
-        <TopologyDiagram layout={TALL_LAYOUT} className="mx-auto max-w-md lg:hidden" />
-        <figcaption className="mt-8 flex flex-col items-center gap-4 border-t border-border/60 pt-6 text-center">
-          <TopologyLegend />
-          <p className="text-sm font-medium text-foreground">{architecture.topologyCaption}</p>
-        </figcaption>
+      <figure className="mt-10">
+        <SurfaceTile tone="cool" padding="lg" className="rounded-[var(--t-radius-hero)]">
+          <TopologyDiagram layout={WIDE_LAYOUT} className="hidden lg:block" />
+          <TopologyDiagram layout={TALL_LAYOUT} className="mx-auto max-w-md lg:hidden" />
+
+          <figcaption className="mt-8 flex flex-col items-center gap-3.5 border-t border-[var(--t-border-subtle)] pt-6 text-center">
+            <TopologyLegend />
+            <p className="text-[14px] font-medium text-[var(--t-ink)]">
+              {architecture.topologyCaption}
+            </p>
+          </figcaption>
+        </SurfaceTile>
       </figure>
 
-      <ol className="mt-4 grid gap-4 lg:grid-cols-3">
-        {architecture.pillars.map((pillar) => (
+      <ol className="mt-5 grid gap-5 lg:grid-cols-3">
+        {architecture.pillars.map((pillar, index) => (
           <li key={pillar.index} className="flex">
-            <Card className="flex-1">
-              <CardHeader className="gap-3">
-                <span aria-hidden="true" className="font-mono text-sm text-brand">
-                  {pillar.index}
-                </span>
-                <CardTitle>{pillar.title}</CardTitle>
-                <CardDescription>{pillar.description}</CardDescription>
-              </CardHeader>
-            </Card>
+            <SurfaceTile
+              tone={PILLAR_TONES[index] ?? 'neutral'}
+              padding="md"
+              className="flex flex-1 flex-col gap-3"
+            >
+              <TonalChip
+                tone="neutral"
+                className="w-fit border border-[var(--t-border-subtle)] bg-[var(--t-elevated)] font-mono text-[11.5px] text-[var(--t-blue)]"
+              >
+                {pillar.index}
+              </TonalChip>
+              <h3 className="t-headline text-[21px]">{pillar.title}</h3>
+              <p className="t-body text-[14.5px]">{pillar.description}</p>
+            </SurfaceTile>
           </li>
         ))}
       </ol>

@@ -1,8 +1,10 @@
-import { ArrowRight, ArrowUpRight, Star, Terminal } from 'lucide-react'
-import { CopyButton } from '@/components/copy-button'
-import { LinkButton } from '@/components/link-button'
-import { Badge } from '@/components/ui/badge'
+import { ArrowUpRight, Check, ChevronRight, Copy, Star } from 'lucide-react'
+import { TonalLinkButton } from '@/components/tonal/button'
+import { ChevronLink } from '@/components/tonal/chevron-link'
+import { TonalChip } from '@/components/tonal/chip'
+import { SurfaceTile } from '@/components/tonal/surface-tile'
 import { siteCopy } from '@/content/siteCopy'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { capture } from '@/lib/posthog'
 
 // Intrinsic size of public/demo.gif, so the frame reserves its space before the GIF loads.
@@ -12,49 +14,47 @@ const DEMO_GIF_HEIGHT = 563
 export function HeroSection() {
   const { hero, links } = siteCopy
   const { announcement, quickCommand, demoFrame } = hero
+  const { copied, copy } = useCopyToClipboard('hero_quick_command_copied')
 
   return (
-    <section aria-labelledby="hero-heading" className="relative isolate overflow-hidden">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-        <div className="hero-grid absolute inset-x-0 top-0 h-[46rem]" />
-        <div className="hero-glow absolute inset-x-0 top-0 h-[38rem]" />
-      </div>
-
-      <div className="page-container flex flex-col items-center pt-14 pb-20 text-center sm:pt-24 sm:pb-28">
+    <section aria-labelledby="hero-heading" className="page-container pt-10 sm:pt-16">
+      <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
         <a
           href={announcement.href}
           target="_blank"
           rel="noreferrer"
           onClick={() => capture('release_notes_opened')}
-          className="group inline-flex max-w-full items-center gap-2.5 rounded-full border border-border/60 bg-card/70 py-1 pr-3.5 pl-1 text-left text-[13px] text-muted-foreground backdrop-blur-sm transition-colors hover:border-border hover:text-foreground sm:text-sm"
+          className="group mb-6 inline-flex max-w-full items-center gap-2.5 rounded-full border border-[var(--t-border-subtle)] bg-[var(--t-surface)] py-1 pr-3.5 pl-1.5 text-left text-[13px] font-medium text-[var(--t-ink-secondary)] transition-colors duration-200 hover:bg-[var(--t-surface-muted)] hover:text-[var(--t-ink)]"
         >
-          <Badge variant="primary" className="font-mono">
+          <TonalChip tone="blue" className="font-mono text-[11.5px]">
             {announcement.badge}
-          </Badge>
-          <span>{announcement.text}</span>
-          <ArrowRight
+          </TonalChip>
+          <span className="truncate">{announcement.text}</span>
+          <ChevronRight
             aria-hidden="true"
-            className="size-3.5 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5"
+            className="h-4 w-4 shrink-0 text-[var(--t-ink-muted)] transition-transform duration-200 [transition-timing-function:var(--t-ease)] group-hover:translate-x-0.5 group-hover:text-[var(--t-ink)]"
           />
         </a>
 
         <h1
           id="hero-heading"
-          className="mt-8 text-[clamp(2.375rem,5.2vw,3.75rem)] leading-[1.04] font-semibold tracking-[-0.035em] text-balance"
+          className="t-display text-[40px] text-balance sm:text-[58px] lg:text-[64px]"
         >
-          {hero.headline} <span className="block text-brand">{hero.headlineAccent}</span>
+          {hero.headline}{' '}
+          <span className="block text-[var(--t-blue)]">{hero.headlineAccent}</span>
         </h1>
 
-        <p className="mt-6 max-w-2xl text-base leading-relaxed text-pretty text-muted-foreground sm:text-lg">
+        <p className="t-body mt-5 max-w-2xl text-[16.5px] text-pretty sm:text-[18.5px]">
           {hero.subheadline}
         </p>
 
-        <div className="mt-9 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
-          <LinkButton link={hero.primaryCta} event="live_demo_cta_clicked" size="lg">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
+          <TonalLinkButton link={hero.primaryCta} event="live_demo_cta_clicked" size="lg">
             {hero.primaryCta.label}
             <ArrowUpRight aria-hidden="true" />
-          </LinkButton>
-          <LinkButton
+          </TonalLinkButton>
+
+          <TonalLinkButton
             link={hero.secondaryCta}
             event="hero_github_cta_clicked"
             variant="outline"
@@ -62,70 +62,80 @@ export function HeroSection() {
           >
             <Star aria-hidden="true" />
             {hero.secondaryCta.label}
-          </LinkButton>
-          <LinkButton
-            link={hero.tertiaryCta}
+          </TonalLinkButton>
+
+          <ChevronLink
+            href={hero.tertiaryCta.href}
             event="quickstart_cta_clicked"
-            variant="ghost"
-            size="lg"
+            className="px-2 py-2"
           >
-            <Terminal aria-hidden="true" />
             {hero.tertiaryCta.label}
-          </LinkButton>
+          </ChevronLink>
         </div>
 
-        <div className="mt-8 w-full max-w-4xl">
-          <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-surface/80 py-1 pr-1 pl-3.5 text-left backdrop-blur-sm">
-            <span aria-hidden="true" className="font-mono text-[13px] text-muted-foreground select-none">
+        <div className="mt-7 flex w-full max-w-3xl flex-col items-center">
+          <button
+            type="button"
+            onClick={() => void copy(quickCommand.command)}
+            aria-label={`Copy ${quickCommand.label}`}
+            className="group inline-flex max-w-full cursor-pointer items-center gap-3 rounded-full border border-[var(--t-border-subtle)] bg-[var(--t-surface)] px-5 py-2.5 text-left font-mono text-[12.5px] text-[var(--t-ink-secondary)] transition-colors duration-200 hover:bg-[var(--t-surface-muted)] sm:text-[13px]"
+          >
+            <span aria-hidden="true" className="text-[var(--t-ink-muted)] select-none">
               $
             </span>
-            <code
-              className="scrollbar-none min-w-0 flex-1 overflow-x-auto py-1.5 font-mono text-[13px] whitespace-nowrap text-foreground/90"
-            >
+            <code className="scrollbar-none min-w-0 flex-1 overflow-x-auto whitespace-nowrap">
               {quickCommand.command}
             </code>
-            <CopyButton
-              value={quickCommand.command}
-              label={quickCommand.label}
-              event="hero_quick_command_copied"
-            />
-          </div>
-          <p className="mt-2.5 text-xs text-muted-foreground">{quickCommand.label}</p>
+            {copied ? (
+              <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-[var(--t-chip-mint-fg)]" />
+            ) : (
+              <Copy
+                aria-hidden="true"
+                className="h-4 w-4 shrink-0 text-[var(--t-ink-muted)] transition-colors group-hover:text-[var(--t-ink)]"
+              />
+            )}
+          </button>
+          <span role="status" className="sr-only">
+            {copied ? `Copied ${quickCommand.label}` : ''}
+          </span>
+          <p className="mt-2 text-[12.5px] text-[var(--t-ink-muted)]">{quickCommand.label}</p>
         </div>
+      </div>
 
-        <figure className="relative mt-14 w-full max-w-5xl sm:mt-20">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -inset-x-6 -top-12 bottom-8 -z-10 rounded-[3rem] bg-primary/20 blur-3xl"
-          />
-          <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-black/60">
-            <div
-              aria-hidden="true"
-              className="absolute inset-x-0 top-0 z-10 h-px bg-linear-to-r from-transparent via-brand/70 to-transparent"
-            />
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-border/60 bg-muted/50 px-3.5 py-2.5">
+      {/* Tonal Browser Stage */}
+      <figure className="mt-12 sm:mt-16">
+        <SurfaceTile
+          tone="cool"
+          padding="md"
+          className="rounded-[var(--t-radius-hero)] p-4 sm:p-7 lg:p-9"
+        >
+          <div className="overflow-hidden rounded-[20px] border border-[var(--t-border-subtle)] bg-[var(--t-elevated)]">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-[var(--t-border-subtle)] bg-[var(--t-surface)] px-4 py-3">
               <div aria-hidden="true" className="flex gap-1.5">
-                <span className="size-2.5 rounded-full bg-foreground/15" />
-                <span className="size-2.5 rounded-full bg-foreground/15" />
-                <span className="size-2.5 rounded-full bg-foreground/15" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--t-border)]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--t-border)]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--t-border)]" />
               </div>
-              <div className="flex min-w-0 items-center gap-2 rounded-md border border-border/60 bg-background/70 px-3 py-1 font-mono text-xs text-foreground/90">
-                <span aria-hidden="true" className="relative flex size-2 shrink-0">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-success/70 motion-reduce:hidden" />
-                  <span className="relative inline-flex size-2 rounded-full bg-success" />
-                </span>
+
+              <div className="flex min-w-0 items-center gap-2 rounded-full border border-[var(--t-border-subtle)] bg-[var(--t-elevated)] px-3.5 py-1 font-mono text-[12px] text-[var(--t-ink-secondary)]">
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 shrink-0 rounded-full bg-[var(--t-chip-mint-fg)]"
+                />
                 <span className="truncate">{demoFrame.urlLabel}</span>
               </div>
-              <p className="hidden justify-self-end text-xs text-muted-foreground lg:block">
+
+              <p className="hidden justify-self-end text-[12px] text-[var(--t-ink-muted)] lg:block">
                 {demoFrame.statusLabel}
               </p>
             </div>
+
             <a
               href={links.liveDemoUrl}
               target="_blank"
               rel="noreferrer"
               onClick={() => capture('demo_gif_clicked')}
-              className="block bg-surface focus-visible:-outline-offset-2"
+              className="block bg-[var(--t-surface-muted)] focus-visible:-outline-offset-2"
             >
               <img
                 src={demoFrame.gifSrc}
@@ -137,25 +147,20 @@ export function HeroSection() {
               />
               <span className="sr-only">. Opens the live demo at {demoFrame.urlLabel}.</span>
             </a>
-            <p className="border-t border-border/60 px-3.5 py-2.5 text-left text-xs text-muted-foreground lg:hidden">
+
+            <p className="border-t border-[var(--t-border-subtle)] bg-[var(--t-surface)] px-4 py-2.5 text-left text-[12px] text-[var(--t-ink-muted)] lg:hidden">
               {demoFrame.statusLabel}
             </p>
           </div>
-          <figcaption className="mx-auto mt-5 flex max-w-3xl flex-col items-center gap-x-4 gap-y-2 text-sm text-pretty text-muted-foreground">
-            <span>{demoFrame.caption}</span>
-            <a
-              href={links.liveDemoUrl}
-              target="_blank"
-              rel="noreferrer"
-              onClick={() => capture('demo_caption_cta_clicked')}
-              className="inline-flex items-center gap-1 rounded-sm font-medium text-brand underline-offset-4 hover:underline"
-            >
-              {demoFrame.urlLabel}
-              <ArrowUpRight aria-hidden="true" className="size-3.5" />
-            </a>
-          </figcaption>
-        </figure>
-      </div>
+        </SurfaceTile>
+
+        <figcaption className="mx-auto mt-5 flex max-w-3xl flex-col items-center gap-2 text-center text-[13.5px] text-pretty text-[var(--t-ink-muted)] sm:flex-row sm:justify-center sm:gap-3">
+          <span>{demoFrame.caption}</span>
+          <ChevronLink href={links.liveDemoUrl} external event="demo_caption_cta_clicked">
+            {demoFrame.urlLabel}
+          </ChevronLink>
+        </figcaption>
+      </figure>
     </section>
   )
 }

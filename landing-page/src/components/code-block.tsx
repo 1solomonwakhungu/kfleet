@@ -4,11 +4,11 @@ import { tokenize, type CodeLanguage, type CodeTokenKind } from '@/lib/highlight
 import { cn } from '@/lib/utils'
 
 const TOKEN_CLASS: Record<CodeTokenKind, string | undefined> = {
-  key: 'text-brand',
-  flag: 'text-brand',
-  string: 'text-success/90',
-  variable: 'text-warning/90',
-  punctuation: 'text-muted-foreground/70',
+  key: 'text-[var(--t-blue)]',
+  flag: 'text-[var(--t-blue)]',
+  string: 'text-[var(--t-chip-mint-fg)]',
+  variable: 'text-[var(--t-chip-warning-fg)]',
+  punctuation: 'text-[var(--t-ink-muted)]',
   plain: undefined,
 }
 
@@ -34,25 +34,25 @@ export function CodeBlock({
   actions,
   className,
 }: CodeBlockProps) {
-  // A one-line command wraps so it is readable without scrolling. Multi-line
-  // snippets keep their line breaks and indentation and scroll sideways.
   const isSingleLine = !code.includes('\n')
 
   return (
     <div
       className={cn(
-        'min-w-0 overflow-hidden rounded-lg border border-border/60 bg-surface text-left',
+        'min-w-0 overflow-hidden rounded-[18px] border border-[var(--t-border-subtle)] bg-[var(--t-elevated)] text-left',
         className,
       )}
     >
-      <div className="flex min-h-10 items-center gap-2 border-b border-border/60 py-1 pr-1 pl-3.5">
-        <div className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{title}</div>
+      <div className="flex min-h-11 items-center gap-2 border-b border-[var(--t-border-subtle)] bg-[var(--t-surface)]/75 py-1.5 pr-2 pl-4">
+        <div className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[var(--t-ink-muted)]">
+          {title}
+        </div>
         {actions}
         <CopyButton value={code} label={copyLabel} event={copyEvent} />
       </div>
       <pre
         className={cn(
-          'scrollbar-subtle p-3.5 font-mono text-xs leading-relaxed text-foreground/90 sm:text-[13px]',
+          'scrollbar-subtle p-4 font-mono text-[12.5px] leading-[1.65] text-[var(--t-ink)] sm:text-[13px]',
           isSingleLine ? 'wrap-break-word whitespace-pre-wrap' : 'overflow-x-auto',
         )}
       >

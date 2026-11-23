@@ -1,4 +1,5 @@
 import { BrandMark } from '@/components/brand-mark'
+import { TonalChip } from '@/components/tonal/chip'
 import { siteCopy, type FooterLink } from '@/content/siteCopy'
 import { capture } from '@/lib/posthog'
 
@@ -34,24 +35,26 @@ export function SiteFooter() {
   const { footer, meta } = siteCopy
 
   return (
-    <footer className="border-t border-border/60">
+    <footer className="border-t border-[var(--t-border-subtle)] bg-[var(--t-bg)]">
       <div className="page-container py-14 sm:py-16">
         <div className="grid grid-cols-2 gap-x-8 gap-y-12 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]">
           <div className="col-span-2 flex max-w-sm flex-col gap-4 lg:col-span-1">
             <a
               href="#top"
               aria-label={`${meta.name} home`}
-              className="flex w-fit items-center gap-2.5 rounded-sm text-[17px] font-semibold tracking-tight"
+              className="flex w-fit items-center gap-2.5 rounded-full text-[17px] font-medium tracking-[-0.02em] text-[var(--t-ink)]"
             >
               <BrandMark />
-              {meta.name}
+              <span>{meta.name}</span>
             </a>
-            <p className="text-sm leading-relaxed text-pretty text-muted-foreground">{footer.tagline}</p>
+            <p className="t-body text-[14px] text-pretty text-[var(--t-ink-muted)]">
+              {footer.tagline}
+            </p>
           </div>
 
           {footer.columns.map((column) => (
             <nav key={column.title} aria-label={column.title}>
-              <h2 className="text-sm font-medium text-foreground">{column.title}</h2>
+              <h2 className="text-[13.5px] font-medium text-[var(--t-ink)]">{column.title}</h2>
               <ul className="mt-4 flex flex-col gap-3">
                 {column.links.map((link) => {
                   const event = footerEvent(link)
@@ -61,7 +64,7 @@ export function SiteFooter() {
                         href={link.href}
                         {...(link.external ? { target: '_blank', rel: 'noreferrer' } : {})}
                         onClick={event ? () => capture(event) : undefined}
-                        className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground"
+                        className="rounded-sm text-[13.5px] text-[var(--t-ink-muted)] transition-colors duration-150 hover:text-[var(--t-ink)]"
                       >
                         {link.label}
                       </a>
@@ -73,9 +76,11 @@ export function SiteFooter() {
           ))}
         </div>
 
-        <div className="mt-14 flex flex-col gap-2 border-t border-border/60 pt-6 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-14 flex flex-col gap-3 border-t border-[var(--t-border-subtle)] pt-6 text-[13px] text-[var(--t-ink-muted)] sm:flex-row sm:items-center sm:justify-between">
           <p>{footer.copyright}</p>
-          <p className="font-mono text-xs">{meta.version}</p>
+          <TonalChip tone="neutral" className="w-fit font-mono text-[11.5px]">
+            {meta.version}
+          </TonalChip>
         </div>
       </div>
     </footer>
