@@ -9,6 +9,19 @@ This changelog begins in September 2026; older releases (v0.1.0 through
 v0.1.2) predate it. Their notes live on the
 [GitHub releases page](https://github.com/1solomonwakhungu/kfleet/releases).
 
+## [0.4.0](https://github.com/1solomonwakhungu/kfleet/compare/v0.3.0...v0.4.0) (2026-11-23)
+
+
+### Features
+
+* **landing:** overhaul landing page UI with shadcn/ui ([#70](https://github.com/1solomonwakhungu/kfleet/issues/70)) ([5b77834](https://github.com/1solomonwakhungu/kfleet/commit/5b77834faa6cb260823d9bc4e4bb36a64f4860fa))
+
+
+### Documentation
+
+* **landing:** add structured site copy module and bump docs to v0.3.0 ([#69](https://github.com/1solomonwakhungu/kfleet/issues/69)) ([7502fd8](https://github.com/1solomonwakhungu/kfleet/commit/7502fd8e164c0145c872eb7886d8fae9f3f7048d))
+* **site:** sharpen landing page copy, outbound topology map, and setup guide ([#67](https://github.com/1solomonwakhungu/kfleet/issues/67)) ([572f9ef](https://github.com/1solomonwakhungu/kfleet/commit/572f9ef4b2793f9131bf0a2cb61ad16faf34cd27))
+
 ## [0.3.0](https://github.com/1solomonwakhungu/kfleet/compare/v0.2.1...v0.3.0) (2026-11-22)
 
 
