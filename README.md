@@ -123,6 +123,8 @@ Live-pull tools like Lens, Headlamp, and `k9s` show nothing when a cluster API s
 
 Open **[https://kfleet.sullylab.de](https://kfleet.sullylab.de)** — no login, synthetic data, all mutations blocked with HTTP 405.
 
+<!-- x-release-please-start-version -->
+
 ### Option 2: Local demo with Docker (10 seconds, no Kubernetes required)
 
 Runs the embedded UI and API against an in-memory SQLite database seeded with three synthetic clusters:
@@ -130,7 +132,7 @@ Runs the embedded UI and API against an in-memory SQLite database seeded with th
 ```bash
 docker run --rm -p 8080:8080 \
   -e KFLEET_DEMO_MODE=true \
-  ghcr.io/1solomonwakhungu/kfleet/hub:v0.3.0
+  ghcr.io/1solomonwakhungu/kfleet/hub:v0.4.0
 ```
 
 Open <http://localhost:8080>.
@@ -178,7 +180,7 @@ export KFLEET_ADMIN_PASSWORD="$(openssl rand -base64 24)"
 
 helm upgrade --install kfleet-hub \
   oci://ghcr.io/1solomonwakhungu/charts/kfleet-hub \
-  --version 0.3.0 \
+  --version 0.4.0 \
   --namespace kfleet-system \
   --create-namespace \
   --set registration.token="$KFLEET_REGISTRATION_TOKEN" \
@@ -196,7 +198,7 @@ Expose the hub via Ingress, `LoadBalancer`, or `kubectl port-forward`.
 ```bash
 helm upgrade --install kfleet-agent \
   oci://ghcr.io/1solomonwakhungu/charts/kfleet-agent \
-  --version 0.3.0 \
+  --version 0.4.0 \
   --kube-context my-cluster \
   --namespace kfleet-system \
   --create-namespace \
@@ -217,7 +219,7 @@ Sign in to the hub UI as the bootstrap admin and approve the pending agent on th
 
 ## Use it from an AI client (MCP)
 
-Both the `kfleet` CLI (`kfleet mcp`, included with the Homebrew cask) and the `hub` binary (`hub mcp`, from [GitHub Releases](https://github.com/1solomonwakhungu/kfleet/releases) or Docker `ghcr.io/1solomonwakhungu/kfleet/hub:v0.3.0 mcp`) run the read-only stdio MCP server against a kfleet hub's REST API.
+Both the `kfleet` CLI (`kfleet mcp`, included with the Homebrew cask) and the `hub` binary (`hub mcp`, from [GitHub Releases](https://github.com/1solomonwakhungu/kfleet/releases) or Docker `ghcr.io/1solomonwakhungu/kfleet/hub:v0.4.0 mcp`) run the read-only stdio MCP server against a kfleet hub's REST API.
 
 ### Try MCP against the live demo (no credentials)
 
@@ -247,11 +249,11 @@ claude mcp add kfleet-demo \
   -- kfleet mcp
 ```
 
-Using the `hub` binary from GitHub Releases instead of Homebrew? Replace `kfleet mcp` with `/usr/local/bin/hub mcp` (or `docker run --rm -i -e KFLEET_HUB_URL=https://kfleet.sullylab.de ghcr.io/1solomonwakhungu/kfleet/hub:v0.3.0 mcp`).
+Using the `hub` binary from GitHub Releases instead of Homebrew? Replace `kfleet mcp` with `/usr/local/bin/hub mcp` (or `docker run --rm -i -e KFLEET_HUB_URL=https://kfleet.sullylab.de ghcr.io/1solomonwakhungu/kfleet/hub:v0.4.0 mcp`).
 
 ### Connect to your own hub
 
-1. Install `kfleet` via Homebrew (`brew install --cask 1solomonwakhungu/tap/kfleet`), download `kfleet` or `hub` for your OS/arch from [GitHub Releases](https://github.com/1solomonwakhungu/kfleet/releases) (e.g. `hub_0.3.0_darwin_arm64.tar.gz`), or run via Docker (`ghcr.io/1solomonwakhungu/kfleet/hub:v0.3.0`).
+1. Install `kfleet` via Homebrew (`brew install --cask 1solomonwakhungu/tap/kfleet`), download `kfleet` or `hub` for your OS/arch from [GitHub Releases](https://github.com/1solomonwakhungu/kfleet/releases) (e.g. `hub_0.4.0_darwin_arm64.tar.gz`), or run via Docker (`ghcr.io/1solomonwakhungu/kfleet/hub:v0.4.0`).
 2. Create a dedicated `read_only` user in the hub at `/admin/users`.
 3. Add kfleet to your MCP client:
 
@@ -307,7 +309,7 @@ Using the `hub` binary from GitHub Releases instead of Homebrew? Replace `kfleet
         "-e", "KFLEET_HUB_URL",
         "-e", "KFLEET_HUB_USERNAME",
         "-e", "KFLEET_HUB_PASSWORD",
-        "ghcr.io/1solomonwakhungu/kfleet/hub:v0.3.0",
+        "ghcr.io/1solomonwakhungu/kfleet/hub:v0.4.0",
         "mcp"
       ],
       "env": {
@@ -319,6 +321,7 @@ Using the `hub` binary from GitHub Releases instead of Homebrew? Replace `kfleet
   }
 }
 ```
+<!-- x-release-please-end -->
 
 </details>
 
