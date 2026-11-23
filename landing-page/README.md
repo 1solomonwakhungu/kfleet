@@ -1,8 +1,8 @@
 # kfleet landing page
 
-The public marketing site for kfleet, built with React, Vite, Tailwind CSS v4, and shadcn/ui components (`base-nova` style on Base UI primitives).
+The public marketing site for kfleet, built with React, Vite, Tailwind CSS v4, and the **Tonal** editorial design system (Google Sans, flat tonal surfaces, 24px bento tiles, and Soft Pill controls).
 
-All copy lives in `src/content/siteCopy.ts`. Page sections are in `src/components/sections/`, shadcn/ui primitives in `src/components/ui/`, and theme tokens in `src/index.css`.
+All copy lives in `src/content/siteCopy.ts`. Page sections are in `src/components/sections/`, Tonal primitives in `src/components/tonal/`, and Tonal design tokens in `src/styles/tonal-tokens.css`.
 
 ```bash
 npm install

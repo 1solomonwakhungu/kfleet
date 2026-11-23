@@ -1,0 +1,131 @@
+/* Tonal Design Tokens — Editorial Tonal Surfaces & Typography */
+:root {
+  color-scheme: light;
+
+  --t-font: "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --t-font-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  /* Surfaces (flat tonal steps instead of heavy shadows) */
+  --t-bg: #ffffff;
+  --t-surface: #f8f9fa;
+  --t-surface-muted: #f1f3f4;
+  --t-surface-warm: #f4f2ee;
+  --t-surface-cool: #f0f4f9;
+  --t-surface-sky: #e8f0fe;
+  --t-surface-mint: #e6f4ea;
+  --t-surface-sand: #fef7e0;
+  --t-elevated: #ffffff;
+
+  /* Ink & Hairlines */
+  --t-ink: #202124;
+  --t-ink-secondary: #3c4043;
+  --t-ink-muted: #5f6368;
+  --t-border: #dadce0;
+  --t-border-subtle: #e8eaed;
+
+  /* Accent & Status */
+  --t-blue: #1967d2;
+  --t-blue-hover: #174ea6;
+  --t-blue-tint: #e8f0fe;
+  --t-blue-tint-hover: #d2e3fc;
+  --t-chip-mint-fg: #137333;
+  --t-chip-warning-bg: #fef7e0;
+  --t-chip-warning-fg: #b06000;
+  --t-chip-danger-bg: #fce8e6;
+  --t-chip-danger-fg: #c5221f;
+  --t-nav-active-bg: #c2e7ff;
+  --t-nav-active-fg: #001d35;
+
+  /* Shape & Motion */
+  --t-radius-card: 24px;
+  --t-radius-hero: 28px;
+  --t-radius-sm: 14px;
+  --t-radius-btn: 9999px;
+  --t-cta-bg: #1967d2;
+  --t-cta-fg: #ffffff;
+  --t-cta-hover: #174ea6;
+  --t-dark-btn-bg: #202124;
+  --t-dark-btn-fg: #ffffff;
+  --t-dark-btn-hover: #3c4043;
+  --t-hover-overlay: rgba(32, 33, 36, 0.04);
+  --t-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Switch button shape & primary ink globally for Commerce mode */
+[data-tonal-mode="commerce"] {
+  --t-radius-btn: 6px;
+  --t-cta-bg: #202124;
+  --t-cta-fg: #ffffff;
+  --t-cta-hover: #3c4043;
+}
+
+/* Dark Mode tonal surfaces */
+[data-tonal-theme="dark"] {
+  color-scheme: dark;
+
+  --t-bg: #131314;
+  --t-surface: #1e1f20;
+  --t-surface-muted: #282a2c;
+  --t-surface-warm: #252422;
+  --t-surface-cool: #1b2230;
+  --t-surface-sky: #1e2a3d;
+  --t-surface-mint: #18291f;
+  --t-surface-sand: #2a2417;
+  --t-elevated: #1e1f20;
+
+  --t-ink: #e3e3e3;
+  --t-ink-secondary: #c4c7c5;
+  --t-ink-muted: #9aa0a6;
+  --t-border: #3c4043;
+  --t-border-subtle: #2d2f31;
+
+  --t-blue: #8ab4f8;
+  --t-blue-hover: #aecbfa;
+  --t-blue-tint: #1f3352;
+  --t-blue-tint-hover: #284169;
+  --t-chip-mint-fg: #81c995;
+  --t-chip-warning-bg: #332914;
+  --t-chip-warning-fg: #fdd663;
+  --t-chip-danger-bg: #3c1e1d;
+  --t-chip-danger-fg: #f28b82;
+  --t-nav-active-bg: #004a77;
+  --t-nav-active-fg: #c2e7ff;
+
+  --t-cta-bg: #8ab4f8;
+  --t-cta-fg: #062e6f;
+  --t-cta-hover: #aecbfa;
+  --t-dark-btn-bg: #e3e3e3;
+  --t-dark-btn-fg: #131314;
+  --t-dark-btn-hover: #ffffff;
+  --t-hover-overlay: rgba(227, 227, 227, 0.08);
+}
+
+[data-tonal-theme="dark"][data-tonal-mode="commerce"],
+[data-tonal-theme="dark"] [data-tonal-mode="commerce"] {
+  --t-cta-bg: #e3e3e3;
+  --t-cta-fg: #131314;
+  --t-cta-hover: #ffffff;
+}
+
+.t-display {
+  font-family: var(--t-font);
+  font-weight: 500;
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  color: var(--t-ink);
+}
+
+.t-headline {
+  font-family: var(--t-font);
+  font-weight: 500;
+  line-height: 1.14;
+  letter-spacing: -0.025em;
+  color: var(--t-ink);
+}
+
+.t-body {
+  font-family: var(--t-font);
+  font-weight: 400;
+  line-height: 1.58;
+  color: var(--t-ink-secondary);
+}

@@ -1,73 +1,62 @@
-import { useRef, useState, type MouseEvent } from 'react'
-import { ArrowUpRight, Menu } from 'lucide-react'
+import { ArrowUpRight, Moon, Sun } from 'lucide-react'
 import { BrandMark } from '@/components/brand-mark'
 import { BrandGithubIcon } from '@/components/icons/brand-github'
-import { LinkButton } from '@/components/link-button'
-import { Separator } from '@/components/ui/separator'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
-import { buttonVariants } from '@/components/ui/button-variants'
+import { TonalLinkButton } from '@/components/tonal/button'
 import { siteCopy } from '@/content/siteCopy'
-import { cn } from '@/lib/utils'
 
-export function Navbar() {
+interface NavbarProps {
+  readonly theme: 'light' | 'dark'
+  readonly onToggleTheme: () => void
+}
+
+export function Navbar({ theme, onToggleTheme }: NavbarProps) {
   const { nav, meta } = siteCopy
-  const [menuOpen, setMenuOpen] = useState(false)
-  const pendingAnchor = useRef<string | null>(null)
-
-  // The sheet locks page scroll while it is open, so an in-page link cannot
-  // scroll yet. Remember the target, close, and jump once the close finishes.
-  const followAnchorAfterClose = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
-    event.preventDefault()
-    pendingAnchor.current = href
-    setMenuOpen(false)
-  }
-
-  const handleOpenChangeComplete = (open: boolean) => {
-    const href = pendingAnchor.current
-    if (open || !href) {
-      return
-    }
-    pendingAnchor.current = null
-    document.getElementById(href.slice(1))?.scrollIntoView()
-    window.history.pushState(null, '', href)
-  }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <div className="page-container flex h-14 items-center gap-6">
-        <a
-          href="#top"
-          aria-label={`${meta.name} home`}
-          className="flex items-center gap-2.5 rounded-sm text-[17px] font-semibold tracking-tight"
-        >
-          <BrandMark />
-          {meta.name}
-        </a>
+    <header className="sticky top-0 z-40 border-b border-[var(--t-border-subtle)] bg-[var(--t-bg)]/90 backdrop-blur-md transition-colors duration-200">
+      <div className="page-container flex h-16 items-center justify-between gap-4">
+        <div className="flex items-center gap-6">
+          <a
+            href="#top"
+            aria-label={`${meta.name} home`}
+            className="flex items-center gap-2.5 rounded-full text-[17px] font-medium tracking-[-0.02em] text-[var(--t-ink)]"
+          >
+            <BrandMark />
+            <span>{meta.name}</span>
+          </a>
 
-        <nav aria-label="Primary" className="hidden lg:block">
-          <ul className="flex items-center gap-0.5">
-            {nav.items.map((item) => (
-              <li key={item.href}>
-                <a
-                  href={item.href}
-                  className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {item.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
+          <nav aria-label="Primary" className="hidden lg:block">
+            <ul className="flex items-center gap-1">
+              {nav.items.map((item) => (
+                <li key={item.href}>
+                  <a
+                    href={item.href}
+                    className="rounded-full px-3.5 py-1.5 text-[13.5px] font-medium text-[var(--t-ink-muted)] transition-colors duration-200 hover:bg-[var(--t-surface)] hover:text-[var(--t-ink)]"
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <LinkButton
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[var(--t-border-subtle)] bg-[var(--t-surface)] text-[var(--t-ink-secondary)] transition-colors duration-200 hover:bg-[var(--t-surface-muted)] hover:text-[var(--t-ink)]"
+          >
+            {theme === 'dark' ? (
+              <Sun aria-hidden="true" className="h-4 w-4" />
+            ) : (
+              <Moon aria-hidden="true" className="h-4 w-4" />
+            )}
+          </button>
+
+          <TonalLinkButton
             link={nav.secondaryCta}
             event="header_github_clicked"
             variant="outline"
@@ -76,67 +65,30 @@ export function Navbar() {
           >
             <BrandGithubIcon aria-hidden="true" />
             {nav.secondaryCta.label}
-          </LinkButton>
-          <LinkButton link={nav.primaryCta} event="header_live_demo_clicked" size="sm">
+          </TonalLinkButton>
+
+          <TonalLinkButton link={nav.primaryCta} event="header_live_demo_clicked" size="sm">
             {nav.primaryCta.label}
             <ArrowUpRight aria-hidden="true" />
-          </LinkButton>
-
-          <Sheet
-            open={menuOpen}
-            onOpenChange={setMenuOpen}
-            onOpenChangeComplete={handleOpenChangeComplete}
-          >
-            <SheetTrigger
-              aria-label="Open menu"
-              className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'lg:hidden')}
-            >
-              <Menu aria-hidden="true" />
-            </SheetTrigger>
-            <SheetContent closeLabel="Close menu">
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2.5">
-                  <BrandMark />
-                  {meta.name}
-                </SheetTitle>
-                <SheetDescription className="sr-only">Page sections and project links</SheetDescription>
-              </SheetHeader>
-              <Separator />
-              <nav aria-label="Mobile" className="px-3 py-3">
-                <ul className="flex flex-col">
-                  {nav.items.map((item) => (
-                    <li key={item.href}>
-                      <a
-                        href={item.href}
-                        onClick={(event) => followAnchorAfterClose(event, item.href)}
-                        className="flex h-11 items-center rounded-md px-2 text-[15px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        {item.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-              <Separator />
-              <div className="flex flex-col gap-2 p-5">
-                <LinkButton link={nav.primaryCta} event="header_live_demo_clicked" size="lg">
-                  {nav.primaryCta.label}
-                  <ArrowUpRight aria-hidden="true" />
-                </LinkButton>
-                <LinkButton
-                  link={nav.secondaryCta}
-                  event="header_github_clicked"
-                  variant="outline"
-                  size="lg"
-                >
-                  <BrandGithubIcon aria-hidden="true" />
-                  {nav.secondaryCta.label}
-                </LinkButton>
-              </div>
-            </SheetContent>
-          </Sheet>
+          </TonalLinkButton>
         </div>
       </div>
+
+      {/* Mobile horizontal pill section bar */}
+      <nav
+        aria-label="Mobile sections"
+        className="scrollbar-none flex items-center gap-1.5 overflow-x-auto px-5 pb-2.5 lg:hidden"
+      >
+        {nav.items.map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            className="shrink-0 rounded-full bg-[var(--t-surface)] px-3.5 py-1 text-[12.5px] font-medium text-[var(--t-ink-muted)] transition-colors hover:bg-[var(--t-blue-tint)] hover:text-[var(--t-blue-hover)]"
+          >
+            {item.label}
+          </a>
+        ))}
+      </nav>
     </header>
   )
 }

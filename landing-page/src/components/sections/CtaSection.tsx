@@ -1,7 +1,7 @@
 import { ArrowUpRight, Star } from 'lucide-react'
-import { LinkButton } from '@/components/link-button'
 import { Section } from '@/components/section'
-import { Card } from '@/components/ui/card'
+import { TonalLinkButton } from '@/components/tonal/button'
+import { SurfaceTile } from '@/components/tonal/surface-tile'
 import { siteCopy } from '@/content/siteCopy'
 
 export function CtaSection() {
@@ -9,32 +9,37 @@ export function CtaSection() {
 
   return (
     <Section aria-labelledby="cta-heading">
-      <Card className="relative isolate items-center overflow-hidden border-primary/40 px-6 py-14 text-center sm:px-12 sm:py-20">
-        <div aria-hidden="true" className="hero-glow pointer-events-none absolute inset-0 -z-10 opacity-80" />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-brand/80 to-transparent"
-        />
+      <SurfaceTile
+        tone="sky"
+        padding="lg"
+        className="flex flex-col items-center rounded-[var(--t-radius-hero)] px-6 py-14 text-center sm:px-12 sm:py-20"
+      >
         <h2
           id="cta-heading"
-          className="max-w-3xl text-3xl leading-[1.1] font-semibold tracking-tight text-balance sm:text-4xl"
+          className="t-display max-w-3xl text-[32px] text-balance sm:text-[46px]"
         >
           {cta.headline}
         </h2>
-        <p className="mt-4 max-w-xl text-base leading-relaxed text-pretty text-muted-foreground sm:text-lg">
+        <p className="t-body mt-4 max-w-xl text-[16px] text-pretty sm:text-[17.5px]">
           {cta.description}
         </p>
-        <div className="mt-8 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row">
-          <LinkButton link={cta.primaryCta} event="cta_live_demo_clicked" size="lg">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
+          <TonalLinkButton link={cta.primaryCta} event="cta_live_demo_clicked" size="lg">
             {cta.primaryCta.label}
             <ArrowUpRight aria-hidden="true" />
-          </LinkButton>
-          <LinkButton link={cta.secondaryCta} event="cta_github_clicked" variant="outline" size="lg">
+          </TonalLinkButton>
+          <TonalLinkButton
+            link={cta.secondaryCta}
+            event="cta_github_clicked"
+            variant="outline"
+            size="lg"
+            className="bg-[var(--t-elevated)]/70 hover:bg-[var(--t-elevated)]"
+          >
             <Star aria-hidden="true" />
             {cta.secondaryCta.label}
-          </LinkButton>
+          </TonalLinkButton>
         </div>
-      </Card>
+      </SurfaceTile>
     </Section>
   )
 }

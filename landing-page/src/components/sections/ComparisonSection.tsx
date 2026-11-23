@@ -1,29 +1,15 @@
 import { Check, Minus } from 'lucide-react'
 import { Section, SectionHeader } from '@/components/section'
-import { Card, CardFooter } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { siteCopy } from '@/content/siteCopy'
 import { cn } from '@/lib/utils'
 
-const KFLEET_COLUMN_CLASS = 'bg-primary/[0.06] text-foreground font-medium'
-
-// In the kfleet column "None" and "No" are the selling points (no stored
-// kubeconfigs, no mutations), so they get a check. Elsewhere "None" only
-// means the tool has nothing in that row, shown as a neutral dash.
 function ComparisonValue({ value, isKfleet }: { readonly value: string; readonly isKfleet: boolean }) {
   const isEmptyValue = value === 'None' || value === 'No'
 
   if (isKfleet && isEmptyValue) {
     return (
-      <span className="inline-flex items-center gap-1.5">
-        <Check aria-hidden="true" className="size-4 shrink-0 text-success" />
+      <span className="inline-flex items-center gap-1.5 font-medium text-[var(--t-ink)]">
+        <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-[var(--t-chip-mint-fg)]" />
         {value}
       </span>
     )
@@ -31,8 +17,8 @@ function ComparisonValue({ value, isKfleet }: { readonly value: string; readonly
 
   if (value === 'None') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-muted-foreground/80">
-        <Minus aria-hidden="true" className="size-3.5 shrink-0" />
+      <span className="inline-flex items-center gap-1.5 text-[var(--t-ink-muted)]">
+        <Minus aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
         {value}
       </span>
     )
@@ -54,62 +40,70 @@ export function ComparisonSection() {
         subtitle={comparison.subtitle}
       />
 
-      <Card className="mt-12 overflow-hidden">
+      <div className="mt-10 overflow-hidden rounded-[var(--t-radius-card)] border border-[var(--t-border-subtle)] bg-[var(--t-bg)]">
         <div
           role="region"
           aria-labelledby="compare-heading"
           tabIndex={0}
           className="scrollbar-subtle overflow-x-auto focus-visible:-outline-offset-2"
         >
-          <Table className="min-w-[62rem]">
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col" className="w-[15%] pl-6">
+          <table className="w-full min-w-[60rem] border-collapse text-left">
+            <thead>
+              <tr className="border-b border-[var(--t-border-subtle)] bg-[var(--t-surface)] text-[13px] font-medium text-[var(--t-ink-muted)]">
+                <th scope="col" className="w-[16%] py-4 pr-4 pl-6 font-medium">
                   {capabilityColumn}
-                </TableHead>
+                </th>
                 {productColumns.map((column, index) => (
-                  <TableHead
+                  <th
                     key={column}
                     scope="col"
                     className={cn(
-                      index === 0 &&
-                        'bg-primary/[0.06] text-sm font-semibold text-brand shadow-[inset_0_2px_0_0_var(--primary)]',
+                      'px-4 py-4 font-medium',
+                      index === 0
+                        ? 'bg-[var(--t-surface-sky)]/70 font-medium text-[var(--t-blue-hover)] shadow-[inset_0_2px_0_0_var(--t-blue)]'
+                        : 'text-[var(--t-ink)]',
                     )}
                   >
                     {column}
-                  </TableHead>
+                  </th>
                 ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--t-border-subtle)] text-[13.5px]">
               {comparison.rows.map((row) => (
-                <TableRow key={row.capability}>
-                  <TableHead
+                <tr
+                  key={row.capability}
+                  className="transition-colors duration-150 hover:bg-[var(--t-surface)]/55"
+                >
+                  <th
                     scope="row"
-                    className="h-auto py-3.5 pl-6 text-sm font-medium whitespace-normal text-foreground"
+                    className="py-4 pr-4 pl-6 align-top text-[14px] font-medium whitespace-normal text-[var(--t-ink-muted)]"
                   >
                     {row.capability}
-                  </TableHead>
+                  </th>
                   {row.values.map((value, index) => (
-                    <TableCell
+                    <td
                       key={productColumns[index]}
                       className={cn(
-                        'py-3.5 text-[13px] leading-snug text-muted-foreground',
-                        index === 0 && KFLEET_COLUMN_CLASS,
+                        'px-4 py-4 align-top leading-snug',
+                        index === 0
+                          ? 'bg-[var(--t-surface-sky)]/45 font-medium text-[var(--t-ink)]'
+                          : 'text-[var(--t-ink-secondary)]',
                       )}
                     >
                       <ComparisonValue value={value} isKfleet={index === 0} />
-                    </TableCell>
+                    </td>
                   ))}
-                </TableRow>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
-        <CardFooter>
-          <p className="text-[13px] text-pretty text-muted-foreground">{comparison.footnote}</p>
-        </CardFooter>
-      </Card>
+
+        <div className="border-t border-[var(--t-border-subtle)] bg-[var(--t-surface)]/65 px-6 py-4">
+          <p className="text-[13px] text-pretty text-[var(--t-ink-muted)]">{comparison.footnote}</p>
+        </div>
+      </div>
     </Section>
   )
 }
