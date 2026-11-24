@@ -273,15 +273,19 @@ export interface SiteCopy {
   readonly footer: FooterCopy
 }
 
+// Bumped automatically by release-please (see release-please-config.json extra-files).
+const version = '0.4.0' // x-release-please-version
+const releaseTag = `v${version}`
+
 const repoUrl = 'https://github.com/1solomonwakhungu/kfleet'
-const releaseUrl = `${repoUrl}/releases/tag/v0.3.0`
+const releaseUrl = `${repoUrl}/releases/tag/${releaseTag}`
 const liveDemoUrl = 'https://kfleet.sullylab.de'
 const docsBaseUrl = `${repoUrl}/blob/main/docs`
 
 export const siteCopy: SiteCopy = {
   meta: {
     name: 'kfleet',
-    version: 'v0.3.0',
+    version: releaseTag,
     tagline: 'Multi-cluster Kubernetes visibility. Zero kubeconfigs.',
     description:
       'A 14 MB Go + SQLite control plane with outbound 3-rule read-only agents, live reverse-WebSocket pod logs, cross-cluster drift checks, and a built-in 9-tool MCP server for AI diagnostics.',
@@ -324,7 +328,7 @@ export const siteCopy: SiteCopy = {
 
   hero: {
     announcement: {
-      badge: 'v0.3.0',
+      badge: releaseTag,
       text: 'Read-only MCP server & Homebrew CLI now live',
       href: releaseUrl,
     },
@@ -350,7 +354,7 @@ export const siteCopy: SiteCopy = {
     quickCommand: {
       label: '10-second Docker demo',
       command:
-        'docker run --rm -p 8080:8080 -e KFLEET_DEMO_MODE=true ghcr.io/1solomonwakhungu/kfleet/hub:v0.3.0',
+        `docker run --rm -p 8080:8080 -e KFLEET_DEMO_MODE=true ghcr.io/1solomonwakhungu/kfleet/hub:${releaseTag}`,
     },
     demoFrame: {
       urlLabel: 'kfleet.sullylab.de',
@@ -741,9 +745,9 @@ export const siteCopy: SiteCopy = {
           'Starts the embedded React UI and REST API against an in-memory SQLite database seeded with three synthetic clusters.',
         steps: [
           {
-            label: 'Launch hub v0.3.0 in demo mode',
+            label: `Launch hub ${releaseTag} in demo mode`,
             command:
-              'docker run --rm -p 8080:8080 \\\n  -e KFLEET_DEMO_MODE=true \\\n  ghcr.io/1solomonwakhungu/kfleet/hub:v0.3.0',
+              `docker run --rm -p 8080:8080 \\\n  -e KFLEET_DEMO_MODE=true \\\n  ghcr.io/1solomonwakhungu/kfleet/hub:${releaseTag}`,
             note: 'Then open http://localhost:8080 in your browser.',
           },
         ],
@@ -786,7 +790,7 @@ export KFLEET_ADMIN_PASSWORD="$(openssl rand -base64 24)"
 
 helm upgrade --install kfleet-hub \\
   oci://ghcr.io/1solomonwakhungu/charts/kfleet-hub \\
-  --version 0.3.0 \\
+  --version ${version} \\
   --namespace kfleet-system \\
   --create-namespace \\
   --set registration.token="$KFLEET_REGISTRATION_TOKEN" \\
@@ -800,7 +804,7 @@ helm upgrade --install kfleet-hub \\
             label: '2. Install kfleet-agent in each cluster',
             command: `helm upgrade --install kfleet-agent \\
   oci://ghcr.io/1solomonwakhungu/charts/kfleet-agent \\
-  --version 0.3.0 \\
+  --version ${version} \\
   --kube-context my-cluster \\
   --namespace kfleet-system \\
   --create-namespace \\
@@ -920,7 +924,7 @@ helm upgrade --install kfleet-hub \\
           { label: 'Features', href: '#features', external: false },
           { label: 'MCP server', href: '#mcp', external: false },
           { label: 'Quickstart', href: '#quickstart', external: false },
-          { label: 'Release v0.3.0', href: releaseUrl, external: true },
+          { label: `Release ${releaseTag}`, href: releaseUrl, external: true },
         ],
       },
       {
