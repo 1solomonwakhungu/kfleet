@@ -9,6 +9,24 @@ This changelog begins in September 2026; older releases (v0.1.0 through
 v0.1.2) predate it. Their notes live on the
 [GitHub releases page](https://github.com/1solomonwakhungu/kfleet/releases).
 
+## [0.5.0](https://github.com/1solomonwakhungu/kfleet/compare/v0.4.0...v0.5.0) (2026-11-24)
+
+
+### Features
+
+* **landing:** refactor landing page into Tonal design system ([#72](https://github.com/1solomonwakhungu/kfleet/issues/72)) ([9005bb5](https://github.com/1solomonwakhungu/kfleet/commit/9005bb5b0902aecebe3751ecc55ea21882e090c6))
+
+
+### Bug fixes
+
+* **landing:** sync install commands with latest release and auto-bump on release ([#73](https://github.com/1solomonwakhungu/kfleet/issues/73)) ([c28b06f](https://github.com/1solomonwakhungu/kfleet/commit/c28b06f6c9eb15652e5c9abd14451e2532782bd8))
+
+
+### Documentation
+
+* **readme:** keep one version per line for release-please bumps ([#74](https://github.com/1solomonwakhungu/kfleet/issues/74)) ([74914c5](https://github.com/1solomonwakhungu/kfleet/commit/74914c53d15000b3771c2b40a9803739cf8bf00d))
+* update landing-page OG URLs to kfleet.harlo.dev ([44e0f5b](https://github.com/1solomonwakhungu/kfleet/commit/44e0f5b4e8efc9c792b3bacb41fa81b3c3592dcc))
+
 ## [0.4.0](https://github.com/1solomonwakhungu/kfleet/compare/v0.3.0...v0.4.0) (2026-11-23)
 
 
