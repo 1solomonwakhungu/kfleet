@@ -253,7 +253,8 @@ Using the `hub` binary from GitHub Releases instead of Homebrew? Replace `kfleet
 
 ### Connect to your own hub
 
-1. Install `kfleet` via Homebrew (`brew install --cask 1solomonwakhungu/tap/kfleet`), download `kfleet` or `hub` for your OS/arch from [GitHub Releases](https://github.com/1solomonwakhungu/kfleet/releases) (e.g. `hub_0.4.0_darwin_arm64.tar.gz`), or run via Docker (`ghcr.io/1solomonwakhungu/kfleet/hub:v0.4.0`).
+1. Install `kfleet` via Homebrew (`brew install --cask 1solomonwakhungu/tap/kfleet`), download `kfleet` or `hub` for your OS/arch from [GitHub Releases](https://github.com/1solomonwakhungu/kfleet/releases) (e.g. `hub_0.4.0_darwin_arm64.tar.gz`),
+or run via Docker (`ghcr.io/1solomonwakhungu/kfleet/hub:v0.4.0`).
 2. Create a dedicated `read_only` user in the hub at `/admin/users`.
 3. Add kfleet to your MCP client:
 
