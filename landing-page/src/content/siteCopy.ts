@@ -274,7 +274,7 @@ export interface SiteCopy {
 }
 
 // Bumped automatically by release-please (see release-please-config.json extra-files).
-const version = '0.4.0' // x-release-please-version
+const version = '0.5.0' // x-release-please-version
 const releaseTag = `v${version}`
 
 const repoUrl = 'https://github.com/1solomonwakhungu/kfleet'
