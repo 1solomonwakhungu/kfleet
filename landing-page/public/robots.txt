@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kfleet.harlo.dev/sitemap.xml
