@@ -21,7 +21,12 @@
   "packages": {
     ".": {
       "package-name": "kfleet",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        { "type": "generic", "path": "landing-page/src/content/siteCopy.ts" },
+        { "type": "generic", "path": "landing-page/index.html" },
+        { "type": "generic", "path": "README.md" }
+      ]
     }
   }
 }
