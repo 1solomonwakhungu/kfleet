@@ -7,7 +7,7 @@ toolchain go1.26.11
 require (
 	github.com/coder/websocket v1.8.15
 	github.com/google/uuid v1.6.0
-	github.com/mark3labs/mcp-go v0.48.0
+	github.com/mark3labs/mcp-go v1.6.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/mod v0.41.0
 	k8s.io/api v0.32.0
@@ -41,6 +41,7 @@ require (
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
